@@ -67,7 +67,9 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 ## 2. Account Registration and Identity
 
-**2.1 Real identity required.** United Feminist does not permit anonymous accounts. When you create an account, you must provide your real, legal name (or the name by which you are known and identified in daily life). Your real name will be displayed on your profile.
+**2.1 Real identity required.** United Feminist does not permit anonymous accounts. When you create an account, you must provide your real, legal name (or the name by which you are known and identified in daily life). We collect and verify this so that every member is accountable for their conduct.
+
+**Your legal name is not displayed publicly by default.** Your profile and your posts show your @handle. You may choose, in your account settings, to display your legal name as well, and you may change that choice at any time. Choosing not to display it does not make you anonymous — it means the platform knows who you are and the public does not.
 
 **2.2 Public handle.** You will also select a unique @handle, which is the name displayed on your posts and interactions within the Platform feed. Your @handle may be a pseudonym, a nickname, or any name you choose, subject to availability and our naming rules.
 
