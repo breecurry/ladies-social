@@ -57,7 +57,11 @@ You are not on probation. You are not under special surveillance. If you are her
 ## What We Expect From You
 
 ### Be who you say you are
-Your account must reflect your real name. You may post under your chosen @handle, but your profile carries your actual name. Impersonating someone else — a public figure, a private individual, another member, or the platform itself — is not allowed.
+Your account must reflect your real name. We collect and verify it when you join, because nobody here is anonymous to us.
+
+But your legal name is not shown publicly unless you decide to show it. By default, your profile and your posts carry your @handle, and that is enough. Some members have good reasons for not wanting their legal name on a public page, and we are not going to make them explain those reasons to anyone. What matters is that you are a real, accountable person — not that strangers can read your ID.
+
+Impersonating someone else — a public figure, a private individual, another member, or the platform itself — is not allowed.
 
 ### Interact with good faith
 Disagreement is fine. Debate is fine. Anger is sometimes appropriate. But there is a difference between disagreeing with someone and targeting them. Know the difference and stay on the right side of it.
