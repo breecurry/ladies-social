@@ -1,0 +1,240 @@
+@import "tailwindcss";
+
+/* ============================================================
+   United Feminist — design tokens
+   Source of truth: ladiessocial-design-system.md ("Calm paper,
+   sharp tools"). Values are implemented verbatim, light and dark.
+   Dark theme follows the system preference; [data-theme] wins
+   when set so a toggle can be added later without touching this.
+   ============================================================ */
+
+:root {
+  /* LIGHT */
+  --background: #f4f0ea;
+  --surface: #fbf8f3;
+  --surface-raised: #ffffff;
+  --border: #e6dfd4;
+  --border-strong: #8f8471;
+  --text-primary: #211c15;
+  --text-secondary: #5a5247;
+  --text-tertiary: #756c5e;
+  --accent: #6d28d9;
+  --accent-hover: #5b21b6;
+  --accent-fill: #6d28d9;
+  --accent-subtle: #f1e9fd;
+  --on-accent: #ffffff;
+  --success: #15803d;
+  --success-fill: #15803d;
+  --success-subtle: #e7f3eb;
+  --warning: #b45309;
+  --warning-fill: #fbbf24;
+  --on-warning-fill: #211c15;
+  --danger: #c62828;
+  --danger-fill: #c62828;
+  --danger-hover: #991b1b;
+  --danger-subtle: #fbeaea;
+  --focus-ring: #6d28d9;
+  --scrim: rgba(31, 27, 21, 0.45);
+
+  --shadow-e1: 0 1px 2px rgba(31, 27, 21, 0.06), 0 1px 1px rgba(31, 27, 21, 0.04);
+  --shadow-e2: 0 4px 12px rgba(31, 27, 21, 0.1), 0 1px 3px rgba(31, 27, 21, 0.06);
+  --shadow-e3: 0 16px 40px rgba(31, 27, 21, 0.16), 0 4px 12px rgba(31, 27, 21, 0.08);
+  --shadow-sticky: 0 1px 0 var(--border), 0 2px 8px rgba(31, 27, 21, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* DARK — warm charcoal, deliberately not pure black */
+    --background: #16130f;
+    --surface: #201c17;
+    --surface-raised: #2a251f;
+    --border: #332d25;
+    --border-strong: #7a7162;
+    --text-primary: #f4efe7;
+    --text-secondary: #b8ae9f;
+    --text-tertiary: #968c7c;
+    --accent: #a78bfa;
+    --accent-hover: #c4b5fd;
+    --accent-fill: #7c3aed;
+    --accent-subtle: #2a2140;
+    --on-accent: #ffffff;
+    --success: #4ade80;
+    --success-fill: #15803d;
+    --success-subtle: #16271c;
+    --warning: #fbbf24;
+    --warning-fill: #fbbf24;
+    --on-warning-fill: #16130f;
+    --danger: #f87171;
+    --danger-fill: #dc2626;
+    --danger-hover: #ef4444;
+    --danger-subtle: #2a1616;
+    --focus-ring: #c4b5fd;
+    --scrim: rgba(11, 9, 7, 0.6);
+
+    /* Dark elevation = surface lift + border, not shadow */
+    --shadow-e1: 0 0 0 1px var(--border);
+    --shadow-e2: 0 0 0 1px var(--border);
+    --shadow-e3: 0 0 0 1px var(--border);
+    --shadow-sticky: 0 1px 0 var(--border);
+  }
+}
+
+[data-theme="dark"] {
+  --background: #16130f;
+  --surface: #201c17;
+  --surface-raised: #2a251f;
+  --border: #332d25;
+  --border-strong: #7a7162;
+  --text-primary: #f4efe7;
+  --text-secondary: #b8ae9f;
+  --text-tertiary: #968c7c;
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --accent-fill: #7c3aed;
+  --accent-subtle: #2a2140;
+  --on-accent: #ffffff;
+  --success: #4ade80;
+  --success-fill: #15803d;
+  --success-subtle: #16271c;
+  --warning: #fbbf24;
+  --warning-fill: #fbbf24;
+  --on-warning-fill: #16130f;
+  --danger: #f87171;
+  --danger-fill: #dc2626;
+  --danger-hover: #ef4444;
+  --danger-subtle: #2a1616;
+  --focus-ring: #c4b5fd;
+  --scrim: rgba(11, 9, 7, 0.6);
+  --shadow-e1: 0 0 0 1px var(--border);
+  --shadow-e2: 0 0 0 1px var(--border);
+  --shadow-e3: 0 0 0 1px var(--border);
+  --shadow-sticky: 0 1px 0 var(--border);
+}
+
+@theme inline {
+  /* Colors — semantic names, theme-adaptive */
+  --color-*: initial;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-success-fill: var(--success-fill);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-fill: var(--warning-fill);
+  --color-on-warning-fill: var(--on-warning-fill);
+  --color-danger: var(--danger);
+  --color-danger-fill: var(--danger-fill);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-focus-ring: var(--focus-ring);
+  --color-scrim: var(--scrim);
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+
+  /* Type — Hanken Grotesk, scale per design system */
+  --font-sans: var(--font-hanken), -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+
+  --text-*: initial;
+  --text-display: 2.125rem; /* 34px */
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 1.5rem; /* 24px */
+  --text-title--line-height: 1.875rem;
+  --text-title--font-weight: 700;
+  --text-title--letter-spacing: -0.018em;
+  --text-heading: 1.1875rem; /* 19px */
+  --text-heading--line-height: 1.625rem;
+  --text-heading--font-weight: 600;
+  --text-heading--letter-spacing: -0.01em;
+  --text-body-lg: 1.0625rem; /* 17px — primary reading surface */
+  --text-body-lg--line-height: 1.625rem;
+  --text-body: 0.9375rem; /* 15px — default UI text */
+  --text-body--line-height: 1.375rem;
+  --text-label: 0.875rem; /* 14px — buttons, field labels */
+  --text-label--line-height: 1.125rem;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.005em;
+  --text-caption: 0.8125rem; /* 13px — metadata, timestamps */
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 500;
+  --text-caption--letter-spacing: 0.01em;
+  --text-micro: 0.6875rem; /* 11px — overlines, badges */
+  --text-micro--line-height: 0.875rem;
+  --text-micro--font-weight: 600;
+  --text-micro--letter-spacing: 0.06em;
+
+  /* Radius */
+  --radius-*: initial;
+  --radius-none: 0;
+  --radius-sm: 6px;
+  --radius-md: 10px; /* buttons, inputs */
+  --radius-lg: 14px; /* cards */
+  --radius-xl: 20px; /* modals */
+  --radius-2xl: 28px; /* bottom sheets */
+  --radius-full: 9999px; /* avatars, pills */
+
+  /* Elevation */
+  --shadow-*: initial;
+  --shadow-e1: var(--shadow-e1);
+  --shadow-e2: var(--shadow-e2);
+  --shadow-e3: var(--shadow-e3);
+  --shadow-sticky: var(--shadow-sticky);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Breakpoints */
+  --breakpoint-*: initial;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+/* Motion durations (referenced via arbitrary values, e.g. duration-(--duration-base)) */
+:root {
+  --duration-instant: 0ms;
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --duration-sheet: 320ms;
+}
+
+@layer base {
+  html {
+    background-color: var(--background);
+    color: var(--text-primary);
+  }
+  body {
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
