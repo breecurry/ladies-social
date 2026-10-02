@@ -68,19 +68,24 @@ Database: SQL migrations live in `supabase/migrations/` (apply in order
 with `supabase db push` or psql). `supabase/tests/` contains a local
 smoke test of the security invariants — see its README.
 
-First-run setup against a fresh Supabase project:
+First-run setup against a fresh Supabase project is a single command:
 
-1. Apply the migrations.
-2. In the dashboard: set JWT expiry to 1800s, enable refresh-token
-   rotation, require email confirmation, enable TOTP MFA (and the
-   WebAuthn factor, currently beta). Enable the `pg_cron` extension and
-   re-run migration `20261001000010` if it was applied before pg_cron.
-3. Run `npm run bootstrap` (see `scripts/bootstrap.mjs` header for the
-   required environment variables) to create the Owner and the
-   "United Feminist" system account.
-4. Sign in as the Owner and enroll MFA immediately — role grants, audit
-   reads and contact-info views refuse to run without a step-up (AAL2),
-   and that is enforced in the database, not the UI.
+```bash
+npm run provision
+```
+
+`scripts/provision.sh` creates the project, applies the migrations, enables
+`pg_cron`, sets the required auth posture (30-minute JWTs, refresh-token
+rotation, mandatory email confirmation, TOTP + WebAuthn MFA), writes the app
+keys into `.env.local`, and runs `npm run bootstrap` to create the Owner and the
+"United Feminist" system account. It is idempotent and never prints a secret.
+The env vars it needs, and the few steps that are irreducibly manual (upgrading
+the org to Pro, minting the access token), are documented in
+[`docs/provisioning.md`](docs/provisioning.md).
+
+After provisioning, **sign in as the Owner and enroll MFA immediately** — role
+grants, audit reads and contact-info views refuse to run without a step-up
+(AAL2), and that is enforced in the database, not the UI.
 
 ## On originality
 
