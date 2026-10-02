@@ -682,6 +682,12 @@ Registration is fully open: no invite, no vouch, no approval queue, no gender sc
 - **Validation and submit.** The 18+ check runs on submit, and may preview inline once all three fields are filled. An incomplete or invalid date shows an inline `text-caption` `danger` message beneath the group ("Enter your full date of birth"). An under-18 date routes to the rejection screen (17.2); it does not silently record and continue. **The date of birth must *reject*, not merely be stored,** or the gate is theatre.
 - **Accessibility:** the three fields share a group label "Date of birth" (`role="group"` with an accessible name); each field also has its own label; the error is tied to the group via `aria-describedby` and announced politely; every target is at least 44px.
 
+**Approved copy (17.1):**
+- Field group label: "Date of birth"
+- Placeholder per field: "Month" / "Day" / "Year"
+- Helper text (text-caption, text-tertiary): "You must be 18 or older to join United Feminist."
+- Inline error for incomplete or invalid date: "Enter your full date of birth."
+
 ### 17.2 The under-18 rejection screen
 
 Someone has just been told no. She may be sixteen. She is not a problem to be dealt with; she is a member in two years. The screen is clear, warm, and brief, and it does not lecture.
@@ -690,6 +696,11 @@ Someone has just been told no. She may be sixteen. She is not a problem to be de
 - **Tone rules:** no "sorry", no "oops", no exclamation marks, no birthday countdown, no joke. Clear and kind. It must not read as a scolding and it must not read as a taunt.
 - **CRITICAL: this screen collects and displays nothing identifying.** There is **no email field, no name, no "notify me when I turn 18" capture, no "contact us" form, and no retention message.** The only control on the screen is a single neutral link back to the public home or marketing page ("Back to United Feminist"). The moment a visitor self-declares under 13, the platform has actual knowledge under COPPA, and collecting any personal information from them would be a violation; so the design collects none from anyone the gate turns away. **If a future revision feels the urge to add a "we will remind you" email box here, do not. That urge is the violation.**
 - **Contrast:** all existing measured pairings. `text-primary` on `background` is 14.90:1, `text-secondary` on `background` is 6.77:1 light / 8.46:1 dark (2.3). Nothing new is introduced.
+
+**Approved copy (17.2):**
+- Headline (text-title): "You need to be 18 to join."
+- Body (text-body-lg): "United Feminist is for adults 18 and over. You cannot create an account right now. We are not going anywhere -- we hope to see you in a few years."
+- Link: "Back to United Feminist"
 
 ### 17.3 The blocked screen (device returns within 14 days)
 
@@ -702,6 +713,11 @@ If a device that just failed the age check tries again within 14 days, it meets 
   - Beneath the code, one line at `text-body` `text-secondary`: "Entered the wrong date? Contact support@unitedfeminist.com and quote this code." The email address is a selectable `mailto:` link (`accent` text, 6.26:1 light / 6.80:1 dark on `background`), which opens the visitor's own mail app. It is an outbound link, not a form on our page, so it collects nothing.
 - **CRITICAL: again, no identifying input.** The reference code is the only thing on this screen the visitor interacts with, and it is read-only, displayed and copyable, never typed into. There is **no email box, no name box, no message form, no "notify me", and no "we are keeping your information" language.** The platform stores only a hashed fingerprint, a timestamp, an expiry, and this code; the screen must not ask for or display anything beyond the code. Support unlocks a device by looking up the quoted code; the member never types anything here.
 - **Accessibility:** the code is exposed to screen readers character by character via an `aria-label` that spells it out ("Reference code: four, F, two, A"), so it is not misread as a word; the Copy button announces "Copied" through a polite live region; the `mailto` link is a normal focusable link; every target is at least 44px; there is no motion beyond the label swap, which is instant under reduced motion.
+
+**Approved copy (17.3):**
+- Headline (text-title): "You cannot create an account right now."
+- Body (text-body): "This device recently did not meet our age requirement. You can try again later."
+- Below reference code (text-body, text-secondary): "If you entered the wrong date, email support@unitedfeminist.com and quote this code. We will sort it out."
 
 ### 17.4 What these screens must never become
 
@@ -717,7 +733,7 @@ Stated honestly, with what would resolve each. Some of these were open questions
 
 2. **How prominent the on-card Follow button should be.** I specified a filled `accent` Follow pill because the filled pill is the most conventional, instantly legible follow affordance and because growth depends on new members actually following people from Discover. The tension: a feed full of filled purple pills works against the "calm paper" restraint, and the inherited rule (1.6) keeps accent sparing. A quieter bordered pill would be calmer but reads as lower priority. I lean filled for conventionality and growth, but this is a genuine judgement call. **What would resolve it:** the owner's eye on a real Discover screen with ten cards. It is a one-line change either way.
 
-3. **The exact rejection copy, and the undo-toast duration.** Two small, honest uncertainties bundled. First, the under-18 rejection wording (17.2) is trying to be kind without being patronising to a teenager, and getting that exactly right is a copy decision better made by the owner, whose voice the guidelines already carry, than guessed by a designer. Second, I set the follow undo toast to about six seconds (4.9); that is a guess at "long enough to catch a mis-tap, short enough not to nag", and the right number is an empirical question. **What would resolve both:** the owner's pass on the rejection copy, and light testing on the toast duration.
+3. **The exact rejection copy, and the undo-toast duration.** Two small, honest uncertainties bundled. **The under-18 rejection wording (17.2) is now settled** -- approved copy is in the Approved copy block in 17.2. The undo-toast duration (4.9) remains an empirical question; I set it to about six seconds as a guess at "long enough to catch a mis-tap, short enough not to nag." **What would resolve the remaining open item:** light testing on the toast duration.
 
 The two older open questions remain open and unchanged: whether the photo-attach and Message controls should be hidden or shown-disabled before their phases (5.5, 7.1), and the Likes-tab and following-list visibility defaults (7.2, 7.3), which is a values call about safety versus discoverability for the founding cohort.
 
