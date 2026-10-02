@@ -1,12 +1,14 @@
 # PROGRESS — United Feminist
 
-Updated: 2026-10-01 (end of kickoff session)
+Updated: 2026-10-02
 
 ## Where things stand
 
-**Planning complete. Phase 1 built, tested, and merged.** Nothing is running
-yet — there is no Supabase project, so the next session starts with
-provisioning.
+**Planning complete. Phase 1 built, tested, and merged.** Provisioning is now a
+single command (`npm run provision`) — once a Supabase personal access token is
+supplied, the project is created and fully configured with no dashboard clicking,
+save for three irreducible manual steps (see below). Still not run against a real
+project yet: that needs the token.
 
 ## Done
 
@@ -22,15 +24,26 @@ provisioning.
       triage, roles with database-enforced owner-only grants, hash-chained
       audit log, auth with WebAuthn/TOTP. 17-assertion security smoke suite
       passing. Typecheck, lint, and build clean.
+- [x] **Automated provisioning path** — `scripts/provision.sh`
+      (`npm run provision`) and `docs/provisioning.md`. Verified against the live
+      Supabase Management API: project creation, the pg_cron extension, applying
+      migrations, and every required auth setting (30-min JWT, refresh rotation,
+      email confirmation, TOTP + WebAuthn) are all automatable with a PAT. The
+      script is idempotent, fails loudly, and never prints a secret.
 
 ## Next session — start here
 
-1. **Create the Supabase project.** Nothing runs until this exists.
-2. Apply the migrations in `supabase/migrations/`.
-3. Dashboard configuration: 30-minute JWTs, refresh token rotation, email
-   confirmation, MFA factors, pg_cron.
-4. Run `npm run bootstrap` to seed the Owner account and the system account.
-5. First real signup on your own platform.
+1. **Owner supplies a Supabase personal access token** and the Owner details
+   (see `docs/provisioning.md` §2 for the exact env var names).
+2. **Upgrade the org to Pro** in the dashboard (one-time; no billing API) — see
+   `docs/provisioning.md` §4.
+3. **Run `npm run provision`.** This creates the project, applies the migrations,
+   enables pg_cron, sets all the auth/security config, writes `.env.local`, and
+   runs `npm run bootstrap` to seed the Owner + system account.
+4. Sign in as the Owner and **enrol MFA immediately** (AAL2 is required for
+   privileged actions, enforced in the database).
+5. Configure custom SMTP (Resend) for confirmation email at volume, then do the
+   first real signup.
 
 ## Not started
 
