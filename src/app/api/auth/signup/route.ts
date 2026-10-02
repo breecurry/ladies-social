@@ -4,25 +4,33 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireEnv } from "@/lib/env";
 import { hashIdentifier } from "@/lib/crypto";
 import { padToUniformTime } from "@/lib/timing";
-import { lookupPhone } from "@/lib/admission/phone";
-import { runTriage } from "@/lib/admission/triage";
+import { runSignupTriage } from "@/lib/signup/triage";
 import { signupSchema, RESERVED_HANDLES } from "@/lib/validation";
 import type { Database } from "@/lib/database.types";
 
 /**
- * POST /api/auth/signup — the two-lane admission gate.
+ * POST /api/auth/signup — open registration.
  *
- * ENUMERATION SAFETY (hard requirement): the "Who invited you?" handle
- * is resolved inside create_application(); whether or not it matches a
- * member, this endpoint returns THE SAME response body and THE SAME
- * status code, and every post-validation response is padded to a
- * uniform floor (see lib/timing.ts) so response time does not leak
- * membership either. A vouch request is only created server-side,
- * invisible to the applicant.
+ * Everyone is welcome; enforcement is conduct-based and happens after
+ * the fact. What this endpoint still defends:
+ *
+ *   BAN EVASION: a signup whose email or device-fingerprint hash
+ *   matches a banned account is answered with the EXACT same response
+ *   as a successful signup, and nothing is created. The banned person
+ *   never learns she was detected. Every post-validation response is
+ *   padded to a uniform floor (lib/timing.ts) so the refusal is not
+ *   measurable from latency either.
+ *
+ *   BOTS: the pre-filter (disposable email domains, subnet velocity,
+ *   profile-coherence heuristics) auto-flags suspicious accounts; the
+ *   flags land on the private record and in the audit log. Flags never
+ *   block a signup on their own.
+ *
+ * Email verification is required: Supabase sends the confirmation and
+ * the account cannot sign in until it is confirmed.
  */
 
-const SUCCESS_BASE = "Application received. Check your email to confirm your address.";
-const SUCCESS_INVITER_SUFFIX = " If that member exists, they've been notified.";
+const SUCCESS_MESSAGE = "Account created. Check your email to confirm your address.";
 
 function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -62,12 +70,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(body, { status });
   };
 
-  const successMessage = SUCCESS_BASE + (input.inviterHandle !== "" ? SUCCESS_INVITER_SUFFIX : "");
-
   try {
     const admin = createSupabaseAdminClient();
     const ip = getClientIp(request);
     const emailHash = hashIdentifier(input.email);
+    const fingerprintHash = input.deviceFingerprint
+      ? hashIdentifier(input.deviceFingerprint)
+      : null;
 
     // Per-IP rate limit: makes bulk probing of the signup form (for
     // handles OR emails) expensive. Recorded before counting so the
@@ -93,8 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Handle availability. This necessarily reveals whether a HANDLE is
     // taken (any platform with unique handles does); the per-IP rate
-    // limit above bounds its use for bulk probing, and profiles are not
-    // otherwise visible pre-admission.
+    // limit above bounds its use for bulk probing.
     if (RESERVED_HANDLES.has(input.handle)) {
       return uniform({ ok: false, error: "That handle isn't available.", field: "handle" }, 409);
     }
@@ -107,34 +115,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return uniform({ ok: false, error: "That handle isn't available.", field: "handle" }, 409);
     }
 
-    // --- Triage signals (bot/abuse only — never appearance or gender) ---
-    const [phoneSignal, subnetResult, fpBanned, emailBanned, phoneBanned] = await Promise.all([
-      lookupPhone(input.phone),
+    // --- Ban evasion + bot signals (never appearance or gender) ---
+    const [subnetResult, fpBanned, emailBanned] = await Promise.all([
       ip
         ? admin.rpc("count_signups_from_subnet", { p_ip: ip })
         : Promise.resolve({ data: 0 } as const),
-      input.deviceFingerprint
-        ? admin.rpc("identifier_is_banned", {
-            p_kind: "device_hash",
-            p_hash: hashIdentifier(input.deviceFingerprint),
-          })
+      fingerprintHash
+        ? admin.rpc("identifier_is_banned", { p_kind: "device_hash", p_hash: fingerprintHash })
         : Promise.resolve({ data: false } as const),
       admin.rpc("identifier_is_banned", { p_kind: "email_hash", p_hash: emailHash }),
-      admin.rpc("identifier_is_banned", {
-        p_kind: "phone_hash",
-        p_hash: hashIdentifier(input.phone),
-      }),
     ]);
 
-    const triage = runTriage({
+    if ((fpBanned.data ?? false) || (emailBanned.data ?? false)) {
+      // Banned-account match: create nothing, answer exactly like
+      // success. The signup attempt above is already recorded.
+      return uniform({ ok: true, message: SUCCESS_MESSAGE }, 200);
+    }
+
+    const triage = runSignupTriage({
       email: input.email,
       legalName: input.legalName,
       handle: input.handle,
-      phone: phoneSignal,
       subnetSignups24h: (subnetResult.data ?? 1) - 1, // exclude this attempt
-      fingerprintBanned: fpBanned.data ?? false,
-      emailBanned: emailBanned.data ?? false,
-      phoneBanned: phoneBanned.data ?? false,
     });
 
     // --- Create the auth user (email confirmation flows from Supabase) ---
@@ -152,36 +154,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return uniform({ ok: false, error: "Could not create your account. Please try again." }, 400);
     }
     // Existing account (Supabase anti-enumeration returns a userless
-    // shell): respond EXACTLY like success. No application is created.
+    // shell): respond EXACTLY like success. No profile is created.
     const user = signUpData.user;
     if (!user || (user.identities ?? []).length === 0) {
-      return uniform({ ok: true, message: successMessage }, 200);
+      return uniform({ ok: true, message: SUCCESS_MESSAGE }, 200);
     }
 
-    const { error: appError } = await admin.rpc("create_application", {
+    const { error: memberError } = await admin.rpc("create_member", {
       p_user_id: user.id,
       p_email: input.email,
       p_legal_name: input.legalName,
       p_dob: input.dob,
       p_handle: input.handle,
-      p_phone: input.phone,
-      p_inviter_handle: input.inviterHandle === "" ? null : input.inviterHandle,
       p_signup_ip: ip,
-      p_fingerprint_hash: input.deviceFingerprint ? hashIdentifier(input.deviceFingerprint) : null,
+      p_email_hash: emailHash,
+      p_fingerprint_hash: fingerprintHash,
       p_signals: triage.signals,
-      p_bucket: triage.bucket,
+      p_flagged: triage.flagged,
     });
-    if (appError) {
+    if (memberError) {
       // Roll back the orphan auth user so the email can retry cleanly.
       await admin.auth.admin.deleteUser(user.id).catch(() => undefined);
+      // Belt-and-braces ban check inside create_member: same silent
+      // success shape as the pre-check above.
+      if (memberError.message.includes("banned_identifier")) {
+        return uniform({ ok: true, message: SUCCESS_MESSAGE }, 200);
+      }
       // Handle race on the unique index — same shape as the pre-check.
-      if (appError.code === "23505") {
+      if (memberError.code === "23505") {
         return uniform({ ok: false, error: "That handle isn't available.", field: "handle" }, 409);
       }
       return uniform({ ok: false, error: "Could not create your account. Please try again." }, 500);
     }
 
-    return uniform({ ok: true, message: successMessage }, 200);
+    return uniform({ ok: true, message: SUCCESS_MESSAGE }, 200);
   } catch {
     return uniform({ ok: false, error: "Something went wrong. Please try again." }, 500);
   }

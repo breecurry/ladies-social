@@ -7,17 +7,15 @@ export const metadata: Metadata = { title: "Join" };
 
 export default async function SignupPage() {
   const viewer = await getViewer();
-  if (viewer) {
-    redirect(viewer.isAdmitted ? "/home" : "/pending");
-  }
+  if (viewer) redirect("/home");
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-title">Request to join</h1>
+        <h1 className="text-title">Create your account</h1>
         <p className="text-body text-text-secondary">
-          If a member invited you, name her below and she&apos;ll be asked to vouch for you.
-          Otherwise your application waits for review.
+          Joining takes an email address, a handle and your legal name. Your legal name stays
+          private unless you choose to show it.
         </p>
       </div>
       <SignupForm />

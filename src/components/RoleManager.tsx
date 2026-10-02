@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
 /**
- * Owner-only forms for role and auto_admit management. The browser is
- * the least trusted layer here: the database trigger + SECURITY DEFINER
+ * Owner-only forms for role management. The browser is the least
+ * trusted layer here: the database trigger + SECURITY DEFINER
  * functions enforce Owner + AAL2 regardless of what this form submits.
  */
 export function RoleManager() {
@@ -15,11 +15,11 @@ export function RoleManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (endpoint: "roles" | "privileges", payload: Record<string, string>) => {
+  const submit = async (payload: Record<string, string>) => {
     setBusy(true);
     setError(null);
     setNotice(null);
-    const response = await fetch(`/api/owner/${endpoint}`, {
+    const response = await fetch("/api/owner/roles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -37,20 +37,10 @@ export function RoleManager() {
   const onRoleSubmit = (action: "grant" | "revoke") => (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    void submit("roles", {
+    void submit({
       action,
       handle: String(form.get("handle") ?? ""),
       role: String(form.get("role") ?? ""),
-    });
-  };
-
-  const onPrivilegeSubmit = (action: "grant" | "revoke") => (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    void submit("privileges", {
-      action,
-      handle: String(form.get("handle") ?? ""),
-      privilege: "auto_admit",
     });
   };
 
@@ -93,30 +83,6 @@ export function RoleManager() {
         </Field>
         <Button type="submit" variant="danger" disabled={busy}>
           Revoke role (kills her sessions)
-        </Button>
-      </form>
-
-      <form onSubmit={onPrivilegeSubmit("grant")} className="flex flex-col gap-3">
-        <h3 className="text-heading">Grant auto-admit</h3>
-        <p className="text-body text-text-secondary">
-          Her confirmed vouch will admit applicants immediately. Use the statistics below to decide
-          — nothing is ever granted automatically.
-        </p>
-        <Field label="Member handle" htmlFor="auto-grant-handle">
-          <Input id="auto-grant-handle" name="handle" placeholder="@handle" required />
-        </Field>
-        <Button type="submit" disabled={busy}>
-          Grant auto-admit
-        </Button>
-      </form>
-
-      <form onSubmit={onPrivilegeSubmit("revoke")} className="flex flex-col gap-3">
-        <h3 className="text-heading">Revoke auto-admit</h3>
-        <Field label="Member handle" htmlFor="auto-revoke-handle">
-          <Input id="auto-revoke-handle" name="handle" placeholder="@handle" required />
-        </Field>
-        <Button type="submit" variant="danger" disabled={busy}>
-          Revoke auto-admit
         </Button>
       </form>
     </div>

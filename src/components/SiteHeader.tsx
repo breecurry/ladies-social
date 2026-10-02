@@ -17,16 +17,8 @@ export async function SiteHeader() {
         <div className="flex items-center gap-1">
           {viewer ? (
             <>
-              {viewer.isAdmitted ? (
-                <>
-                  <HeaderLink href="/home" label="Home" />
-                  <HeaderLink href="/vouches" label="Vouches" />
-                  <HeaderLink href="/settings" label="Settings" />
-                </>
-              ) : (
-                <HeaderLink href="/pending" label="Application" />
-              )}
-              {viewer.isReviewer ? <HeaderLink href="/review" label="Review" /> : null}
+              <HeaderLink href="/home" label="Home" />
+              <HeaderLink href="/settings" label="Settings" />
               {viewer.isOwner ? (
                 <>
                   <HeaderLink href="/owner/roles" label="Roles" />

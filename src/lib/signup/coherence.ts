@@ -2,7 +2,8 @@
  * Profile-coherence heuristics: does the name/handle/email pattern look
  * machine-generated? Pure signals about BOT-NESS — never about
  * appearance, gender, or identity (locked product rule). Output is a
- * 0–1 suspicion score plus human-readable reasons for the review queue.
+ * 0-1 suspicion score plus human-readable reasons recorded with the
+ * auto-flag.
  */
 
 export interface CoherenceResult {

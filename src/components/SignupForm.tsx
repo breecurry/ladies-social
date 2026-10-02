@@ -47,11 +47,9 @@ export function SignupForm() {
     const payload = {
       legalName: String(form.get("legalName") ?? ""),
       email: String(form.get("email") ?? ""),
-      phone: String(form.get("phone") ?? ""),
       dob: String(form.get("dob") ?? ""),
       handle: String(form.get("handle") ?? ""),
       password: String(form.get("password") ?? ""),
-      inviterHandle: String(form.get("inviterHandle") ?? ""),
       deviceFingerprint: await computeDeviceFingerprint().catch(() => ""),
     };
 
@@ -63,7 +61,7 @@ export function SignupForm() {
       });
       const body = (await response.json()) as SignupResponse;
       if (body.ok) {
-        setSuccess(body.message ?? "Application received.");
+        setSuccess(body.message ?? "Account created.");
       } else {
         setError(body.error ?? "Something went wrong. Please try again.");
         setField(body.field ?? null);
@@ -78,10 +76,10 @@ export function SignupForm() {
   if (success) {
     return (
       <Card className="flex flex-col gap-4">
-        <h2 className="text-heading">Application received</h2>
+        <h2 className="text-heading">Check your email</h2>
         <Alert tone="success">{success}</Alert>
         <p className="text-body text-text-secondary">
-          We&apos;ll review your application. You can sign in at any time to check its status.
+          Once you confirm your address, you can log in and get started.
         </p>
       </Card>
     );
@@ -94,7 +92,7 @@ export function SignupForm() {
       <Field
         label="Legal name"
         htmlFor="legalName"
-        hint="Required and verified, but never shown publicly unless you choose to show it. Members see your @handle."
+        hint="Required, but never shown publicly unless you choose to show it. Members see your @handle."
         error={field === "legalName" ? error : null}
       >
         <Input id="legalName" name="legalName" autoComplete="name" required maxLength={100} />
@@ -102,15 +100,6 @@ export function SignupForm() {
 
       <Field label="Email" htmlFor="email" error={field === "email" ? error : null}>
         <Input id="email" name="email" type="email" autoComplete="email" required />
-      </Field>
-
-      <Field
-        label="Phone number"
-        htmlFor="phone"
-        hint="International format, e.g. +15551234567."
-        error={field === "phone" ? error : null}
-      >
-        <Input id="phone" name="phone" type="tel" autoComplete="tel" required />
       </Field>
 
       <Field
@@ -125,7 +114,7 @@ export function SignupForm() {
       <Field
         label="Handle"
         htmlFor="handle"
-        hint="3–30 characters: lowercase letters, numbers, underscores. This is what members see."
+        hint="3-30 characters: lowercase letters, numbers, underscores. This is what members see."
         error={field === "handle" ? error : null}
       >
         <Input id="handle" name="handle" autoComplete="off" required maxLength={30} />
@@ -147,21 +136,13 @@ export function SignupForm() {
         />
       </Field>
 
-      <Field
-        label="Who invited you?"
-        htmlFor="inviterHandle"
-        hint="Their @handle, if a member invited you. Optional — without one, your application goes to review."
-      >
-        <Input id="inviterHandle" name="inviterHandle" autoComplete="off" placeholder="@handle" />
-      </Field>
-
       <Button type="submit" disabled={submitting}>
-        {submitting ? "Submitting…" : "Request to join"}
+        {submitting ? "Creating your account…" : "Join"}
       </Button>
 
       <p className="text-caption text-text-tertiary">
-        Admission is by vouching or human review of signup signals — never by appearance,
-        photographs, or gender.
+        Everyone is welcome here. What keeps this space safe is conduct: bullying and harassment
+        are not tolerated and lead to removal.
       </p>
     </form>
   );

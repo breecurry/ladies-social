@@ -15,8 +15,8 @@ export const metadata: Metadata = {
     template: "%s · United Feminist",
   },
   description:
-    "A social platform built as a safe space for women and their allies. Admission by vouching or review — never by appearance.",
-  robots: { index: false, follow: false }, // profiles/admission surfaces are never indexed
+    "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
+  robots: { index: false, follow: false }, // member surfaces are never indexed
 };
 
 export const viewport: Viewport = {

@@ -4,9 +4,7 @@ import { getViewer } from "@/lib/auth";
 
 export default async function LandingPage() {
   const viewer = await getViewer();
-  if (viewer) {
-    redirect(viewer.isAdmitted ? "/home" : "/pending");
-  }
+  if (viewer) redirect("/home");
 
   return (
     <div className="flex flex-col gap-8 py-12">
@@ -17,8 +15,9 @@ export default async function LandingPage() {
           genuinely sophisticated underneath — and safety is architecture here, not a settings page.
         </p>
         <p className="max-w-prose text-body text-text-tertiary">
-          Admission is by vouching or human review. Nobody is ever judged by appearance,
-          photographs, or gender — the standard is behaviour. You must be 18 or older.
+          Everyone is welcome to join. What keeps this space safe is conduct, not identity: bullying
+          and harassment are not tolerated, and accounts that cross that line are removed. You must
+          be 18 or older.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
@@ -26,7 +25,7 @@ export default async function LandingPage() {
           href="/signup"
           className="inline-flex min-h-11 items-center rounded-md bg-accent-fill px-6 text-label text-on-accent transition-colors duration-(--duration-fast) hover:bg-accent-hover"
         >
-          Request to join
+          Join
         </Link>
         <Link
           href="/login"

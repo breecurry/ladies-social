@@ -7,9 +7,7 @@ export const metadata: Metadata = { title: "Log in" };
 
 export default async function LoginPage() {
   const viewer = await getViewer();
-  if (viewer) {
-    redirect(viewer.isAdmitted ? "/home" : "/pending");
-  }
+  if (viewer) redirect("/home");
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">

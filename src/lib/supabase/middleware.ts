@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/home", "/pending", "/vouches", "/settings", "/review", "/owner"];
+const PROTECTED_PREFIXES = ["/home", "/settings", "/owner"];
 
 /**
- * Session refresh + coarse auth gate. Role and admission checks happen
- * server-side in each page (and, authoritatively, in RLS) — middleware
- * only keeps signed-out visitors away from member surfaces.
+ * Session refresh + coarse auth gate. Role and account-status checks
+ * happen server-side in each page (and, authoritatively, in RLS) —
+ * middleware only keeps signed-out visitors away from member surfaces.
  */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request });

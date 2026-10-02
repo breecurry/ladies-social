@@ -23,10 +23,7 @@ export async function requireUser(): Promise<
  * clean JSON error. The raised messages are deliberately user-safe.
  */
 export function rpcError(error: PostgrestError): NextResponse {
-  const denied =
-    error.message.includes("Only the Owner") ||
-    error.message.includes("may decide applications") ||
-    error.code === "42501";
+  const denied = error.message.includes("Only the Owner") || error.code === "42501";
   const stepUp = error.message.includes("Re-authentication");
   return NextResponse.json(
     { ok: false, error: error.message },

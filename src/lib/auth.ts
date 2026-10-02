@@ -8,8 +8,8 @@ export interface Viewer {
   roles: SystemRole[];
   isOwner: boolean;
   isAdminOrOwner: boolean;
-  isReviewer: boolean;
-  isAdmitted: boolean;
+  /** Account exists and is in acceptable standing (active or restricted). */
+  isActiveMember: boolean;
 }
 
 /** Load the signed-in user with her profile and active roles (RLS-scoped). */
@@ -31,17 +31,13 @@ export async function getViewer(): Promise<Viewer | null> {
 
   const roles = (roleRows ?? []).map((row) => row.role as SystemRole);
   const isOwner = roles.includes("owner");
-  const isAdminOrOwner = isOwner || roles.includes("admin");
   return {
     user,
     profile: profile ?? null,
     roles,
     isOwner,
-    isAdminOrOwner,
-    isReviewer: isAdminOrOwner || roles.includes("moderator") || roles.includes("ts_reviewer"),
-    isAdmitted:
-      profile !== null &&
-      profile.trust_level !== "pending_vouch" &&
-      (profile.status === "active" || profile.status === "restricted"),
+    isAdminOrOwner: isOwner || roles.includes("admin"),
+    isActiveMember:
+      profile !== null && (profile.status === "active" || profile.status === "restricted"),
   };
 }
