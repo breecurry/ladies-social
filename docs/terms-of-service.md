@@ -6,7 +6,7 @@
 
 **This is a comprehensive draft, not legal advice, and not a substitute for qualified legal counsel.**
 
-United Feminist operates an open-membership social platform for adults that handles user-generated content including images and video, operates a direct-messaging system, and uses a two-lane admission process with conduct-based removal. Before these Terms of Service are published, the owner must have them reviewed by a lawyer who is:
+United Feminist operates an open-membership social platform for adults that handles user-generated content including images and video, operates a direct-messaging system, and uses fully open registration with conduct-based enforcement. Before these Terms of Service are published, the owner must have them reviewed by a lawyer who is:
 
 - Licensed to practice in Tennessee and familiar with applicable state, federal, and (when EU/UK launch occurs) international law
 - Knowledgeable about platform liability, Section 230 of the Communications Decency Act, and its current scope
@@ -15,8 +15,8 @@ United Feminist operates an open-membership social platform for adults that hand
 - Experienced with content moderation platforms and trust-and-safety legal obligations
 
 **Specific areas of elevated legal risk on this platform that require attorney attention:**
-1. The two-lane admission process and conduct-based removal — the prior gender-restricted membership model has been replaced with an open-membership model; the legal risk from gender restriction is substantially reduced, but the new model raises its own questions: whether the Lane 2 review criteria and automated screening are consistently applied and compliant with applicable anti-discrimination law; whether conduct-based removal applied equally across all members regardless of gender is appropriately framed; and whether any aspect of the admission or review process creates unintended legal exposure
-2. The invitation-and-vouching system and the inviter accountability provisions, including how they interact with the two-lane model — whether these provisions are enforceable and appropriate under applicable law
+1. Open registration and conduct-based enforcement -- the Platform uses fully open registration with no admission screening, no invite, no vouch, and no gender screening of any kind. Whether the conduct-based enforcement framework -- applied equally to all members regardless of gender or any other personal characteristic -- is appropriately framed under applicable anti-discrimination law requires attorney review.
+2. Age verification posture -- the Platform uses self-attestation (a date-of-birth field plus a Terms checkbox affirming 18+) as its age-assurance method, with no document verification. Tennessee's Protecting Children from Social Media Act (Public Chapter 899 / HB 1891) requires social media platforms to verify the age of prospective account holders. Curry Co LLC is a Tennessee entity. The platform's current age-assurance approach and any exposure under that statute require attorney review before launch.
 3. Section 230 protections, their scope, and any exceptions relevant to this platform's content and moderation model
 4. CSAM reporting obligations under 18 U.S.C. § 2258A as amended by the REPORT Act, and the platform's obligations and liability exposure
 5. Arbitration clause enforceability, particularly for users in jurisdictions that restrict mandatory arbitration
@@ -27,7 +27,7 @@ Do not publish these Terms of Service without counsel review.
 ---
 
 *Effective date: October 1, 2026*
-*Last updated: October 1, 2026*
+*Last updated: October 2, 2026*
 
 These Terms of Service ("Terms") are a binding legal agreement between you and Curry Co LLC ("Company," "we," "us," or "our"), the operator of the United Feminist platform available at unitedfeminist.com (the "Platform"). By creating an account or using the Platform in any way, you agree to be bound by these Terms. If you do not agree, do not use the Platform.
 
@@ -37,7 +37,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 1. Eligibility
 2. Account Registration and Identity
-3. Admission and the Vouching System
+3. Membership and Eligibility
 4. Acceptable Use; Community Guidelines
 5. User Content
 6. Intellectual Property
@@ -57,7 +57,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 **1.1 Age.** You must be at least 18 years old to create an account or use the Platform. By accepting these Terms, you represent that you are 18 or older. If we discover that an account belongs to a person under 18, we will immediately terminate that account and delete all associated content.
 
-**1.2 Membership.** United Feminist is designed as a safe space for women and for allies of any gender who are committed to the platform's purpose. Membership is open to any person who agrees to abide by these Terms and the Community Guidelines. Membership is conditional on conduct and may be permanently terminated for violations of these Terms or the Guidelines as described in Section 9. All applicants are also subject to the admission process described in Section 3.
+**1.2 Membership.** United Feminist is designed as a safe space for women and for allies of any gender who are committed to the platform's purpose. Membership is open to any person who agrees to abide by these Terms and the Community Guidelines. Membership is conditional on conduct and may be permanently terminated for violations of these Terms or the Guidelines as described in Section 9.
 
 **1.3 Legal capacity.** You represent that you have the legal capacity to enter into a binding agreement under the laws of your jurisdiction, and that you are not barred from using the Platform under applicable law.
 
@@ -77,40 +77,21 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 **2.4 Account security.** You are responsible for maintaining the security of your account credentials. You must not share your password with any other person. You agree to notify us immediately at support@unitedfeminist.com if you believe your account has been compromised. We are not liable for any loss or damage arising from unauthorized access to your account that results from your failure to maintain the security of your credentials.
 
-**2.5 One account per person.** Each person may hold only one active account. Creating additional accounts — including to evade an enforcement action, to access the invitation system additional times, or for any other purpose — violates these Terms.
+**2.5 One account per person.** Each person may hold only one active account. Creating additional accounts -- including to evade an enforcement action or for any other purpose -- violates these Terms.
 
 **2.6 Non-transferability.** Your account is personal to you and may not be transferred, sold, or assigned to any other person.
 
 ---
 
-## 3. Admission and the Vouching System
+## 3. Membership and Eligibility
 
-**3.1 Admission — two-lane process.** Membership is open to any person who agrees to abide by these Terms and the Community Guidelines. All applicants proceed through one of two admission pathways:
+**3.1 Open registration.** Registration on the Platform is fully open. There is no invitation requirement, no vouching process, no application queue, and no approval gate. Any person who meets the eligibility requirements in this section and agrees to abide by these Terms and the Community Guidelines may create an account.
 
-**(a) Lane 1 — Vouched admission.** At signup, an applicant may identify an existing member who has invited them ("Inviter"). The named Inviter receives a prompt asking them to actively confirm that they personally know the applicant and vouch for their membership. If the Inviter confirms, the applicant is admitted. If the Inviter declines, or does not respond within 48 hours, the application automatically moves to Lane 2; it is not rejected.
+**3.2 Age requirement.** You must be at least 18 years old to create an account. By submitting your date of birth at registration, you confirm that you are 18 or older. If we discover that an account belongs to a person under 18, we will immediately terminate that account and delete all associated content.
 
-**(b) Lane 2 — Reviewed queue.** Applicants who do not name an Inviter, or whose named Inviter has not confirmed within 48 hours, enter a pending review queue. Applications are assessed for good-faith signals — whether the account appears to be genuine rather than automated, fraudulent, or created in bad faith. Automated checks screen for disposable email addresses, invalid contact information, and patterns associated with bulk or automated account creation. Lane 2 review does not evaluate appearance, photographs, or physical presentation, and involves no gender screening of any kind.
+**3.3 No appearance-based or gender screening.** The Platform does not use photographs, selfies, video review, visual assessment, or any other appearance-based method to evaluate applicants or members. There is no gender screening of any kind. Membership is not conditioned on how a person looks, presents, or identifies their gender. A person's gender identity is not a basis for admission or removal.
 
-**3.2 Active vouch required (Lane 1).** For applicants proceeding through Lane 1, the Inviter must actively confirm — not merely be named — before access is granted. Access is granted when the vouch is confirmed, not when the Inviter's name is entered at signup. An Inviter who is named but does not respond within 48 hours has not confirmed, and the application moves to Lane 2 without further action required by the applicant.
-
-**3.3 What vouching means.** By confirming a vouch, an Inviter represents that: (a) they personally know the applicant; (b) they believe the applicant is joining in good faith and is aligned with the community's purpose as described in the Community Guidelines; and (c) they understand that they bear accountability for the applicant's conduct on the Platform as described in Section 3.5.
-
-**3.4 No appearance-based or gender screening.** Neither admission lane involves appearance-based screening of any kind. The Platform does not use photographs, selfies, video review of physical presentation, or any other visual assessment to evaluate applicants. There is no gender screening in either lane. Lane 1 admission is based on the personal attestation of an Inviter. Lane 2 admission is based on good-faith account signals. Neither process assesses who an applicant is or how they present.
-
-**3.5 Inviter accountability.** Inviters bear accountability for the conduct of members they vouch for, as follows:
-
-| Outcome for a vouched member | Consequence for the Inviter |
-|---|---|
-| Minor violation resulting in a warning | No consequence to the Inviter |
-| Suspension of 7 days or more | One invite slot deducted from the Inviter's next invitation period; Inviter notified |
-| Permanent removal for a serious violation | Inviter's invitation privileges frozen pending account review |
-| CSAM-related violation or illegal conduct | Inviter's account suspended pending investigation |
-
-**Permanent loss of invitation privileges:** If two or more members vouched for by the same Inviter are permanently removed for serious violations within any rolling six-month period, the Inviter's ability to issue invitations is permanently ended. The Inviter's own account is not automatically terminated; this consequence applies specifically and only to invitation privileges.
-
-**3.6 Invitation limits.** Invitation privileges are subject to periodic limits. New members may not issue invitations until they have been members in good standing for a qualifying period. Members in good standing receive a limited number of invitation slots per period. Specific current limits are set in the Platform's Account Settings and may be updated from time to time.
-
-**3.7 Non-transferability of invitations.** Invitation tokens are issued to and for use by a specific applicant. You may not sell, trade, auction, publicly post, or transfer invitation tokens. Doing so is a violation of these Terms and may result in the suspension or termination of your account.
+**3.4 Conduct-based membership.** Membership is conditional on conduct and may be suspended or permanently terminated for violations of these Terms or the Community Guidelines, as described in Section 9. The only basis for removal is conduct -- not identity, appearance, or any personal characteristic. Enforcement is applied equally to all members regardless of gender or any other personal characteristic.
 
 ---
 
@@ -206,7 +187,7 @@ Our collection, use, and storage of personal information is described in our Pri
 
 **9.3 Enforcement ladder.** Our typical approach to enforcement is described in the Community Guidelines: warning, content removal, temporary suspension, and permanent termination. We reserve the right to skip steps and proceed directly to permanent termination for serious violations, including but not limited to CSAM, credible threats of violence, doxxing, non-consensual intimate imagery, and coordinated harassment. Enforcement decisions are based solely on conduct and are applied equally to all members regardless of gender or any other personal characteristic.
 
-**9.4 Effect of termination.** On permanent termination of your account: your right to access and use the Platform ends immediately; your public content may be removed; your invitation tokens are cancelled; and any account you create subsequently may be subject to immediate termination.
+**9.4 Effect of termination.** On permanent termination of your account: your right to access and use the Platform ends immediately; your public content may be removed; and any account you create subsequently may be subject to immediate termination.
 
 **9.5 Appeals.** If you believe a moderation action was taken in error, you may appeal by contacting us at appeals@unitedfeminist.com within 30 days of the action. Your appeal should include your @handle, a description of the action taken, and your basis for believing the action was incorrect or disproportionate. All appeals are reviewed by a human reviewer who was not involved in the original decision. We will communicate the outcome of your appeal.
 
