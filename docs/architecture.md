@@ -181,13 +181,24 @@ create type notif_type       as enum ('follow','like','reply','mention','reshare
 
 -- ============================================================
 -- IDENTITY: profiles + private PII split
--- Real name (display_name) is PUBLIC on the profile by spec.
+-- 🚨 display_name (the member's REAL LEGAL NAME) IS NOT PUBLIC BY DEFAULT.
+--    Public display is OPT-IN. The default public identity is the @handle
+--    alone. This is deliberate pseudonymity-with-accountability: the platform
+--    knows exactly who everyone is, but a member hiding from a stalker is not
+--    exposed to the whole internet by signing up.
+--    This block previously read "Real name (display_name) is PUBLIC on the
+--    profile by spec" and declared the column NOT NULL. That was WRONG and
+--    contradicted the shipped migration. It is corrected below to match
+--    20261001000002_identity.sql, which is authoritative.
 -- Phone, IPs, fingerprints are PRIVATE -> separate table, Owner-only RLS.
 -- ============================================================
 create table profiles (
   user_id        uuid primary key references auth.users(id) on delete restrict,
   handle         citext not null unique check (handle ~ '^[a-z0-9_]{3,30}$'),
-  display_name   text   not null check (char_length(display_name) between 1 and 60),
+  -- NULLABLE on purpose. NULL = handle-only (the default). A trigger
+  -- (enforce_display_name_is_legal_name) permits only NULL or the member's
+  -- own verified legal name, so this can never become a nickname field.
+  display_name   text   check (display_name is null or char_length(display_name) between 1 and 60),
   bio            text   check (char_length(bio) <= 300),
   avatar_media_key text,                      -- R2 key, served via Cloudflare
   trust_level    trust_level not null default 'pending_vouch',
