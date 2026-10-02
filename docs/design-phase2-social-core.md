@@ -4,21 +4,34 @@
 
 **Date:** 2026-10-02
 
-**Design thesis (inherited, not reopened):** "Calm paper, sharp tools." A warm, low-glare sand neutral canvas carries the content; a single Iris-violet accent carries interaction; safety and capability sit one tap away, always labeled, never buried. Warmth lives in the neutrals, never in pink.
+**Design thesis (inherited, not reopened):** "Calm paper, sharp tools." A warm, low-glare sand neutral canvas carries the content; a single Iris-violet accent carries interaction; safety and capability sit one tap away, in the familiar places people already reach for them. Warmth lives in the neutrals, never in pink.
 
-**Reference product:** Threads, for its philosophy only (simple reading surface, sophisticated capability underneath). The visual and structural language here is deliberately distinct from Threads. See section 15.
+**Reference product:** Threads, for its philosophy only (simple reading surface, sophisticated capability underneath). The visual and structural language here is deliberately distinct from Threads. See section 14.
 
-**What Phase 2 is:** posting, the home feed, threaded replies, likes, reshares, follows, profiles, people search, in-app notifications, the settings area, and first-class block/mute/report. Direct messages, image upload, and the algorithmic "For You" feed are later phases and are referenced here only where the shell has to leave room for them.
+**What Phase 2 is:** account creation with the age gate, posting, the home feed with its Following and Discover tabs, threaded replies, likes, reshares, follows and unfollows, profiles, people search, in-app notifications, the settings area, and conventional, always-reachable controls for hiding, muting, blocking, and reporting. Direct messages, image upload, and the algorithmic "For You" feed are later phases and are referenced here only where the shell has to leave room for them.
 
 ---
 
 ## 0. How to read this document
 
-- **Tokens** are the ones already implemented in `src/app/globals.css`. They are named exactly as the CSS custom properties and Tailwind theme names in that file (for example `surface`, `text-secondary`, `accent-subtle`, `radius-lg`, `shadow-e1`, `text-body-lg`). Where this document proposes a change or addition, it is called out in section 16 and nowhere else silently.
+- **Tokens** are the ones already implemented in `src/app/globals.css`. They are named exactly as the CSS custom properties and Tailwind theme names in that file (for example `surface`, `text-secondary`, `accent-subtle`, `radius-lg`, `shadow-e1`, `text-body-lg`). Where this document proposes a change or addition, it is called out in section 15 and nowhere else silently.
 - **Spacing** uses the base-4 scale already defined: 0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80 (pixels).
 - **Type roles** are the eight already defined: display, title, heading, body-lg, body, label, caption, micro. Content (posts) is body-lg at 17px. UI chrome is body at 15px. This content-dominant hierarchy is deliberate and is kept.
 - **Contrast:** every new foreground/background pairing introduced here is listed with its measured ratio in section 2.3. The target is WCAG 2.2 AA: 4.5:1 for normal text, 3:1 for large text (greater than or equal to 18.66px bold or 24px regular) and for non-text UI boundaries that are the sole identifier of a control.
 - **Icons** are Phosphor (MIT). Regular weight is the inactive state; Fill weight is the active or selected state. Named glyphs in this document map to real Phosphor icons.
+
+### 0.1 Standing principle: conventional interactions, distinctive look
+
+This is a governing rule. It applies everywhere in this document, including retroactively to patterns that earlier revisions described.
+
+**Use conventional, instantly legible social-media interaction patterns. Do not innovate on interaction design.** A three-dot overflow menu for "deal with this post or person", a bottom tab bar, a Follow button that follows, a heart for Like, pull-to-refresh, a "show N new posts" pill, a reply-reshare-like action row: these are the patterns people already carry in muscle memory from every other app. A member should never have to learn how to operate this platform. Novelty in interaction is a tax the member pays, and on a product whose whole promise is a calm, safe place to be, that tax is not worth it. Where a familiar pattern exists, use it. The owner's instruction in her own words: keep it super obvious and copy-paste in style so people are not jumping into a platform they cannot read.
+
+**This does not conflict with staying visually distinct from Threads, because the two instructions live on different layers.**
+
+- **Interaction conventions** (where the overflow menu lives, that a tab bar sits at the bottom, that a Follow button follows, that a heart means like) are industry-standard behaviours. No one owns them and they are not protectable. Copying them is expected and correct.
+- **Trade dress** is the distinctive *look*: the colour palette, the typeface, the logo, the icon family, and the specific visual construction of the surfaces. That is what this product keeps entirely its own, and it is what makes United Feminist perceptually and legally distinct. The "calm paper" system (warm sand neutrals, the single Iris-violet accent, Hanken Grotesk, Phosphor icons, the card-and-rule feed surface, the warm-charcoal dark theme) is the distinctiveness. See section 14.
+
+So the rule is simple: **copy the patterns, never the look.** Anywhere an earlier revision of this document invented an interaction where a familiar one already exists, it has been changed to the familiar one, and the change is noted where it occurs (most consequentially, the safety controls in section 10). No one reading this later should treat "be conventional" and "do not copy Threads" as contradictory. They are not.
 
 ---
 
@@ -44,9 +57,9 @@ Three-column frame, centered on the viewport:
 
 - **Left rail, fixed width 240px.** Vertical nav. Each item is an icon plus a label at `text-label`, laid out in a row, min height 44px, padding 12px horizontal. The active item uses the Fill-weight icon, `accent` text color, and a 2px `accent` indicator bar on the inner edge (left edge of the rail content). Inactive items use Regular icons and `text-secondary`. Hover raises the row background to `surface-raised` in light and lifts one surface step in dark (see 1.6 on hover). Below the nav sits a single raised **Compose button**: full width of the rail minus 16px padding each side, `accent-fill` background, `on-accent` label, `radius-full`, min height 48px, `shadow-e1`. At the very bottom, an **account control**: avatar plus @handle plus a CaretUp, opening a small menu (Settings, Switch appearance, Log out).
 - **Center column, the feed, fixed max width 600px.** This is the reading measure, roughly 66 characters at 17px. It never grows wider, so posts stay readable on a 27-inch monitor. Gutters of 24px separate it from the rails.
-- **Right rail, 320px, appears only at xl (1280px) and up.** In Phase 2 it holds a persistent **Search field** at the top (so search is reachable without leaving the feed) and a **"Getting started" checklist** card for new accounts (see 10.5). It is additive: at lg the feed simply centers with the left rail and no right rail, and nothing is lost because search also exists as a left-rail destination. The right rail must never hold anything that is the only way to reach a function.
+- **Right rail, 320px, appears only at xl (1280px) and up.** In Phase 2 it holds a persistent **Search field** at the top (so search is reachable without leaving the feed) and a **"Getting started" checklist** card for new accounts (see 9.6). It is additive: at lg the feed simply centers with the left rail and no right rail, and nothing is lost because search also exists as a left-rail destination. The right rail must never hold anything that is the only way to reach a function.
 
-The overall page background is `background`. The feed column sits on `background` with its cards on `surface` (see section 5). Rails sit on `background` with no card chrome, so the eye reads one calm plane with the content column raised slightly out of it.
+The overall page background is `background`. The feed column sits on `background` with its cards on `surface` (see section 4). Rails sit on `background` with no card chrome, so the eye reads one calm plane with the content column raised slightly out of it.
 
 ### 1.3 Mobile and small tablet (less than lg)
 
@@ -59,12 +72,12 @@ The overall page background is `background`. The feed column sits on `background
 - Tapping a primary nav item switches surface with an instant crossfade of content (no slide between top-level tabs; slides are reserved for push navigation into detail). Scroll position per tab is preserved when you return to it.
 - Tapping a post opens the **thread view** as a push (slide-in from the right on mobile, in-place on desktop with the thread replacing the feed column). A back affordance always returns to the exact feed scroll position.
 - Tapping an avatar or @handle anywhere opens that **profile** as a push.
-- The composer opens as an overlay (modal on desktop, bottom sheet on mobile) over whatever surface you are on, so composing never loses your place. See section 6.
-- Settings opens as a full push surface with its own internal nav (see section 9).
+- The composer opens as an overlay (modal on desktop, bottom sheet on mobile) over whatever surface you are on, so composing never loses your place. See section 5.
+- Settings opens as a full push surface with its own internal nav (see section 8).
 
 ### 1.5 The frame and reading rhythm
 
-One vertical rhythm governs the whole app: 4px base, with 16px as the default breathing unit between unrelated blocks and 8px to 12px between related elements inside a block. The feed column has 0 horizontal padding on its outer edge at desktop (cards carry their own padding) and 0 on mobile as well, with cards spanning edge to edge on small screens (see 5.3 on the mobile density choice).
+One vertical rhythm governs the whole app: 4px base, with 16px as the default breathing unit between unrelated blocks and 8px to 12px between related elements inside a block. The feed column has 0 horizontal padding on its outer edge at desktop (cards carry their own padding) and 0 on mobile as well, with cards spanning edge to edge on small screens (see 4.3 on the mobile density choice).
 
 ### 1.6 Hover and row-fill rule (applies shell-wide)
 
@@ -83,10 +96,10 @@ The entire existing token system is built to, not redesigned. That means: the tw
 
 ### 2.2 What Phase 2 adds
 
-One new decorative token and two derived helpers. Full reasoning is in section 16. In brief:
+One new decorative token and two derived helpers. Full reasoning is in section 15. In brief:
 
 - `--thread-rail`: the reply-nesting guide color, Iris accent at approximately 16% alpha. Decorative only.
-- `--skeleton-base` and `--skeleton-sheen`: loading-placeholder colors derived from existing neutrals (see section 12). Decorative only.
+- `--skeleton-base` and `--skeleton-sheen`: loading-placeholder colors derived from existing neutrals (see section 11). Decorative only.
 
 No new text color, no new accent, no new semantic color is introduced. Everything readable reuses an existing, already-measured token.
 
@@ -104,8 +117,12 @@ These are the foreground/background combinations this document relies on that we
 | text-tertiary on surface | Timestamps, counts, metadata | 4.88 | 5.11 |
 | border-strong on surface | Input, segmented-control, and sole-identifier control outlines (non-text, target 3:1) | 3.47 | 3.52 |
 | accent on background | Links and active icons sitting directly on the page background (rails) | 6.26 | 6.80 |
+| danger on surface-raised | Destructive overflow-menu items (Block, Report, Delete) on the popover surface | 5.62 | 5.49 |
+| accent on surface-raised | Toast "Undo" action and accent text on the raised popover or toast | 7.10 | 5.58 |
+| text-primary on surface-raised | Reference-code block, popover and toast body text on the raised surface | 16.91 | 13.27 |
+| text-secondary on background | Rejection-screen body copy and support line on the auth surface | 6.77 | 8.46 |
 
-The `--thread-rail` color is intentionally below 3:1. It is exempt from WCAG 2.2 success criterion 1.4.11 because it is not the sole means of conveying reply nesting: indentation and each reply card's own `border-strong` boundary carry the structure, and the rail is reinforcement. A low-vision user who cannot see the rail still reads the thread correctly from the indentation steps and the card boundaries. See 7.3.
+The `--thread-rail` color is intentionally below 3:1. It is exempt from WCAG 2.2 success criterion 1.4.11 because it is not the sole means of conveying reply nesting: indentation and each reply card's own `border-strong` boundary carry the structure, and the rail is reinforcement. A low-vision user who cannot see the rail still reads the thread correctly from the indentation steps and the card boundaries. See 6.3.
 
 ---
 
@@ -133,10 +150,15 @@ This is where the locked identity rule lives, so it is specified exactly. The id
 - Target: minimum 44x44 touch, with the live glyph at 20px to 24px centered. Default `text-secondary`, hover `text-primary` on a neutral row-fill (content context) or `accent` on `accent-subtle` (control context, per 1.6). Pressed: scale 0.97 for 120ms (killed under reduced motion).
 - Every icon button has a visible-on-focus ring (2px `focus-ring`, 2px offset) and an `aria-label`. Icon-only buttons additionally get a tooltip on desktop after a short delay, but the tooltip is never the only label.
 
-### 3.4 Overflow menu
+### 3.4 Overflow menu (the three-dot menu)
 
-- Trigger: DotsThree icon button. Opens a popover (desktop, `shadow-e2`, `radius-md`) or a bottom sheet (mobile, `radius-2xl` top, `shadow-e3`).
-- Items are icon-plus-label rows at `text-body`, min height 44px. Destructive items use `danger` text. The Safety group (see section 11) is always pinned at the top of this menu for any content authored by someone other than the viewer, above generic actions like Copy link.
+This is the single most important interaction change in this revision. An earlier draft gave the safety controls a dedicated Shield button; that has been removed in favour of the conventional three-dot overflow that every social platform uses, for the reasons in section 10. The menu is defined once here and reused on every post card, reply, list row, and profile header.
+
+- **Trigger:** a **DotsThree** icon button (the standard three-dot "more" glyph), 44x44 target, placed on the far right of the item's header row. On a post card it sits on the far right of the identity row (see 4.2).
+- **Surface:** on desktop and large tablet, a popover anchored to the trigger: `surface-raised`, `shadow-e2`, `radius-md`, min width 240px, 8px vertical padding. On mobile, a bottom sheet: `surface-raised`, `radius-2xl` top corners, `shadow-e3`, a 32px drag handle centred at the top, sliding up at `sheet` duration. These are the two conventional presentations; nothing novel.
+- **Items** are icon-plus-label rows: a 20px Phosphor glyph, 12px gap, label at `text-body` (`text-primary`), min height 44px, 16px horizontal padding. A hovered or focused item fills with `accent-subtle` (this is a control surface, per 1.6). Dividers are a full-width `border` hairline with 4px of space above and below.
+- **Destructive items** (Block, Report, Delete) use `danger` text with a `danger`-coloured glyph and are grouped below a divider at the bottom of the menu, which is where every mainstream app puts them. See 10.1 for the exact contents and order, 10.2 for block confirmation, and 10.4 for report. `danger` text on the popover surface measures 5.62:1 light and 5.49:1 dark (2.3).
+- **Keyboard and screen reader:** the trigger carries `aria-haspopup="menu"`, `aria-expanded`, and an `aria-label` naming the item ("More options for post by @handle"). The menu is a `role="menu"` of `role="menuitem"` rows; the mobile bottom sheet is a modal dialog (`role="dialog"`, `aria-modal`, labelled "Post options") wrapping the same items. It opens on Enter, Space, or Down-arrow with focus on the first item; Up and Down arrows move between items, Home and End jump to the ends, Escape closes and returns focus to the trigger, and selecting an item closes it and returns focus to the trigger. Focus is trapped while open. Destructive items are distinguished by their wording and glyph, not by colour alone (12.6).
 
 ### 3.5 Toast
 
@@ -144,22 +166,23 @@ This is where the locked identity rule lives, so it is specified exactly. The id
 
 ### 3.6 Button and pill (from the existing kit, with Phase 2 additions)
 
-The existing Button variants (primary, secondary, danger, ghost) stand. Phase 2 adds one **follow control** pattern that is used often enough to standardize:
+The existing Button variants (primary, secondary, danger, ghost) stand. Phase 2 adds one **follow control** pattern. Its full behaviour (where the Follow button appears, that it disappears once you follow, and that unfollowing happens only from the profile) is specified in 4.9 and 7.1; this entry defines only its appearance.
 
-- **Follow (not following):** `secondary` style (bordered, `border-strong`, `surface` fill, `text-primary` label), label "Follow".
-- **Following (hover or focus reveals Unfollow):** filled low-emphasis using `accent-subtle` background and `accent` text, label "Following". On hover or focus it swaps to a `danger`-text "Unfollow" so the destructive outcome is visible before the tap. On mobile, where there is no hover, tapping "Following" opens a small confirm sheet ("Unfollow @handle?") rather than unfollowing instantly, so a mis-tap does not silently drop a follow.
-- Min height 36px in compact rows, 44px as a standalone control. Pill shape (`radius-full`).
+- **Follow button (on post cards and in lists):** a compact filled pill, `accent-fill` background, `on-accent` label "Follow", `radius-full`, `text-label`. Visual height about 30px, with the tap target padded to a minimum of 44x44. The filled pill is the near-universal convention for a follow action and reads instantly as "tap to follow". It is shown only for accounts you do not already follow, and it is removed once you follow them (4.9). `on-accent` on `accent-fill` is a measured pairing (7.10 light, 5.70 dark).
+- **Follow confirmation chip (transient):** the moment after you tap Follow, the pill is replaced in place by a non-interactive confirmation chip, `accent-subtle` background, `accent` text and a Check glyph, reading "Following", held for about two seconds and then removed. This gives on-the-spot proof the action registered before the button goes away (4.9). Under reduced motion it simply appears and is removed with no fade. `accent` on `accent-subtle` is measured (6.03 light, 5.55 dark).
+- **Unfollow button (profile only):** on a profile you already follow, the primary action reads "Following" in the `secondary` style (bordered `border-strong`, `surface` fill, `text-primary` label). Activating it asks for confirmation before unfollowing (7.1). There is deliberately no unfollow control in the feed; unfollowing is a profile-only action by design.
+- Min height 36px visual in compact rows, 44px target minimum everywhere. Pill shape (`radius-full`).
 
 ---
 
 ## 4. The home feed
 
-The feed is the single most important screen and the one the owner called dead. It is dead today only because Phase 2 does not exist yet. The job here is to define a feed that is alive and calm at the same time, and that still feels intentional when it is nearly empty (see section 10).
+The feed is the single most important screen and the one the owner called dead. It is dead today only because Phase 2 does not exist yet. The job here is to define a feed that is alive and calm at the same time, and that still feels intentional when it is nearly empty (see section 9).
 
 ### 4.1 Feed structure
 
-- **Feed header (sticky under the top bar).** A two-item segmented control: **Following** and **Discover**. Following is the reverse-chronological feed of people you follow and is the default. Discover is a lightweight reverse-chronological stream of recent public posts from across the platform (not the algorithmic For You feed, which is Phase 5). Discover exists in Phase 2 specifically so that a new account with zero follows still has something real to read on day one. The segmented control uses `border-strong` for the track, `accent` text plus a 2px `accent` underline for the active segment, and `text-secondary` for the inactive. Switching segments crossfades at `fast`.
-- **Composer entry affordance** sits at the very top of the Following feed on desktop and tablet: a single-line, tap-to-expand prompt row (see 6.2). On mobile the top-of-feed prompt is also present but secondary to the bottom-bar Compose button.
+- **Feed header (sticky under the top bar).** Two tabs: **Following** and **Discover**. This is the same two-tab home that mainstream feed apps use, so it needs no explanation. **Following** is the reverse-chronological feed of people you follow. **Discover** is a reverse-chronological stream of recent public posts from across the platform (not the algorithmic For You feed, which is Phase 5). The **default tab depends on your follow graph:** a brand-new member with zero follows lands on **Discover**, because an empty Following feed is the dead-on-arrival state the owner rightly rejected; once you follow at least one account the default becomes **Following**, and thereafter the app simply remembers the tab you last chose. The full Discover design, the difference in post treatment, and the thin-cohort states are in 4.7. Visually the two tabs use the segmented-tab treatment already defined: `border-strong` track, `accent` text plus a 2px `accent` underline for the active tab, `text-secondary` for the inactive, switching at `fast`.
+- **Composer entry affordance** sits at the very top of the Following feed on desktop and tablet: a single-line, tap-to-expand prompt row (see 5.1). On mobile the top-of-feed prompt is also present but secondary to the bottom-bar Compose button.
 - **The post list:** a vertical stack of post cards.
 - **New-posts pill:** when new posts arrive above the current scroll position, a floating pill ("3 new posts", `accent-fill`, `on-accent`, `radius-full`, `shadow-e2`) appears pinned near the top center. Tapping it scrolls to top and loads them. It never auto-jumps the reader. Under reduced motion the scroll is instant rather than animated.
 
@@ -168,7 +191,7 @@ The feed is the single most important screen and the one the owner called dead. 
 A post card is the atomic unit. Top to bottom, left to right:
 
 1. **Avatar**, 48px, top-left, links to profile.
-2. **Identity block** (3.2): `@handle` primary, `· 2h` after it, optional Founding pill. On the far right of this row, a **DotsThree overflow** icon button (44x44), which opens the overflow menu with Safety pinned at top (section 11).
+2. **Identity block** (3.2): `@handle` primary, `· 2h` after it, optional Founding pill. **Immediately after the handle, a compact "Follow" pill** (3.6) appears for any account you do not already follow; it is removed the moment you follow them (full behaviour in 4.9). On the far right of this row, a **DotsThree overflow** icon button (44x44), which opens the overflow menu (3.4); for anyone else's post that menu contains Copy link, then Show me less, Mute, and the destructive Block and Report at the bottom (section 10).
 3. **Body text**, `text-body-lg` (17px), `text-primary`, with generous line height (26px). Max 500 characters per the data model. Links, @mentions, and #hashtags render in `accent`; mentions and hashtags are tappable. Body preserves line breaks. A post that is only a reshare or quote renders the quoted card inline (see 4.4).
 4. **Media** (Phase 3, but the slot is defined now): below the body, a `radius-md` image block constrained to the card width, max height roughly 1.5x the card width, with a blurhash placeholder. In Phase 2 this slot is simply absent.
 5. **Action row:** four actions, evenly spaced, each a 44x44 target with a Regular Phosphor glyph plus a count at `text-caption` `text-tertiary`:
@@ -204,6 +227,37 @@ Posts carry a reply-control setting (Everyone, People you follow, Mentioned only
 
 - Notification unread count: a `danger-fill`-free, `accent-fill` numeric badge with `on-accent` text at `text-micro`, capped at "9+". Placed on the Bell icon. Using accent rather than red keeps alerts from feeling like errors and keeps the palette coherent. (Red is reserved for destructive and error states.)
 - Like, reply, and reshare counts: `text-caption` `text-tertiary`, hidden at zero.
+
+### 4.7 Discover, and how it relates to Following
+
+Discover is the answer to "a new member sees an empty feed and leaves." It is confirmed for Phase 2 at the owner's direction; she overruled an earlier recommendation to hold it back, and she is right that a social platform where newcomers see an empty feed is dead on arrival.
+
+- **Two tabs, one Home.** Following and Discover are tabs on the same Home surface (4.1), not separate destinations in the nav. This is the conventional arrangement and keeps the primary nav to five items (1.1).
+- **Which is default.** Zero follows, default to Discover. One or more follows, default to Following, then remember the last-chosen tab. So the first session is never an empty room, and an established member lands on the people she chose.
+- **Post treatment, Discover versus Following.** The card is identical in both (same anatomy, 4.2). The one and only difference is the **Follow pill**: in Discover you will meet accounts you do not follow, so their cards show the Follow pill; in Following you already follow everyone, so no pill appears. The presence or absence of that pill is exactly the "you do not follow this person" signal, and because it is the same control used everywhere, it needs no separate legend. (If a reshare in the Following feed surfaces an original author you do not follow, that author's card shows the pill too, for the same reason.)
+- **Why am I seeing this.** In Phase 2 Discover is plain reverse-chronological, so the honest answer is "this is a recent public post," which needs no per-post label. Instead Discover carries a single, dismissible one-line header the first few times you open it: "Recent posts from across United Feminist." Per-post "why you are seeing this" explanations are a ranked-feed affordance and are deferred to Phase 5 with the For You feed; bolting them onto a chronological stream would be noise.
+- **A note on moderation timing.** Discover shows unfiltered public posts before the Phase 3 moderation tooling exists. That risk is real and is the owner's informed call. The overflow controls (Show me less, Mute, Block, Report) are the member's self-defence in the interim and are on every Discover card; the hide signal (4.8) also lets a member quietly tune Discover away from accounts she does not want to see. This is noted again as a residual risk in section 18.
+
+### 4.8 Hide: "show me less from this account"
+
+Hide is the lightest of the three negative signals, below Mute and far below Block. It means **"show me less from this account,"** not "hide this one post."
+
+- **Where it lives.** It is the first negative item in the overflow menu (3.4, 10.1), labelled **"Show me less from @handle"** with a `MinusCircle` glyph. Neutral styling, not danger. The label is worded so it cannot be misread as "hide this post."
+- **Confirmation: none, deliberately.** It is reversible and low-stakes; a confirmation dialog would be friction out of all proportion to the action. The member taps once and it is done.
+- **Feedback, so it never feels like nothing happened.** This is the important part. On tap, the post's card is **replaced in place** by a slim confirmation panel occupying the same slot: "Thanks. You will see less from @handle." with an **Undo** link (`accent` text). This is the conventional "see less" feedback the big feeds use, and it makes an otherwise invisible ranking action visible. The panel stays until the next load, or until the member scrolls well past it; Undo restores both the card and the signal. A polite `aria-live` announcement conveys the same to screen readers.
+- **What it does.** It records a per-account negative signal. In Phase 2's chronological Discover this means that account's posts are shown to you noticeably less (suppressed or pushed down in your Discover); the stored signal also feeds the Phase 5 ranked feed. It never affects the other person and never notifies them. If you follow the account, hide does not remove them from your Following feed (for that you unfollow); hide is a Discover-tuning and ranking signal, not an unfollow.
+- **Relationship to Mute and Block.** Hide tunes down; Mute removes an account from your feeds and notifications silently and reversibly (10.3); Block cuts the relationship entirely (10.2). Three clearly separated strengths, in that order in the menu.
+
+### 4.9 Follow and unfollow mechanics
+
+This is the owner's exact specification, with one addition by Grove (the undo toast) to fix a real mis-tap problem. The addition does not weaken her design.
+
+- **Following is one tap, on the card.** A compact Follow pill (3.6) sits right after the @handle on every post card for accounts you do not already follow. Tapping it follows immediately and optimistically.
+- **The button disappears once you follow.** Per the owner's design, once you follow someone the Follow pill is removed from their cards. The signal that you already follow an account is simply the absence of the pill (and their presence in your Following feed). To stop the removal from reading as "did that even register?", two things happen on the tap: (1) the pill is first replaced in place by a transient **"Following" confirmation chip** with a Check glyph for about two seconds (3.6), then removed; and (2) a toast appears (next point).
+- **Grove's addition: a brief "Followed" undo toast.** Immediately after following, a toast reads **"Following @handle"** with an **Undo** action (3.5), and it stays for about six seconds, slightly longer than the default toast, because its whole job is to catch a mis-tap. Tapping Undo unfollows at once, with no confirmation, because undoing an action you just took should be as cheap as the action was. This is the standard snackbar-undo pattern, and it turns the common "oops, wrong button while scrolling" into a one-tap fix.
+- **Why this is needed.** A follow button beside every username in a fast-scrolling mobile feed will be mis-tapped. The owner's design makes the accidental action a single tap while the correction (go to the profile, tap Unfollow, confirm) is three deliberate steps: easy to do by accident, laborious to undo. The undo toast restores symmetry for the overwhelmingly common case, the mis-tap noticed immediately. To reduce mis-taps in the first place, the pill is right-aligned, kept away from the handle link and the card's thread-opening tap zone, with at least 12px of clear space around it, and its 44px target must not overlap the handle or the avatar targets.
+- **Unfollowing is profile-only, and confirmed.** There is no unfollow control in the feed. On a profile you follow, the primary action shows **"Following"** (secondary, bordered style). Activating it opens an **"Unfollow @handle?" confirmation** ("Their posts will no longer appear in your Following feed.") with **Cancel** (ghost, the default focus) and **Unfollow** (`danger-fill` button, white label; measured 5.62 light / 4.83 dark). This is the owner's deliberate asymmetry: easy to follow, considered to unfollow. The honest limits of this are discussed in section 18.
+- **Accessibility.** The Follow pill has an `aria-label` "Follow @handle"; on success the live region announces "Following @handle, undo available," and the toast's Undo is keyboard reachable for its full duration. The transient confirmation chip is decorative and is not a focus target. The profile Unfollow confirmation is a focus-trapped `role="dialog"` that returns focus to the Following button on close (12.2).
 
 ---
 
@@ -243,7 +297,7 @@ Below the field, a single row:
 
 ### 5.6 Reply mode
 
-When the composer is opened from a Reply action, the surface is identical with three differences: the header reads "Reply", a compact one-line preview of the post being replied to sits above the field ("Replying to @handle: first line of their post, truncated", `text-caption` `text-tertiary`), and the audience chip is replaced by the parent post's reply control shown as read-only context. On post, the reply is inserted into the thread optimistically (see section 12.4).
+When the composer is opened from a Reply action, the surface is identical with three differences: the header reads "Reply", a compact one-line preview of the post being replied to sits above the field ("Replying to @handle: first line of their post, truncated", `text-caption` `text-tertiary`), and the audience chip is replaced by the parent post's reply control shown as read-only context. On post, the reply is inserted into the thread optimistically (see section 11.2).
 
 ### 5.7 Draft safety
 
@@ -295,13 +349,13 @@ Profiles are where identity is richest and where the opt-in legal name lives. Th
   3. **Founding pill** (if applicable) on the same line as the handle or just beneath.
 - **Bio:** up to 300 characters, `text-body`, `text-secondary`, below identity.
 - **Metadata row:** joined date (MonthYear) at `text-caption` `text-tertiary`. No location field in Phase 2 (location is a doxxing vector and should be opt-in and deliberate if ever added).
-- **Primary action:** for other people's profiles, the Follow control (3.6) plus a **Message** button (disabled until DMs ship in Phase 4; hide rather than show disabled, per the same principle as the composer image button). For your own profile, an **Edit profile** button (`secondary`).
-- **Safety affordance:** on every profile that is not your own, a dedicated **Shield icon button** (44x44) sits in the header action area, next to the overflow. See section 11. This is not hidden in an overflow menu; it is a first-class header control.
+- **Primary action:** for other people's profiles, the follow control plus a **Message** button (hidden until DMs ship in Phase 4, per the same principle as the composer image button). The follow control on a profile is the full-size version of the one in 4.9: if you do not follow this person it is a filled **Follow** button; if you already follow them it is a bordered **Following** button that, when activated, asks "Unfollow @handle?" before unfollowing (4.9). For your own profile, an **Edit profile** button (`secondary`).
+- **Safety affordance:** on every profile that is not your own, the **three-dot overflow** (3.4) in the header action area carries the same safety controls as everywhere else, in the same order: Copy link, Show me less, Mute, then the destructive Block and Report (section 10). An earlier draft gave the profile header a dedicated Shield button; that has been removed so the safety controls live in the one conventional place a member already knows to look. Section 10 explains why convention beats prominence here.
 
 ### 7.2 Follower and following presentation
 
-- Two counts sit in a row under the header: "**N** Followers" and "**N** Following", each tappable to a list. Counts use `text-label` for the number and `text-caption` `text-tertiary` for the word. At zero, show "0 Followers" plainly; do not hide it, because on a new platform zero is honest and expected, and the empty list has its own friendly state (section 10.4).
-- Follower and following **lists** are rows: 40px avatar, identity block (@handle, and the opted-in legal name only if that person opted in), a one-line bio preview at `text-caption` `text-tertiary`, and a Follow control on the right. Each row has its own overflow with the Safety group.
+- Two counts sit in a row under the header: "**N** Followers" and "**N** Following", each tappable to a list. Counts use `text-label` for the number and `text-caption` `text-tertiary` for the word. At zero, show "0 Followers" plainly; do not hide it, because on a new platform zero is honest and expected, and the empty list has its own friendly state (section 9.5).
+- Follower and following **lists** are rows: 40px avatar, identity block (@handle, and the opted-in legal name only if that person opted in), a one-line bio preview at `text-caption` `text-tertiary`, and a Follow control on the right (a Follow pill if you do not follow them; nothing extra if you already do). Each row carries the same three-dot overflow (3.4), with Show me less, Mute, Block, and Report.
 - **Who can see these lists:** follower and following lists are visible to signed-in members by default. (Whether a member can hide their following list is a privacy control worth offering; flagged in section 18.)
 
 ### 7.3 Tabs
@@ -315,7 +369,7 @@ A segmented tab strip under the header, same active-state treatment as the feed 
 
 ### 7.4 Your own profile
 
-Identical layout with Edit profile in place of Follow and Message, no Shield (you cannot block yourself), and an additional affordance to reach Settings. The own-profile header is where a member confirms how they appear to others, including a clear, reassuring statement of their current name visibility (see 9.3).
+Identical layout with Edit profile in place of the follow and Message controls, no safety controls in the overflow (you cannot block, mute, or report yourself), and an additional affordance to reach Settings. The own-profile header is where a member confirms how they appear to others, including a clear, reassuring statement of their current name visibility (see 9.3).
 
 ---
 
@@ -343,7 +397,7 @@ Order is deliberate: the things a member under stress needs fastest come first.
    - **Following list visibility** (if offered, see 18).
 
 3. **Safety.** Co-equal with Privacy and immediately after it, so safety controls are two taps from anywhere, never buried.
-   - **Blocked accounts:** the full list, each with an Unblock control. Managed here and also actionable in context (section 11).
+   - **Blocked accounts:** the full list, each with an Unblock control. Managed here and also actionable in context from any overflow menu (section 10).
    - **Muted accounts and muted words:** lists, each removable.
    - **Message requests and who can message you** (wiring for Phase 4, shown now as "People you follow" by default).
    - **Report history:** the status of reports you have filed (open, reviewed, action taken), so reporting does not feel like shouting into a void. This directly supports the trust the community guidelines promise.
@@ -376,6 +430,7 @@ This is half the owner's complaint and it is a design opportunity, not a problem
 - **Following tab, no follows yet:** headline "Your feed is waiting". Body: "Follow a few people and their posts show up here. In the meantime, see what the community is sharing." Primary action: a button that switches to **Discover**. Secondary: "Find people to follow" into search. Below the message, seed the view with the Discover stream so the screen is never literally blank.
 - **Following tab, you follow people but they have not posted:** headline "Quiet in here for now". Body: "The people you follow have not posted yet. Be the one who starts." Primary action: Compose.
 - **Discover, genuinely empty (truly nobody has posted):** headline "Be the first voice". Body: "Nothing has been posted yet. Write the first post and set the tone." Primary action: Compose. This is the true cold-start state for the very first session of the very first member, and it should feel like an invitation to found something, not like a server error.
+- **Discover, sparse (the normal founding-cohort state).** With 10 to 50 members, Discover will often hold only a handful of posts. Show every post there is, then close the stream with a calm **end-of-feed card** rather than an endless spinner: headline "You are all caught up", body "United Feminist is brand new, so this is everything for now. More arrives as the community grows." with two quiet actions, "Find people to follow" and "Write a post". The rule: when there is genuinely no more to load, never show a loading spinner or a skeleton, because either reads as broken; show the end-of-feed card so thinness looks intentional, not failed. A thin Discover with three real posts and a warm closing card is a healthy new community; a thin Discover with a perpetual spinner is a dead site.
 
 ### 9.3 Empty notifications
 
@@ -402,42 +457,56 @@ The first session is the make-or-break moment the owner reacted to. The flow aft
    - **Find people.** Follow a few accounts so your feed fills up. (Opens search or a suggested-people list.)
    - **Make it yours.** Add a photo and a line of bio. (Opens Edit profile.)
    Each item checks off as done and the card removes itself when all three are complete or when dismissed.
-3. **No forced tour, no modal gauntlet, no gating.** The member lands directly in a usable Discover feed with the welcome card on top. Registration is fully open, so there is no pending state, no approval wait, no vouch prompt, and none of that language appears anywhere (see section 17 on removing the stale Phase 1 copy).
-4. **A quiet, one-time pointer to safety tools:** the first time a member opens any profile or post overflow, a single non-blocking tooltip highlights the Shield affordance: "Block, mute, and report live here, always one tap away." Shown once, dismissible, never repeated.
+3. **No forced tour, no modal gauntlet, no gating.** The member lands directly in a usable Discover feed with the welcome card on top. Registration is fully open, so there is no pending state, no approval wait, no vouch prompt, and none of that language appears anywhere (see section 16 on removing the stale Phase 1 copy).
+4. **A quiet, one-time pointer to safety tools:** the first time a member opens any post's three-dot overflow, a single non-blocking tooltip points at it: "Hide, mute, block, and report live here, always one tap away." Shown once, dismissible, never repeated. The pointer attaches to the conventional overflow rather than to any special button, so what a member learns once is what every other app already taught her.
 
 ---
 
-## 10. Safety UI as first-class
+## 10. Safety controls: block, mute, hide, and report
 
-This platform exists for people who need block, mute, and report to work under stress. These controls are fast, obvious, and consistent, and they are never three levels deep in an overflow.
+This platform exists for people who need block, mute, and report to work under stress. An earlier draft gave these a dedicated Shield button and made a swipe gesture a primary path, on the theory that safety controls should be as *prominent* as possible because people reach for them under pressure. **That has been changed, at the owner's direction, and she is right.** Under stress people do not hunt for a novel button; they reach for **muscle memory**, and on every social platform the muscle memory for "deal with this person or post" is the **three-dot overflow menu**. A distinctive Shield is more visible but *less findable*: it is one more thing to learn at the exact moment a member has no patience to learn anything. **Convention beats prominence for safety controls.** So the safety actions now live in the conventional overflow (3.4), exactly where a member's hands already expect them. The swipe gesture is kept as an extra accelerator because it costs nothing (10.3).
 
-### 10.1 The Shield affordance
+### 10.1 The overflow menu is the safety home
 
-- A dedicated **Shield icon button** (Phosphor Shield, 44x44) appears in two fixed places: the **profile header** (section 7.1) and, pinned to the top of, **every post and reply overflow menu** for content you did not author.
-- Tapping the Shield opens the **Safety menu**: a focused list, each item an icon plus label at `text-body`, min 44px:
-  - **Mute @handle** (SpeakerSimpleSlash). Silent, reversible, no notification to anyone. "You will not see their posts or notifications from them. They are not told."
-  - **Block @handle** (Prohibit), in `danger` text. "They cannot see your profile or posts, follow you, or message you. They are not told."
-  - **Report @handle or this post** (Flag), in `danger` text. Opens the report flow (10.4).
-- Block and Report sit in `danger` color and are pinned above any generic actions. Mute is neutral. The three safety actions always appear in this same order, in this same place, everywhere, so muscle memory works.
+On every post, reply, list row, and profile that is not your own, the three-dot overflow (3.4) contains, top to bottom:
 
-### 10.2 Swipe actions
+1. **Copy link** (LinkSimple). Neutral. The generic action sits first.
+2. *(divider)*
+3. **Show me less from @handle** (MinusCircle). Neutral. The lightest negative signal; see 4.8.
+4. **Mute @handle** (SpeakerSimpleSlash). Neutral. "You will not see their posts or notifications from them. They are not told."
+5. *(divider)*
+6. **Block @handle** (Prohibit). `danger` text and glyph. Requires a confirmation step (10.2).
+7. **Report @handle or this post** (Flag). `danger` text and glyph, and set apart as the final item so it reads as the most serious action in the menu. Opens the report flow (10.4).
 
-On touch, swiping left on a feed post, a notification row, or (later) a conversation row reveals two quick actions: **Mute** (neutral) and **Block** (danger). This gives a one-gesture escape without opening any menu. Swipe actions are mirrored by the overflow menu so there is always a non-gesture path (accessibility and desktop).
+This order is the mainstream convention: the generic action first, then the escalating negative actions, with the destructive pair fenced off at the bottom. **Report is the visually distinct item:** `danger` colour plus the fenced-off final position. Block is `danger`-coloured too, but it is gated by a confirmation step rather than set apart by position. `danger` text on the menu surface measures 5.62:1 light and 5.49:1 dark on `surface-raised` (2.3), comfortably past AA, and the destructive nature is carried by the word and the glyph as well as the colour (12.6), so nothing depends on colour alone.
 
-### 10.3 Block and mute behavior and feedback
+For your **own** content the menu instead reads: Copy link, then a fenced **Delete post** (Trash, `danger`, confirmed). No safety actions appear against yourself.
 
-- **Block:** immediate, optimistic. The blocked person's content disappears from the viewer's surfaces at once. A toast confirms ("Blocked @handle") with an Undo. Blocking is silent: the blocked person receives no notification. (The data model enforces that the Owner and the system account cannot be blocked; the Shield simply does not offer Block on those two accounts, and no error is ever shown to explain why, to avoid drawing attention.)
-- **Mute:** immediate, optimistic, silent, with an Undo toast. Muted content is removed from feed and notifications; on a profile you visit directly, a muted person's posts appear behind a "You muted @handle. Show posts?" reveal, so muting is not a trap you cannot see out of.
+### 10.2 Block, with a confirmation step
+
+Block is the one safety action confirmed before it happens, because it is the heaviest and because an accidental block is disruptive to undo cleanly.
+
+- Selecting **Block @handle** opens a small confirmation: a centred modal on desktop (`surface-raised`, `radius-xl`, `shadow-e3`, `scrim`) or a bottom sheet on mobile. Title "Block @handle?", body "They will not be able to see your profile or posts, follow you, or message you. They will not be told." Actions: **Cancel** (ghost, and the default focus, so an accidental Enter does nothing destructive) and **Block** (`danger-fill` button, white label; measured 5.62:1 light / 4.83:1 dark).
+- On confirm, block is immediate and optimistic: the blocked person's content disappears from your surfaces at once, and a toast confirms "Blocked @handle" with an **Undo**. Blocking is silent; the blocked person is never notified.
+- The data model forbids blocking the Owner and the system account. For those two, Block is simply absent from the menu, with no error shown to explain the absence, so no attention is drawn to it.
+- **Accessibility:** the confirmation is a focus-trapped `role="dialog"` (`aria-modal`); Escape cancels; focus returns to the overflow trigger on close.
+
+### 10.3 Mute, hide, and the swipe accelerator
+
+- **Mute:** immediate, optimistic, silent, reversible, with an Undo toast. Muted content is removed from your feed and notifications. If you visit a muted person's profile directly, their posts sit behind a "You muted @handle. Show posts?" reveal, so muting is never a trap you cannot see out of. No confirmation step; the Undo toast is enough.
+- **Hide (show me less):** specified in 4.8. No confirmation; an in-place confirmation panel with Undo is the feedback.
+- **Swipe accelerator (kept, secondary).** On touch, swiping left on a feed post or a notification row reveals two quick actions, **Mute** and **Block** (the latter in `danger`, still routed through the block confirmation of 10.2). This is an accelerator for people who already know it is there, not the primary path: every one of these actions is also in the overflow, which is the discoverable, keyboard-reachable, screen-reader-reachable route. Report is deliberately not a swipe action, because reporting needs the reason flow (10.4); swipe is only for the instant mute-or-block escape. Under reduced motion the row still opens, without the elastic animation.
 
 ### 10.4 Reporting flow
 
-Reporting must be quick but must gather enough to be actionable, and it must feel like it goes somewhere.
+Reporting must be quick, must gather enough to be actionable, and must feel like it goes somewhere.
 
-1. **Reason selection** (maps to the `report_reason` enum, minus the stale `male_account` value, see section 17): a single-select list with plain-language labels and one-line descriptions: Harassment or bullying, Hate speech, Threat of violence, Sharing private information (doxxing), Sexual content or harassment, Impersonation, Spam or scam, Self-harm, Something else. CSAM has its own clearly separated, prominent path with gentle, serious copy.
+1. **Reason selection** (maps to the `report_reason` enum, minus the stale `male_account` value, see section 16): a single-select list with plain-language labels and one-line descriptions: Harassment or bullying, Hate speech, Threat of violence, Sharing private information (doxxing), Sexual content or harassment, Impersonation, Spam or scam, Self-harm, Something else. CSAM has its own clearly separated, prominent path with gentle, serious copy.
 2. **Optional detail:** a short free-text field (up to 2000 chars per the model), "Anything else we should know?"
-3. **Immediate options after submitting:** offer Block and Mute right there ("Reports are reviewed by our team. Do you also want to block @handle?"), so the member leaves the flow protected, not just heard.
+3. **Immediate protection:** after submitting, offer Block and Mute right there ("Reports are reviewed by our team. Do you also want to block @handle?"), so the member leaves the flow protected, not just heard.
 4. **Confirmation:** "Thanks. Our team will review this. You can see the status in Settings, Safety, Report history." This closes the loop the community guidelines promise and is why Report history exists in Settings.
-5. **Tone:** serious, brief, never flippant, never bureaucratic. No "Oops!" No exclamation points on a report confirmation.
+5. **Tone:** serious, brief, never flippant, never bureaucratic. No "Oops!", no exclamation points on a report confirmation.
+6. The flow is a standard multi-step sheet (reason list, optional detail, confirm); nothing about it is novel. It opens as a bottom sheet on mobile and a modal on desktop.
 
 ### 10.5 Report-against-power edge
 
@@ -490,7 +559,7 @@ Every interactive element has a minimum 44x44 CSS-pixel target, including icon b
 ### 12.3 Keyboard
 
 - Everything doable by tap is doable by keyboard. Menus open on Enter or Space and are arrow-navigable. The feed is tabbable post to post; within a post, Tab reaches the actions.
-- Optional single-key shortcuts (for example `n` for new post, `j`/`k` to move through the feed, `l` to like the focused post, `.` to open the focused post's safety menu) are a progressive enhancement, documented, and never the only way to do anything. They are disabled while a text field is focused.
+- Optional single-key shortcuts (for example `n` for new post, `j`/`k` to move through the feed, `l` to like the focused post, `.` to open the focused post's overflow menu) are a progressive enhancement, documented, and never the only way to do anything. They are disabled while a text field is focused.
 
 ### 12.4 Screen reader semantics
 
@@ -549,11 +618,11 @@ The owner's concern is explicit: do not make this so similar to Threads that it 
 
 8. **Navigation.** United Feminist's desktop shell is a labeled left rail with a raised accent Compose pill and an accent active-indicator, plus an optional right rail; its mobile bar weights the Compose slot with an accent-filled tile. Threads' chrome is a flatter, unlabeled icon row with no brand-colored action.
 
-9. **Safety as chrome.** United Feminist promotes block, mute, and report to a dedicated labeled Shield affordance in every profile header and at the top of every content overflow, plus swipe actions. This is a structural, first-class safety surface that Threads does not present; it changes what the product foregrounds.
+9. **Safety placement is deliberately *not* a point of distinction.** United Feminist puts block, mute, hide, and report in the conventional three-dot overflow, exactly as other platforms do, because safety controls must be findable by muscle memory under stress (section 10). Interaction placement like this is an industry convention; it is not what makes a product distinct or legally distinguishable. The distinctiveness is entirely in the look (points 1 through 8), not in where the menu sits. This point is listed so no one mistakes "we use the standard overflow" for "we copied Threads": conventions are shared by everyone, trade dress is not (see 0.1).
 
 10. **Empty and first-run language.** United Feminist's empty states and first-run are a designed, branded, founding-cohort experience with a "be the first voice" posture and a safety pointer, specific to this product's purpose and community, not a generic social-app onboarding.
 
-Taken together, the color system, dark-mode construction, typeface, post-surface treatment, threading metaphor, composer form, icon weighting, navigation chrome, and first-class safety surface make this a visually and structurally distinct product that shares only a design philosophy with Threads, not its trade dress. This is a design argument, not a legal opinion; a trademark and trade-dress review by counsel is still recommended before launch, as already flagged in the project's open items.
+Taken together, the color system, dark-mode construction, typeface, post-surface treatment, threading metaphor, composer form, icon weighting, and navigation chrome make this a visually and structurally distinct product that shares only a design philosophy with Threads, not its trade dress. This is a design argument, not a legal opinion; a trademark and trade-dress review by counsel is still recommended before launch, as already flagged in the project's open items.
 
 ---
 
@@ -601,20 +670,61 @@ These were found by reading the current repository. They are not cosmetic; sever
 
 ---
 
-## 17. The three decisions I am least certain about
+## 17. Account creation and the age gate
 
-Stated honestly, with what would resolve each.
+Registration is fully open: no invite, no vouch, no approval queue, no gender screening (see section 16 and the architecture doc). The one gate at signup is age. The platform is 18+, verified by self-attestation (a date-of-birth field that actually rejects under-18) plus a short-lived retry block on the device. That is the owner's documented, informed decision, and the behavioural and legal reasoning for it lives in the age-assurance decision record, not here. This section designs the three screens the decision requires. The visual system is unchanged; these are plain, centred, single-column auth surfaces on `background`, max width about 420px, consistent with the existing signup page. Although account creation happens before the social core a member sees, it is documented here so the whole Phase 2 surface is in one place.
 
-1. **Showing the Discover tab in Phase 2.** I added a platform-wide reverse-chronological Discover feed so a zero-follow new member has real content on day one, because an empty Following feed is the core of the owner's complaint. The risk: on an open-registration platform, an unfiltered public stream is also where spam, brigading, and bad actors are most visible to brand-new members before they have built a safe follow graph, and the moderation backbone is Phase 3, not Phase 2. It may be safer to launch Phase 2 with a curated "Suggested posts from the founding cohort" surface instead of a raw global stream. **To resolve:** a call from the owner and Grove-Security on whether an unmoderated public stream is acceptable during the Phase 2 window, or whether Discover should be a hand-curated founding-cohort surface until Phase 3 moderation exists.
+### 17.1 Date of birth at signup
 
-2. **Whether the photo-attach and Message controls should appear-but-disabled or be hidden in Phase 2.** I recommended hiding both until their phases (media in Phase 3, DMs in Phase 4) so nothing looks broken, but a visible-but-disabled control with "coming soon" copy sets expectations and signals the roadmap. The two readings genuinely conflict: hidden feels more finished, disabled feels more honest about what is coming. **To resolve:** the owner's preference on whether to tease upcoming features in the UI or present only what works today. Low stakes, easily reversed.
+- **It is a normal field in the normal signup form,** alongside email, handle, and legal name. No separate step, no modal, no drama. Label: "Date of birth". Helper, `text-caption` `text-tertiary`: "You must be 18 or older to join United Feminist."
+- **Three separate fields: Month, Day, Year,** each a labelled control laid out in a row (stacking under `sm`). Use either three selects or three numeric inputs; the hard requirement is the same either way: **every field starts blank, with a visible placeholder ("Month", "Day", "Year"), and nothing is pre-selected.** Do not use a wheel or spinner picker that lands on a plausible adult year by default, and never pre-fill a passing value. The member must actively enter each part. The Year field in particular must open empty, not on "2000" or any year that would pass the gate.
+- **Inputs** use the existing field styling: `border-strong` outline (3:1), `radius-md`, 44px minimum height, `text-body`, `text-primary`, with the `focus-ring` on focus. The outline is `border-strong on surface` at 3.47:1 light / 3.52:1 dark (already measured).
+- **Validation and submit.** The 18+ check runs on submit, and may preview inline once all three fields are filled. An incomplete or invalid date shows an inline `text-caption` `danger` message beneath the group ("Enter your full date of birth"). An under-18 date routes to the rejection screen (17.2); it does not silently record and continue. **The date of birth must *reject*, not merely be stored,** or the gate is theatre.
+- **Accessibility:** the three fields share a group label "Date of birth" (`role="group"` with an accessible name); each field also has its own label; the error is tied to the group via `aria-describedby` and announced politely; every target is at least 44px.
 
-3. **The Likes tab and following-list visibility defaults.** I defaulted a member's Likes to private and left following-list visibility as an open control, reasoning that both are surveillance and harassment vectors on a safety-focused platform. But hiding likes and follows also removes social signal that helps a small new community feel alive and discover each other, and other platforms expose both by default. I am not certain the maximally private default is right for the founding-cohort growth phase. **To resolve:** a product call weighing safety against discoverability, ideally informed by what the founding cohort actually wants, since they are the people the privacy default is meant to protect. This is a values question more than a design one, so it belongs to the owner.
+### 17.2 The under-18 rejection screen
+
+Someone has just been told no. She may be sixteen. She is not a problem to be dealt with; she is a member in two years. The screen is clear, warm, and brief, and it does not lecture.
+
+- **Layout:** centred, single column. One Phosphor line glyph at large size in `text-tertiary`, something calm and non-judgemental (for example an `Hourglass` or a simple `Clock`, never a stop sign, never a crossed-out face). Headline at `text-title`, `text-primary`: "You need to be 18 to join". Body at `text-body-lg`, `text-secondary`: "Thanks for checking out United Feminist. We are an adults-only community, so you cannot create an account right now. We hope to see you when you are older." That is the whole message.
+- **Tone rules:** no "sorry", no "oops", no exclamation marks, no birthday countdown, no joke. Clear and kind. It must not read as a scolding and it must not read as a taunt.
+- **CRITICAL: this screen collects and displays nothing identifying.** There is **no email field, no name, no "notify me when I turn 18" capture, no "contact us" form, and no retention message.** The only control on the screen is a single neutral link back to the public home or marketing page ("Back to United Feminist"). The moment a visitor self-declares under 13, the platform has actual knowledge under COPPA, and collecting any personal information from them would be a violation; so the design collects none from anyone the gate turns away. **If a future revision feels the urge to add a "we will remind you" email box here, do not. That urge is the violation.**
+- **Contrast:** all existing measured pairings. `text-primary` on `background` is 14.90:1, `text-secondary` on `background` is 6.77:1 light / 8.46:1 dark (2.3). Nothing new is introduced.
+
+### 17.3 The blocked screen (device returns within 14 days)
+
+If a device that just failed the age check tries again within 14 days, it meets this screen instead of the signup form. The block is a 14-day, time-limited soft block keyed to a hashed device fingerprint plus a cookie; it is deliberately not permanent, because shared family devices and simple typos must not lock real adults out forever.
+
+- **Layout:** the same centred auth surface. Calm glyph (`Clock` or `Hourglass`), headline at `text-title`, `text-primary`: "You cannot create an account right now". Body at `text-body`, `text-secondary`: "This device recently did not meet our age requirement. You can try again later."
+- **The reference code.** Below the message sits a **reference-code block**, because this code is the only way a person can identify their own device to support (nobody can read their own fingerprint hash). It is a short, human-readable code, for example **"4F2A"**. Treatment:
+  - The code is displayed large and legible: `text-title` or `text-display`, `text-primary`, letter-spaced, inside a `surface-raised` chip with a `border-strong` outline and `radius-md`, centred. `text-primary` on `surface-raised` measures 16.91:1 light / 13.27:1 dark (2.3).
+  - A **Copy button** sits beside it: a Copy glyph plus "Copy" label, a `secondary` control, 44px target. Tapping it copies the code to the clipboard and briefly swaps the label to "Copied". The code text itself is also selectable, so copy works without the button too.
+  - Beneath the code, one line at `text-body` `text-secondary`: "Entered the wrong date? Contact support@unitedfeminist.com and quote this code." The email address is a selectable `mailto:` link (`accent` text, 6.26:1 light / 6.80:1 dark on `background`), which opens the visitor's own mail app. It is an outbound link, not a form on our page, so it collects nothing.
+- **CRITICAL: again, no identifying input.** The reference code is the only thing on this screen the visitor interacts with, and it is read-only, displayed and copyable, never typed into. There is **no email box, no name box, no message form, no "notify me", and no "we are keeping your information" language.** The platform stores only a hashed fingerprint, a timestamp, an expiry, and this code; the screen must not ask for or display anything beyond the code. Support unlocks a device by looking up the quoted code; the member never types anything here.
+- **Accessibility:** the code is exposed to screen readers character by character via an `aria-label` that spells it out ("Reference code: four, F, two, A"), so it is not misread as a word; the Copy button announces "Copied" through a polite live region; the `mailto` link is a normal focusable link; every target is at least 44px; there is no motion beyond the label swap, which is instant under reduced motion.
+
+### 17.4 What these screens must never become
+
+A single rule governs all three: **the age gate takes in a date and gives back a yes, a no, or a wait; it never takes in a person.** No email, no name, no contact form, no marketing capture, no "remind me", anywhere in the rejection or blocked paths. The reference code is readable and copyable; it is not an input. This is a hard constraint, not a preference, and it is stated here in the spec so a future change cannot quietly reintroduce a capture field and call it helpful.
 
 ---
 
-## 18. Summary of deliverables for the Phase 2 build
+## 18. The decisions I am least certain about
 
-An engineer implementing Phase 2 from this document builds: the three-column responsive shell and mobile tab bar (section 1); the shared primitives (section 3); the home feed with its card anatomy, density, separators, feed segments, and new-posts pill (section 4); the two-form composer with late-revealing counter and inline audience control (section 5); the thread view with three-level nesting, guide rails, and re-root collapse (section 6); profiles with handle-forward, opt-in-legal-name identity and tabs (section 7); the re-architected settings with privacy and safety high in the order (section 8); the full set of empty states and the first-run checklist and welcome card (section 9); the first-class Shield safety surface with swipe actions and the reporting flow (section 10); skeleton-based loading, optimistic actions, and calm error and offline states (section 11); and the stated accessibility and motion behavior throughout (sections 12 and 13). It stays visually distinct from Threads (section 14), adds only one decorative rail token and two derived skeleton tones (section 15), and corrects the seven implementation issues that work against the above (section 16).
+Stated honestly, with what would resolve each. Some of these were open questions in an earlier draft that the owner has since decided; those are marked settled so the list stays current rather than contradicting the decisions above.
+
+1. **Discover before moderation tooling exists (now decided, residual risk noted).** An earlier draft was unsure whether to ship a public Discover feed in Phase 2 at all, since the moderation backbone is Phase 3. **The owner has decided: Discover ships in Phase 2**, and she is right that a platform where newcomers see an empty feed is dead on arrival. The residual uncertainty is only the interim exposure: an unfiltered public stream is where spam and bad actors are most visible to brand-new members before a safe follow graph exists. The design mitigates this with the on-card overflow controls and the hide signal (sections 4.8, 10), but those are member self-defence, not moderation. **What would reduce the residual risk:** shipping even a thin first pass of moderation tooling alongside Discover, or seeding Discover from the founding cohort for the first weeks. This is a sequencing call for the owner and Grove-Security, not a reason to hold Discover back.
+
+2. **How prominent the on-card Follow button should be.** I specified a filled `accent` Follow pill because the filled pill is the most conventional, instantly legible follow affordance and because growth depends on new members actually following people from Discover. The tension: a feed full of filled purple pills works against the "calm paper" restraint, and the inherited rule (1.6) keeps accent sparing. A quieter bordered pill would be calmer but reads as lower priority. I lean filled for conventionality and growth, but this is a genuine judgement call. **What would resolve it:** the owner's eye on a real Discover screen with ten cards. It is a one-line change either way.
+
+3. **The exact rejection copy, and the undo-toast duration.** Two small, honest uncertainties bundled. First, the under-18 rejection wording (17.2) is trying to be kind without being patronising to a teenager, and getting that exactly right is a copy decision better made by the owner, whose voice the guidelines already carry, than guessed by a designer. Second, I set the follow undo toast to about six seconds (4.9); that is a guess at "long enough to catch a mis-tap, short enough not to nag", and the right number is an empirical question. **What would resolve both:** the owner's pass on the rejection copy, and light testing on the toast duration.
+
+The two older open questions remain open and unchanged: whether the photo-attach and Message controls should be hidden or shown-disabled before their phases (5.5, 7.1), and the Likes-tab and following-list visibility defaults (7.2, 7.3), which is a values call about safety versus discoverability for the founding cohort.
+
+---
+
+## 19. Summary of deliverables for the Phase 2 build
+
+An engineer implementing Phase 2 from this document builds: the three-column responsive shell and mobile tab bar (section 1); the shared primitives including the conventional three-dot overflow menu (section 3); the home feed with its card anatomy, density, separators, the Following and Discover tabs, the on-card Follow button, the hide (show-me-less) signal, and the new-posts pill (section 4); the two-form composer with late-revealing counter and inline audience control (section 5); the thread view with three-level nesting, guide rails, and re-root collapse (section 6); profiles with handle-forward, opt-in-legal-name identity, the profile-only Unfollow with confirmation, and tabs (section 7); the re-architected settings with privacy and safety high in the order (section 8); the full set of empty states including Discover's sparse state, and the first-run checklist and welcome card (section 9); the conventional overflow safety controls (hide, mute, block with confirmation, report), the swipe accelerator, and the reporting flow (section 10); skeleton-based loading, optimistic actions, and calm error and offline states (section 11); the stated accessibility and motion behavior throughout (sections 12 and 13); and the account-creation age gate with its blank date-of-birth field, the kind under-18 rejection screen, and the no-data-collecting blocked screen with its copyable reference code (section 17). It stays visually distinct from Threads (section 14), adds only one decorative rail token and two derived skeleton tones (section 15), and corrects the seven implementation issues that work against the above (section 16).
 
 Everything readable in this specification uses an existing, measured token, or a new pairing whose measured ratio is listed in section 2.3. The product should feel like a serious, calm, trustworthy piece of software that happens to be built for people who need its safety tools to work. That is the whole brief.
