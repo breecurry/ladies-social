@@ -19,8 +19,18 @@ and skips bootstrapping if the Owner already exists.
 ## 1. Before you run it (prerequisites)
 
 1. **Install the Supabase CLI** — <https://supabase.com/docs/guides/local-development/cli/getting-started>
-   (`brew install supabase/tap/supabase`, or `npm i -g supabase`). The script
-   uses it to apply migrations.
+   The script calls `supabase` directly, so you need a **global** install:
+   - macOS / Linux: `brew install supabase/tap/supabase`
+   - Windows: `scoop install supabase`
+
+   ⚠️ **Do NOT install it as a project dependency** (`npm install supabase --save-dev`).
+   That method deliberately provides **no global `supabase` command** — you would have
+   to run `npx supabase` — and this script's preflight check will fail with
+   "'supabase' is required but not on PATH".
+   Docker is **not** required: `supabase db push` talks to the hosted project
+   directly. You only need a container runtime for `supabase start` (the local
+   stack), which this flow never uses.
+   *(Install methods verified against the official CLI docs 2026-10-02.)*
 2. **Install Node.js** (already required to build the app) and run `npm install`.
 3. **Create a Supabase account and an organization**, and **put that
    organization on the Pro plan** — this is a dashboard-only step, see
