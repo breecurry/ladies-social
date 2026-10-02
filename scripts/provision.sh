@@ -199,7 +199,11 @@ step "Waiting for services to come up (ACTIVE_HEALTHY)"
 deadline=$(( $(date +%s) + 600 ))
 fails=0
 while :; do
-  code="$(api GET "/v1/projects/${REF}/health?services=db,auth,rest&timeout_ms=5000")" || true
+  # NOTE: do NOT send timeout_ms. It is an OPTIONAL integer, but the API validates
+  # it strictly and a query string can only ever carry it as text, so any value
+  # fails with: {"message":"timeout_ms: Invalid input: expected number, received
+  # string"}. Omitting it uses the server default and the call succeeds.
+  code="$(api GET "/v1/projects/${REF}/health?services=db,auth,rest")" || true
   if [[ "$code" == "200" ]]; then
     fails=0
     unhealthy="$(jget "$RESP" 'Array.isArray(d)?d.filter(s=>s.status!=="ACTIVE_HEALTHY").map(s=>s.name).join(",")  : "all"')"
