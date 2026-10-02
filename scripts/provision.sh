@@ -5,7 +5,7 @@
 # Given a Supabase personal access token (PAT) and a handful of values, this
 # creates the project, applies the migrations, turns on every security setting
 # the product requires (30-minute JWTs, refresh-token rotation, mandatory email
-# confirmation, TOTP + WebAuthn MFA, pg_cron), writes the app keys to
+# confirmation, TOTP MFA, pg_cron), writes the app keys to
 # .env.local, and seeds the Owner + system account via `npm run bootstrap`.
 #
 # It is idempotent: re-running reuses the existing project, skips already-applied
@@ -251,7 +251,7 @@ info "migrations applied"
 # 6. Configure Auth: the required security posture (idempotent PATCH)
 # ----------------------------------------------------------------------------
 step "Configuring Auth security settings"
-SB_SITE="$SITE_URL" SB_RPID="$WEBAUTHN_RP_ID" SB_SMTP="$SMTP_CONFIGURED" \
+SB_SITE="$SITE_URL" SB_SMTP="$SMTP_CONFIGURED" \
 node -e '
 const fs=require("fs");
 const b={
@@ -267,11 +267,16 @@ const b={
   mfa_max_enrolled_factors: 10,
   mfa_totp_enroll_enabled: true,
   mfa_totp_verify_enabled: true,
-  mfa_web_authn_enroll_enabled: true,          // WebAuthn factor for the Owner
-  mfa_web_authn_verify_enabled: true,
-  webauthn_rp_id: process.env.SB_RPID,
-  webauthn_rp_origins: process.env.SB_SITE,
-  webauthn_rp_display_name: "United Feminist",
+  // WebAuthn MFA is deliberately NOT configured here. The Management API
+  // *accepts* the field names mfa_web_authn_* and webauthn_rp_* (they are in
+  // the published OpenAPI spec), but the server rejects enabling them:
+  //   HTTP 422 {"message":"Enabling of MFA with WebAuthn not currently supported"}
+  // The feature is not generally available yet. TOTP is the MFA factor until
+  // it is. The database still demands AAL2 for privileged actions, and a
+  // verified TOTP factor satisfies AAL2, so the security model is intact.
+  // WHEN SUPABASE SHIPS IT, re-add: mfa_web_authn_enroll_enabled,
+  // mfa_web_authn_verify_enabled, webauthn_rp_id (PERMANENT once set),
+  // webauthn_rp_origins, webauthn_rp_display_name.
 };
 if(process.env.SB_SMTP==="yes"){
   b.smtp_host=process.env.SMTP_HOST;
@@ -284,7 +289,10 @@ if(process.env.SB_SMTP==="yes"){
 fs.writeFileSync(process.argv[1],JSON.stringify(b),{mode:0o600});
 ' "$BODY"
 code="$(api PATCH "/v1/projects/${REF}/config/auth" "$BODY")"; api_ok "$code" 200
-info "auth config written (30m JWT, refresh rotation, email confirmation, TOTP + WebAuthn)"
+info "auth config written (30m JWT, refresh rotation, email confirmation, TOTP)"
+warn "WebAuthn MFA is NOT enabled: Supabase does not currently support it"
+warn "(HTTP 422 on enable). TOTP is the Owner MFA factor and satisfies AAL2."
+warn "Re-enable WebAuthn when Supabase ships it — see the comment in section 6."
 
 # ----------------------------------------------------------------------------
 # 7. Retrieve API keys + URL, write them to .env.local (0600) — never to stdout
@@ -351,7 +359,8 @@ check "jwt_exp == 1800"                       'd.jwt_exp===1800'
 check "refresh_token_rotation_enabled"        'd.refresh_token_rotation_enabled===true'
 check "email confirmation required"           'd.mailer_autoconfirm===false'
 check "TOTP MFA enabled"                       'd.mfa_totp_verify_enabled===true'
-check "WebAuthn MFA enabled"                   'd.mfa_web_authn_verify_enabled===true'
+# No WebAuthn assertion: Supabase rejects enabling it (HTTP 422), so asserting
+# it would fail every run. Restore this check when the feature ships.
 
 printf '{"query":"select exists(select 1 from pg_extension where extname='"'"'pg_cron'"'"') as ok;"}' > "$BODY"
 code="$(api POST "/v1/projects/${REF}/database/query" "$BODY")"; api_ok "$code" 200 201
@@ -365,7 +374,8 @@ cat >&2 <<SUMMARY
   Project URL : $PROJECT_URL
   App env     : .env.local (Supabase URL + anon + service-role key, chmod 600)
   Security    : 30-minute JWTs · refresh rotation · email confirmation required
-                TOTP + WebAuthn MFA · pg_cron scheduled
+                TOTP MFA · pg_cron scheduled
+                WebAuthn MFA unavailable on Supabase right now (422 on enable)
   Owner       : $OWNER_EMAIL — sign in and ENROLL MFA immediately. Privileged
                 actions (role grants, audit reads, contact-info views) refuse to
                 run below AAL2, enforced in the database.
