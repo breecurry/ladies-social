@@ -1,42 +1,48 @@
-# Database tests
+# Local database verification
 
-Local verification of the Phase 1 security invariants against a plain
-PostgreSQL 15/16 — no Supabase stack required.
+These files let the migrations and their security properties be
+exercised against a plain Postgres 16 without a Supabase stack.
+
+## How to run
 
 ```bash
-createdb uftest
-psql -d uftest -v ON_ERROR_STOP=1 -f supabase/tests/00-supabase-shim.sql
-for f in supabase/migrations/*.sql; do
-  psql -d uftest -v ON_ERROR_STOP=1 -f "$f"
-done
-psql -d uftest -f supabase/tests/01-smoke.sql   # expect: ALL SMOKE TESTS PASSED
+createdb uf_test
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/00-supabase-shim.sql
+for f in migrations/*.sql; do psql -v ON_ERROR_STOP=1 -d uf_test -f "$f"; done
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/01-smoke.sql
 ```
 
-`00-supabase-shim.sql` mimics what hosted Supabase provides (the `auth`
-schema, `auth.uid()`/`auth.jwt()`, and the `anon`/`authenticated`/
-`service_role` roles with Supabase's default table grants). It must
-never be applied to a real Supabase project.
+`00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
+schema with `auth.uid()`/`auth.jwt()` reading request GUCs, the
+`anon`/`authenticated`/`service_role` roles, and Supabase's default
+privileges). It is for local testing only and is never applied to a
+real project.
 
-The smoke test asserts, among other things:
+## What the smoke test proves
 
-- the Owner can be bootstrapped exactly once, and the owner role is
-  never grantable afterwards — even by the Owner;
-- a role INSERT whose `granted_by` is not the active Owner is rejected
-  by trigger **even for a superuser session**, and `service_role` holds
-  no write privilege on `role_assignments` at all;
-- `grant_role()` demands AAL2 and refuses non-Owner callers;
-- Lane 1 creates a vouch request; an unresolvable "Who invited you?"
-  handle silently produces a Lane 2 application with **no observable
-  difference** for the applicant (status reads `pending` in both lanes,
-  and applicants can read neither applications nor vouch requests);
-- a confirmed vouch admits only when the voucher holds `auto_admit`
-  (or is the Owner); otherwise it queues at raised priority;
-- the daily per-member vouch-request cap silently reroutes to Lane 2;
-- auto-rejected applications are invisible to every queue, the Owner's
-  included, and the applicant still reads `pending` (no bot oracle);
-- the audit log rejects UPDATE/DELETE for all roles, and corrupting a
-  row (with its guard trigger forcibly disabled) breaks the hash chain
-  at exactly that row, which `verify_audit_chain()` reports;
-- `display_name` can only ever be NULL or the verified legal name;
-- pending applicants cannot browse member profiles;
-- the 48h lapse job moves silent vouch requests to the review queue.
+- `bootstrap_owner()` seeds exactly one Owner and refuses to run twice;
+- a role INSERT whose grantor is not the Owner is rejected **by the
+  trigger**, even in a superuser session;
+- the owner role itself is never grantable, even by the Owner;
+- `service_role` holds no write privilege on `role_assignments`,
+  `user_private`, or `audit_log`;
+- open signup (`create_member`) creates a full, active member
+  immediately: trust level `member`, private record written, signup
+  audit-logged;
+- flagged bot signals are recorded on the private record but never
+  block an account;
+- under-18 signups are refused;
+- a signup matching a banned email or device hash raises
+  `banned_identifier` and creates nothing (ban-evasion enforcement);
+- `grant_role` demands the Owner at AAL2 (fails at aal1, fails for
+  non-owners at aal2); revocation works and closes the assignment;
+- the audit log verifies end to end, UPDATE/DELETE are blocked for
+  every role, and corrupting a row breaks the hash chain at exactly
+  that row;
+- `display_name` can only ever be NULL or the member's verified legal
+  name (trigger-enforced opt-in);
+- an active member can browse profiles the moment she signs up, and a
+  banned account can see nobody but herself;
+- the admission system is actually gone: no vouch/admission/privilege
+  tables or types survive, `pending_vouch` no longer exists in
+  `trust_level`, and the column default is `member`.
