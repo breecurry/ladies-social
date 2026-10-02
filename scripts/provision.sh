@@ -197,16 +197,29 @@ PROJECT_URL="https://${REF}.supabase.co"
 # ----------------------------------------------------------------------------
 step "Waiting for services to come up (ACTIVE_HEALTHY)"
 deadline=$(( $(date +%s) + 600 ))
+fails=0
 while :; do
   code="$(api GET "/v1/projects/${REF}/health?services=db,auth,rest&timeout_ms=5000")" || true
   if [[ "$code" == "200" ]]; then
+    fails=0
     unhealthy="$(jget "$RESP" 'Array.isArray(d)?d.filter(s=>s.status!=="ACTIVE_HEALTHY").map(s=>s.name).join(",")  : "all"')"
     [[ -z "$unhealthy" ]] && { info "all services healthy"; break; }
     info "waiting on: $unhealthy"
   else
-    info "health check HTTP $code (project still booting)"
+    # NEVER swallow the response body here. A bare status code cannot distinguish
+    # "still booting" from "this project was never finished being created" or
+    # "this organisation is on the wrong plan" — and guessing "still booting"
+    # actively sends the operator looking in the wrong place for ten minutes.
+    fails=$(( fails + 1 ))
+    info "health check HTTP $code — $(redact < "$RESP" | tr -d '\n' | head -c 300)"
+    if (( fails == 4 )); then
+      warn "Four consecutive failed health checks. This is usually NOT a slow boot."
+      warn "Read the message above, then check the Supabase dashboard:"
+      warn "  1. Is the project actually finished being created?"
+      warn "  2. Is the ORGANISATION that owns it on the plan you expect?"
+    fi
   fi
-  [[ $(date +%s) -lt $deadline ]] || die "timed out waiting for project $REF to become healthy"
+  [[ $(date +%s) -lt $deadline ]] || die "timed out waiting for project $REF to become healthy — last response: $(redact < "$RESP" | tr -d '\n' | head -c 300)"
   sleep 15
 done
 
