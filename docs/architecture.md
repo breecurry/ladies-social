@@ -1,8 +1,8 @@
 # United Feminist — Technical Architecture, Data Model & Phased Delivery Plan
 
-**Status:** Blueprint for owner approval. No code has been written. Nothing here is built.
-**Date:** 2026-10-01
-**Scope:** unitedfeminist.com — women-only social platform (Threads-class feature set), invite-and-vouch admission, 18+, real name on profile / @handle in feed, DMs with photo upload in V1, mobile-first responsive web, native apps later off the same API.
+**Status:** Living blueprint. Phase 1 (identity, open signup, roles, audit) is built and migrated; everything from §2's social schema onward is planned, not built. Where this document and `supabase/migrations/` disagree, the migrations are authoritative.
+**Date:** 2026-10-01 (membership model updated 2026-10-02)
+**Scope:** unitedfeminist.com, a social platform built as a safe space for women and their allies (Threads-class feature set). **Open registration: everyone is welcome, no invite, no vouch, no approval queue, no gender screening of any kind.** Enforcement is conduct-based and after the fact: bullying and harassment are banable offenses, and the Owner can ban any account including new accounts a banned person creates (ban-evasion detection is load-bearing). 18+, real name collected but displayed only by opt-in / @handle in feed, DMs with photo upload in V1, mobile-first responsive web, native apps later off the same API.
 
 This document builds on, and does not contradict, the locked decisions in the project memory files (`ladiessocial-project.md`, `ladiessocial-security-architecture.md`, `ladiessocial-e2e-and-roles.md`, `ladiessocial-design-system.md`). The design system is complete and is built-to, not redesigned.
 
@@ -22,7 +22,7 @@ Estimated infrastructure cost: **~$65–75/mo at 500 users, ~$130–180/mo at 5,
 
 2. **All media lives in Cloudflare R2 with image variants pre-generated at upload — never transformed on the fly, never proxied through the app host.** Media egress is the classic cost bomb that kills small social platforms (S3-style egress at ~$0.09/GB means a modestly successful image feed costs thousands/month). R2 charges **zero egress at any volume**. Additionally: because we must re-encode every image anyway to strip EXIF (a locked safety requirement), generating the 3 serving sizes in the same step costs nothing and avoids Cloudflare's per-transformation metering (~$300/mo at 50k users if done on-the-fly). DM images get **PhotoDNA hash-checking at upload time as the primary CSAM control**, with Cloudflare's CDN-level scan as the second net — because relying on a CDN cache scan for private, authenticated media is not a guarantee we can prove.
 
-3. **Deliberately un-clever read paths: fan-out-on-read feeds and adjacency-list threading on a single Postgres.** At ≤50,000 users with an invite-gated growth curve, a well-indexed single Postgres answers "posts from people I follow" and "give me this whole thread" in milliseconds. Fan-out-on-write (per-user inbox tables), external search engines, and Redis caches are all *deferred*, with the schema designed so adding them later touches nothing existing. The owner cannot debug a distributed system; she will never need to debug one she doesn't have.
+3. **Deliberately un-clever read paths: fan-out-on-read feeds and adjacency-list threading on a single Postgres.** At ≤50,000 users, a well-indexed single Postgres answers "posts from people I follow" and "give me this whole thread" in milliseconds. Fan-out-on-write (per-user inbox tables), external search engines, and Redis caches are all *deferred*, with the schema designed so adding them later touches nothing existing. The owner cannot debug a distributed system; she will never need to debug one she doesn't have.
 
 ---
 
@@ -39,7 +39,7 @@ Both are credible. SvelteKit produces smaller bundles and is genuinely pleasant,
 - *Plain managed Postgres (Neon/RDS/etc.)* gives us a database and nothing else: auth, session management, realtime, and storage all become separate builds or separate vendors. Rejected: strictly more moving parts for no capability gain.
 - *A standalone Node API service* (Express/Fastify on Railway/Fly) means running and monitoring a server 24/7, plus hand-rolling auth. Rejected for a solo non-engineer owner.
 - *Supabase* bundles Postgres 15+, an auth service (email, phone OTP via Twilio integration, MFA with WebAuthn factors, JWT with configurable expiry and server-side refresh-token revocation — all required by the roles design), and Realtime, for $25/mo. Crucially, Supabase makes **Row Level Security the default posture**, and RLS is how we meet the hard requirement that role grants and audit-log immutability are enforced *below* the application layer. The documented Supabase trap — `service_role` bypasses RLS — is handled by policy: service-role keys live only in server-side code paths, never in anything client-reachable, and the truly sensitive writes (role grants, audit appends, evidence filing) go through `SECURITY DEFINER` functions so even the app's normal server credentials cannot write those tables directly.
-- Server logic that must not live in the client (franking verification, invite redemption, media pipeline, moderation actions) lives in Next.js route handlers on Vercel — same repo, same deploy, no second service.
+- Server logic that must not live in the client (franking verification, signup triage, media pipeline, moderation actions) lives in Next.js route handlers on Vercel — same repo, same deploy, no second service.
 
 **Database: PostgreSQL 15+ (Supabase-managed).** Non-controversial. Full DDL in §2.
 
@@ -53,7 +53,7 @@ R2: $0.015/GB-month, writes $4.50/M, reads $0.36/M, **egress $0**. Supabase Stor
 - **Self-hosted WebSockets (rejected):** a 24/7 stateful service the owner cannot operate.
 
 **Background jobs: pg_cron (built into Supabase) + a Postgres `jobs` table — over Inngest/Trigger.dev/QStash.**
-The job load is modest and tolerant of minute-granularity: invite expiry, vouch-deadline enforcement, notification digests, feed-score recomputation, audit-log export, scan retries, report-velocity anomaly detection. pg_cron schedules; a Vercel cron-invoked route handler (or Supabase Edge Function) drains the job table with `FOR UPDATE SKIP LOCKED`. Zero new vendors, zero cost, transactional with the data it operates on. If job complexity ever grows real (it may not), Inngest is the managed upgrade — but do not start there.
+The job load is modest and tolerant of minute-granularity: notification digests, feed-score recomputation, audit-log export, scan retries, report-velocity anomaly detection. pg_cron schedules; a Vercel cron-invoked route handler (or Supabase Edge Function) drains the job table with `FOR UPDATE SKIP LOCKED`. Zero new vendors, zero cost, transactional with the data it operates on. If job complexity ever grows real (it may not), Inngest is the managed upgrade — but do not start there.
 
 **Search: Postgres full-text search (tsvector/GIN) + pg_trgm for handle/name lookup — over Meilisearch/Typesense/Algolia.**
 50,000 users is *small* by search standards; Postgres FTS over posts plus trigram matching on handles/display-names is instant at this scale and costs nothing. Algolia at this document volume would run hundreds/month for no user-visible benefit. Revisit only if search relevance becomes a real complaint at scale.
@@ -161,23 +161,28 @@ create extension if not exists pg_trgm;       -- handle/name search
 -- ENUMS
 -- ============================================================
 create type system_role      as enum ('owner','admin','moderator','ts_reviewer');
-create type trust_level      as enum ('pending_vouch','member','established');
+create type trust_level      as enum ('member','established');
 create type account_status   as enum ('active','restricted','suspended','banned','deactivated','deleted');
-create type invite_status    as enum ('pending','redeemed','vouched','expired','revoked','vouch_lapsed');
 create type post_visibility  as enum ('visible','pending_scan','removed_moderation','removed_author');
 create type reply_control    as enum ('everyone','followed','mentioned');
 create type media_scan       as enum ('pending','clear','flagged','blocked');
 create type msg_kind         as enum ('text','image','system');
 create type member_state     as enum ('active','request','left');
 create type report_subject   as enum ('post','message','user');
+-- Report reasons are CONDUCT-based only. There is deliberately no
+-- reason for reporting someone's perceived gender: the platform does
+-- no gender screening and membership is open, so such a report has no
+-- enforceable basis and would only invite members to police each
+-- other's identities. (A 'male_account' value existed in an earlier
+-- draft of this enum and was removed for exactly that reason.)
 create type report_reason    as enum ('harassment','hate','violence_threat','doxxing','csam','ncii',
-                                      'spam','impersonation','self_harm','male_account','other');
+                                      'spam','impersonation','self_harm','other');
 create type report_status    as enum ('open','in_review','actioned','dismissed','escalated');
 create type report_routing   as enum ('standard','admin_only','owner_conflict');
 create type mod_action_kind  as enum ('warn','remove_content','restrict','suspend','ban','unban',
-                                      'reinstate_content','freeze_invites','note');
+                                      'reinstate_content','note');
 create type notif_type       as enum ('follow','like','reply','mention','reshare','quote',
-                                      'dm_request','vouch_request','invite_redeemed','system');
+                                      'dm_request','system');
 
 -- ============================================================
 -- IDENTITY: profiles + private PII split
@@ -201,15 +206,13 @@ create table profiles (
   display_name   text   check (display_name is null or char_length(display_name) between 1 and 60),
   bio            text   check (char_length(bio) <= 300),
   avatar_media_key text,                      -- R2 key, served via Cloudflare
-  trust_level    trust_level not null default 'pending_vouch',
+  -- 'member' from the moment the account exists (open registration);
+  -- 'established' is a later trust tier (e.g. media-scan sampling).
+  trust_level    trust_level not null default 'member',
   founding_member boolean not null default false,   -- badge only, zero privileges
   is_system      boolean not null default false,    -- the "United Feminist" account
   status         account_status not null default 'active',
   status_expires_at timestamptz,              -- for timed restrictions/suspensions
-  invites_remaining smallint not null default 0,
-  invites_reset_at  timestamptz,
-  invited_via    uuid,                        -- FK added after invitations exists
-  vouched_by     uuid references profiles(user_id),
   search_indexable boolean not null default false,  -- opt-IN to search engines
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -219,17 +222,23 @@ create index idx_profiles_name_trgm   on profiles using gin (display_name gin_tr
 
 create table user_private (
   user_id        uuid primary key references profiles(user_id) on delete cascade,
-  phone_e164     text unique,                 -- one number, one account
+  legal_name     text not null,
+  dob            date not null,
+  email          citext not null,             -- triage copy; auth.users is authoritative
+  phone_e164     text,                        -- reserved for phone verification (under evaluation)
   phone_verified_at timestamptz,
   age_attested_at   timestamptz not null default now(),  -- 18+ legal attestation
-  gender_attested_at timestamptz,             -- waitlist path attestation
   device_fingerprint_hash bytea,
   signup_ip      inet,
   last_login_ip  inet,
-  last_login_at  timestamptz
+  last_login_at  timestamptz,
+  signup_flags   jsonb                        -- bot pre-filter auto-flags, when any fired
 );
 
--- Ban-evasion blocklist: hashes only, never raw identifiers
+-- Ban-evasion blocklist: hashes only, never raw identifiers.
+-- With open registration this is LOAD-BEARING: it is the mechanism
+-- behind "I can ban whoever I want including any new accounts they may
+-- make." Signups matching a banned hash are silently refused.
 create table banned_identifiers (
   id           bigint generated always as identity primary key,
   kind         text not null check (kind in ('email_hash','phone_hash','device_hash')),
@@ -240,61 +249,13 @@ create table banned_identifiers (
   unique (kind, value_hash)
 );
 
--- ============================================================
--- INVITATIONS & VOUCHING (the gate)
--- Token is NEVER stored raw -- only its SHA-256.
--- Active vouch: inviter must confirm within 48h of redemption.
--- ============================================================
-create table invitations (
-  id             uuid primary key default gen_random_uuid(),
-  token_hash     bytea not null unique,
-  created_by     uuid not null references profiles(user_id),
-  created_at     timestamptz not null default now(),
-  expires_at     timestamptz not null,        -- created_at + 72h
-  redeemed_by    uuid references profiles(user_id),
-  redeemed_at    timestamptz,
-  vouch_deadline timestamptz,                 -- redeemed_at + 48h
-  vouch_confirmed_at timestamptz,             -- "I personally know her and vouch for her"
-  status         invite_status not null default 'pending',
-  revoked_at     timestamptz
-);
-create index idx_invitations_creator on invitations (created_by, created_at desc);
-create index idx_invitations_pending on invitations (expires_at) where status = 'pending';
-
-alter table profiles
-  add constraint fk_profiles_invited_via
-  foreign key (invited_via) references invitations(id);
-
--- Inviter accountability: strikes derived from moderation_actions via this link table
-create table inviter_strikes (
-  id            bigint generated always as identity primary key,
-  inviter_id    uuid not null references profiles(user_id),
-  invitee_id    uuid not null references profiles(user_id),
-  moderation_action_id uuid not null,         -- FK added after moderation_actions
-  severity      text not null check (severity in ('minor','suspension','permanent_ban','illegal')),
-  created_at    timestamptz not null default now()
-);
-create index idx_inviter_strikes on inviter_strikes (inviter_id, created_at desc);
-
--- Layer-2 waitlist (post-launch phase; table included so schema is complete)
-create table waitlist_applications (
-  id            uuid primary key default gen_random_uuid(),
-  email         citext not null unique,
-  phone_e164    text unique,
-  real_name     text not null,
-  gender_attested_at timestamptz not null,    -- legal self-attestation, face value
-  status        text not null default 'queued'
-                check (status in ('queued','under_review','approved','rejected','expired')),
-  coherence_notes text,                        -- profile-coherence review, NOT appearance
-  created_at    timestamptz not null default now(),
-  decided_at    timestamptz
-);
-create table waitlist_vouches (
-  application_id uuid not null references waitlist_applications(id) on delete cascade,
-  voucher_id     uuid not null references profiles(user_id),
-  created_at     timestamptz not null default now(),
-  primary key (application_id, voucher_id)
-);
+-- The former INVITATIONS & VOUCHING section is gone: the admission
+-- gate was removed on 2026-10-02 (owner decision: "all are welcome").
+-- Registration is open; enforcement is conduct-based, after the fact.
+-- Dropped with it: invitations, inviter_strikes, waitlist_applications,
+-- waitlist_vouches, admission_applications, vouch_requests,
+-- privilege_grants (auto_admit existed only for vouching), and the
+-- pending_vouch trust level. See migrations 0011 and 0012.
 
 -- ============================================================
 -- SOCIAL GRAPH
@@ -564,10 +525,6 @@ create table moderation_actions (
 create index idx_mod_actions_target on moderation_actions (target_user_id, created_at desc);
 create index idx_mod_actions_actor  on moderation_actions (actor_id, created_at desc);
 
-alter table inviter_strikes
-  add constraint fk_strike_action
-  foreign key (moderation_action_id) references moderation_actions(id);
-
 -- CSAM events: Owner-only. Preservation >= 1 year (18 U.S.C. 2258A(h), REPORT Act).
 create table csam_events (
   id            uuid primary key default gen_random_uuid(),
@@ -661,7 +618,6 @@ create table notifications (
   type       notif_type not null,
   post_id    bigint references posts(id) on delete cascade,
   message_id bigint references messages(id) on delete cascade,
-  invitation_id uuid references invitations(id),
   created_at timestamptz not null default now(),
   read_at    timestamptz
 );
@@ -751,13 +707,13 @@ end $$;
 
 ```sql
 -- Enable RLS everywhere (deny-by-default on tables with no policy)
-alter table profiles, user_private, invitations, follows, blocks, mutes,
+alter table profiles, user_private, follows, blocks, mutes,
   posts, post_media, likes, reshares,
   conversations, conversation_members, messages, message_content, message_media,
   user_devices, one_time_prekeys,
   reports, message_report_evidence, moderation_actions, csam_events,
   role_assignments, notifications, notification_prefs, jobs, audit_log,
-  banned_identifiers, inviter_strikes, waitlist_applications, waitlist_vouches
+  banned_identifiers
   enable row level security;
 -- (Supabase: issue one ALTER per table; condensed here for readability.)
 
@@ -786,8 +742,7 @@ create policy posts_insert on posts for insert
   with check (auth.uid() = author_id
               and exists (select 1 from profiles p
                           where p.user_id = auth.uid()
-                            and p.status = 'active'
-                            and p.trust_level <> 'pending_vouch'));
+                            and p.status = 'active'));
 create policy posts_author_delete on posts for update
   using (auth.uid() = author_id);               -- soft-delete own posts
 -- Moderator removals flow through SECURITY DEFINER mod functions, not this policy.
@@ -879,7 +834,7 @@ This is the least machinery that serves every read pattern with one index each. 
 ## 2.3 Sessions and refresh tokens
 
 Supabase Auth owns `auth.sessions` and `auth.refresh_tokens` (rotation + reuse detection built in). Configuration, not schema (E2E-readiness decision #5):
-- **JWT expiry 15 minutes** (Supabase-configurable), refresh rotation on. Role revocation = revoke the user's refresh tokens server-side → dead within one 15-minute JWT window, matching the roles design.
+- **JWT expiry 30 minutes** (Supabase-configurable, set by provisioning), refresh rotation on. Role revocation = revoke the user's refresh tokens server-side → dead within one 30-minute JWT window, matching the roles design.
 - **Owner account:** WebAuthn/passkey. Supabase Auth passkeys are **beta as of May 2026** (experimental API); WebAuthn as an **MFA factor** (hardware security key → AAL2) is available. Plan: password + WebAuthn-factor MFA (YubiKey + platform authenticator) now, passkey-primary when GA; **no email-only recovery for the Owner**; printed one-time recovery codes; 4-hour inactivity cap and single-active-session enforced in middleware; `aal2` step-up re-auth required for role changes, permanent bans, audit reads, contact-info views, and CSAM filings (enforced in the SECURITY DEFINER functions, as shown in `grant_role`).
 
 ---
@@ -894,7 +849,7 @@ Browser (Next.js PWA)
    ▼
 Cloudflare ──► Vercel (Next.js)
                  ├─ Server Components / route handlers
-                 │     • verify Supabase JWT (15-min expiry)
+                 │     • verify Supabase JWT (30-min expiry)
                  │     • business logic the client must not hold
                  ▼
                Supabase Postgres  ◄── RLS enforces per-row access on EVERY query,
@@ -905,7 +860,7 @@ Cloudflare ──► Vercel (Next.js)
 media.unitedfeminist.com ──► Cloudflare (cache + CSAM scan + Worker auth for DM media) ──► R2
 ```
 
-Signup flow (gate): invite link → token hashed & matched → email + phone OTP (one number = one account; hash checked against `banned_identifiers`) → real name + @handle → account created at `trust_level = 'pending_vouch'` → inviter prompted for **active vouch** ("I personally know her and vouch for her as a woman", 48h deadline) → on confirmation, trust level `member`; on lapse, account remains gated and the invite is marked `vouch_lapsed`. Device fingerprint hash + signup IP recorded for the anti-farming velocity checks. No appearance review exists anywhere in this flow, by locked decision.
+Signup flow (open registration): email + password + legal name + date of birth + @handle → per-IP rate limit and handle availability → **ban-evasion check**: email and device-fingerprint hashes matched against `banned_identifiers`; a match is silently refused with a success-shaped, uniformly-timed response → bot pre-filter (disposable email domains, subnet velocity, profile-coherence heuristics) **auto-flags** the account but never blocks it → account created at `trust_level = 'member'`, active immediately → Supabase sends the confirmation email; the account cannot sign in until the address is confirmed. Device fingerprint hash + signup IP recorded. There is no admission step, no review queue, and no appearance or gender screening of any kind, by locked decision. Removal is conduct-based and after the fact.
 
 ## 3.2 Media upload pipeline (identical for posts, avatars, and DMs)
 
@@ -986,8 +941,9 @@ Admin: restrictions >7d, permanent ban
 Owner: legal reporting, law-enforcement contact, role consequences
    ▼
 Every action → moderation_actions + append_audit() → hash chain → daily WORM export
-Side effects: inviter_strikes row per accountability ladder; 2+ serious strikes
-in 6 months → inviter's invite privilege permanently suspended (job-enforced).
+Side effects: permanent bans hash the banned account's email/phone/device
+fingerprint into banned_identifiers, so replacement accounts are refused at
+signup (ban-evasion enforcement, load-bearing under open registration).
 Anomaly job: report-velocity spike on one target (≥10/hr) → flagged as coordinated-
 attack signal, queue de-prioritized, Owner notified — not treated as 10 valid reports.
 ```
@@ -1001,7 +957,7 @@ attack signal, queue de-prioritized, Owner notified — not treated as 10 valid 
 ## 3.6 Feed generation — fan-out-on-read, and when that changes
 
 **Following feed: fan-out-on-read (query-time).**
-`SELECT … FROM posts WHERE author_id IN (my follows) AND parent_post_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 30` with keyset pagination, served by `idx_posts_author_time`. At 50k users with an invite-gated graph (median follows in the low hundreds), Postgres executes this in single-digit milliseconds. Fan-out-on-write (materializing a per-user inbox at post time) buys nothing here and costs a write-amplification pipeline, backfill-on-follow logic, and a repair story when it breaks — the kind of system the owner explicitly cannot operate.
+`SELECT … FROM posts WHERE author_id IN (my follows) AND parent_post_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 30` with keyset pagination, served by `idx_posts_author_time`. At 50k users (median follows in the low hundreds), Postgres executes this in single-digit milliseconds. Fan-out-on-write (materializing a per-user inbox at post time) buys nothing here and costs a write-amplification pipeline, backfill-on-follow logic, and a repair story when it breaks — the kind of system the owner explicitly cannot operate.
 
 **Algorithmic "For You" feed: periodically materialized candidates + read-time assembly.**
 A pg_cron job (every ~10 min) scores recent posts (engagement velocity, recency decay, author diversity) into a small `feed_candidates` table (`post_id, score, computed_at` — created in the discovery phase). Read path: top candidates → subtract blocks/mutes/already-seen → light personalization (followed-graph proximity) → blend. Transparent, debuggable, no ML dependency; good enough until engagement data justifies more.
@@ -1018,25 +974,16 @@ A pg_cron job (every ~10 min) scores recent posts (engagement velocity, recency 
 
 # 4. API SURFACE
 
-All endpoints HTTPS JSON under `/api`. Auth legend: **P** = public, **A** = authenticated member (active, vouched), **M** = moderator+, **AD** = admin+, **O** = Owner (with AAL2 re-auth where marked ⚿). Cursor pagination throughout.
+All endpoints HTTPS JSON under `/api`. Auth legend: **P** = public, **A** = authenticated member (active account), **M** = moderator+, **AD** = admin+, **O** = Owner (with AAL2 re-auth where marked ⚿). Cursor pagination throughout.
 
 **Auth & session**
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | /api/auth/signup | P (invite token) | Create account from invite: email, phone, real name, handle |
-| POST | /api/auth/verify-phone | P (flow token) | Confirm Twilio OTP |
+| POST | /api/auth/signup | P | Open signup: email, password, legal name, date of birth, handle |
 | POST | /api/auth/login | P | Password (+ MFA challenge when enrolled) |
 | POST | /api/auth/logout | A | Revoke current session |
 | POST | /api/auth/reauth | A | Step-up to AAL2 for privileged actions |
 | GET | /api/me | A | Current user, roles, trust level, counts |
-
-**Invitations & vouching**
-| POST | /api/invites | A (established) | Create invite (slot-checked; 72h expiry) |
-| GET | /api/invites | A | My invites + statuses |
-| DELETE | /api/invites/{id} | A | Revoke my unredeemed invite |
-| GET | /api/vouches/pending | A | Redemptions awaiting my vouch |
-| POST | /api/vouches/{inviteId}/confirm | A | Active vouch confirmation (the gate's teeth) |
-| POST | /api/vouches/{inviteId}/decline | A | Decline to vouch |
 
 **Profiles & graph**
 | GET | /api/profiles/{handle} | A | Public profile (respects blocks) |
@@ -1095,7 +1042,7 @@ All endpoints HTTPS JSON under `/api`. Auth legend: **P** = public, **A** = auth
 | GET | /api/mod/users/{id}/history | M | Prior reports & actions (no contact info) |
 
 **Admin (AD)**
-| GET / PATCH | /api/admin/config | AD | Thresholds, invite economy parameters |
+| GET / PATCH | /api/admin/config | AD | Thresholds and triage parameters |
 | GET | /api/admin/analytics | AD | Aggregates (no PII) |
 | POST | /api/admin/users/{id}/suspend | AD | Restriction >7 days |
 | POST | /api/admin/users/{id}/ban · /unban | AD | Permanent ban / reinstate |
@@ -1122,9 +1069,9 @@ Sequence and dependencies only — no durations, no calendar. Each phase ends de
 Owner approves this blueprint and answers the decision list (§7). Accounts provisioned: Supabase, Vercel, R2 + Cloudflare zone config, Twilio, Resend, AWS (S3 WORM bucket). PhotoDNA application submitted (lead time). **NCMEC CyberTipline registration initiated** (hard prerequisite for Phase 3). Trademark search commissioned. Attorney engaged for ToS/CSAM-posture review (documents already drafted — see legal memory file).
 *Owner + Grove orchestrating; Grove-Deploy for provisioning; Grove-Security owns the NCMEC/PhotoDNA checklist.*
 
-**Phase 1 — Identity, gate, and the security skeleton** *(depends: 0)*
-Ships: schema migration v1 (all of §2 — the full schema lands at once so nothing is retrofitted); Supabase Auth config (15-min JWTs, refresh rotation); signup via invite token + phone OTP + active-vouch flow; profiles; trust levels; invite economy with slot logic; roles tables + DB-layer enforcement + `grant_role` path; audit log with hash chaining + daily WORM export job; Owner account hardening (WebAuthn MFA factor, recovery codes, session caps); the "United Feminist" system account; app shell with design tokens applied.
-Demonstrable: founding-cohort members join by invite, get vouched, see each other's profiles; the Owner grants a moderator role from her account and the attempt from any other account fails *at the database*.
+**Phase 1: Identity and the security skeleton** *(depends: 0)* **(BUILT, with the 2026-10-02 membership update applied)**
+Shipped: identity/roles/audit schema migrations; Supabase Auth config (30-min JWTs, refresh rotation, required email confirmation); **open signup** (no inviter field, no admission step) with ban-evasion refusal and bot-signal auto-flagging; profiles; trust levels (`member` from signup); roles tables + DB-layer enforcement + `grant_role` path; audit log with hash chaining; Owner account hardening (TOTP MFA to AAL2; WebAuthn pending Supabase support); the "United Feminist" system account; app shell with design tokens applied. The original vouch/admission gate shipped in this phase and was then removed by migrations 0011/0012 when the owner opened registration.
+Demonstrable: anyone can sign up and immediately see member surfaces; the Owner grants a moderator role from her account and the attempt from any other account fails *at the database*.
 *Grove-Code builds; Grove-Security reviews gate + roles enforcement before merge; Grove-Design supplies shell polish; Grove-Deploy CI/CD + environments.*
 
 **Phase 2 — Text social core** *(depends: 1)*
@@ -1133,7 +1080,7 @@ Demonstrable: a genuinely usable private text network for the founding cohort �
 *Grove-Code; Grove-Design review against the token spec (including the @handle-forward feed identity — the documented correction); Grove-Test starts the regression suite.*
 
 **Phase 3 — Media pipeline & moderation backbone** *(depends: 2; gated on NCMEC registration + PhotoDNA approval)*
-Ships: the full §3.2 pipeline (staging bucket → EXIF strip → variants → PhotoDNA → R2 → Cloudflare serving, with the Worker auth path for private media); images on posts + avatars; Hive + Perspective triage wiring; full moderation queue with routing, mod actions, inviter-accountability strikes, report-velocity anomaly job; CSAM response runbook wired (auto-suspend → Owner alert → preservation).
+Ships: the full §3.2 pipeline (staging bucket → EXIF strip → variants → PhotoDNA → R2 → Cloudflare serving, with the Worker auth path for private media); images on posts + avatars; Hive + Perspective triage wiring; full moderation queue with routing, mod actions, report-velocity anomaly job; permanent bans feeding banned_identifiers (ban-evasion blocklist); CSAM response runbook wired (auto-suspend → Owner alert → preservation).
 Demonstrable: image posts that are EXIF-clean and CSAM-screened; a working mod queue processing real reports end-to-end.
 *Grove-Code; Grove-Security gates this phase — no image upload goes live without her sign-off on the NCMEC/PhotoDNA/runbook checklist; Grove-Deploy for Cloudflare Worker + cache config.*
 
@@ -1149,10 +1096,10 @@ Demonstrable: both feed tabs live; push works on installed PWA.
 
 **Phase 6 — Launch hardening** *(depends: 4 + 5)*
 Ships: WCAG 2.2 AA accessibility audit against the design system's measured ratios; load test at 10× founding-cohort scale; security review pass (RLS policy audit, rate limits, abuse paths, secrets hygiene); incident runbooks (DDoS, doxxing-of-owner, CSAM, deplatforming pressure — threat model #2 requires the owner's personal security + comms plan *before* launch); legal checklist (attorney-reviewed ToS + privacy policy live, placeholders filled); onboarding content + community guidelines surfaced in-product; Vercel/Supabase spend alerts configured.
-Demonstrable: launch-ready build; founding cohort (10–50 personally-known invitees, per the seeding plan) onboarded. **Launch.**
+Demonstrable: launch-ready build; founding cohort (10–50 personally-known first members) onboarded. **Launch.**
 *Grove-Test leads; Grove-Security signs off; Grove-Content for onboarding/guidelines; Grove-Deploy for runbooks + monitoring.*
 
-**Post-launch backlog (explicitly out of V1):** waitlist path (open only at several hundred users, per security report) · T&S reviewer tooling · moderator volume-anomaly dashboards for the Owner · E2E upgrade (requires: external crypto audit $15–50k, browser-key-storage decision, and **re-opening the DM CSAM posture** — the documented trap) · native iOS/Android off the same API · EU/UK expansion with GDPR workstream.
+**Post-launch backlog (explicitly out of V1):** T&S reviewer tooling · moderator volume-anomaly dashboards for the Owner · E2E upgrade (requires: external crypto audit $15–50k, browser-key-storage decision, and **re-opening the DM CSAM posture** — the documented trap) · native iOS/Android off the same API · EU/UK expansion with GDPR workstream.
 
 ---
 
@@ -1171,7 +1118,7 @@ Demonstrable: launch-ready build; founding cohort (10–50 personally-known invi
 | 9 | **The E2E trap** (documented in memory): upgrading DMs to E2E silently kills DM-image CSAM scanning | Legal posture regression nobody notices | Blocked in the backlog: E2E work item *requires* re-opening CSAM posture + counsel; franking/evidence pipeline already E2E-compatible so the pressure to rush is low |
 | 10 | **Reports against the Owner have no independent enforcement** | Governance gap on a solely-owned platform; also a credibility risk | §3.5 external-witness path (tamper-evident evidence + named external contact). Honest limitation — owner must accept it on the record (decision #4) |
 | 11 | **Coordinated false-report brigading** (threat model #2, amplified by the explicitly political name) | Trans members especially targeted; queue weaponized | Velocity anomaly job treats spikes as attack signal; reporter-pattern weighting; mod queue shows reporter history; Owner alerted on spikes |
-| 12 | **Invite-token leakage** (codes shared publicly) | Gate bypass at scale | Tokens single-use, 72h expiry, hash-stored; **active vouch is the real gate** — a leaked code still requires the inviter to affirm she personally knows the redeemer; accountability ladder punishes rubber-stamping |
+| 12 | **Open registration invites bots, spam, and ban evasion** (the gate that used to absorb this is gone, by owner decision) | Moderation load scales with abuse, not just with members; a banned harasser can try again with a fresh account | Ban-evasion blocklist checked at signup (email/device hashes, silently refused); per-IP rate limits; subnet-velocity and disposable-email auto-flagging; device fingerprinting raises the cost of return. Honest limit: fingerprinting loses to determined actors with clean devices; it raises cost, it does not make evasion impossible |
 | 13 | **Vercel/Supabase usage billing without hard caps** | Surprise invoice during a traffic spike or attack | Spend alerts + Vercel pause threshold on day one; Supabase spend cap decision made consciously at launch (cap = throttling risk, no cap = billing risk; recommend cap ON until launch, OFF with alerts after) |
 | 14 | **Trademark on "United Feminist" never cleared** (flagged in memory, still open) | Rebrand after launch is expensive and demoralizing | Owner decision #6 — search before money goes into branding |
 
@@ -1181,7 +1128,7 @@ Demonstrable: launch-ready build; founding cohort (10–50 personally-known invi
 
 1. **Approve the overall plan and budget.** Roughly **$65–75/month** to start, growing with the community (≈ $130–180/month at five thousand members; ≈ $600–1,000/month at fifty thousand, at which point part-time human help for safety reviews also becomes a real cost). Yes/no on this plan.
 
-2. **Confirm, one final time, that nobody will ever be judged by their photo or appearance to get in — including by you personally.** Admission is: a member who personally knows the applicant invites her and then actively confirms "I know her and vouch for her." Your earlier message suggested you still plan to "review photos/screen incoming people" yourself. The Australian company that lost in court did exactly that — the founder reviewed faces personally. Doing the review yourself does not reduce the legal risk; it *is* the legal risk. We need your explicit yes to "vouching only, no appearance review, ever."
+2. **RESOLVED 2026-10-02.** Nobody is ever judged by photo, appearance, or gender to get in, because there is no admission screening at all anymore. The owner removed the gate entirely: registration is open and removal is conduct-based. The earlier warning about appearance review (the Giggle/Tickle fact pattern) stands permanently: appearance screening must never be reintroduced in any form.
 
 3. **Approve the lawyer touchpoints before launch:** (a) review of the already-drafted Terms of Service and the privacy policy, (b) sign-off on the child-safety-reporting posture before photo uploads go live, (c) a quick trademark search on "United Feminist" before money goes into branding. These are three contained engagements, not a retainer.
 
@@ -1189,9 +1136,9 @@ Demonstrable: launch-ready build; founding cohort (10–50 personally-known invi
 
 5. **Owner-account security, in your hands:** buy a hardware security key (~$50), register it plus your phone/laptop login, and print the one-time recovery codes and store them somewhere safe (not email). Losing access to your account cannot be fixable by email alone — that's deliberate, because your account controls everything.
 
-6. **Pick your Founding Cohort:** the 10–50 women you personally know and will invite first. They are the roots of the whole invitation tree, and choosing well-connected women (organizers, community-builders) makes the tree branch instead of becoming a thin chain. Start writing the list.
+6. **Pick your Founding Cohort:** the 10–50 people you personally know and will bring in first. Registration is open, so there is no invite mechanism to manage; this is simply about who you personally ask to join early, because a community's first members set its tone. Choosing well-connected women (organizers, community-builders) still matters. Start writing the list.
 
 7. **Decide the data-safety add-on at launch:** roughly **$100/month extra** buys point-in-time database recovery — the ability to rewind the entire platform to any second if something goes badly wrong. Recommended from launch day; your call on the spend.
 
 ---
-*End of blueprint. Nothing in this document has been built. SQL above is the proposed schema for approval, not a deployed migration.*
+*Identity, open signup, roles and audit (Phase 1 plus the open-registration migrations) are built and live in `supabase/migrations/`, which is authoritative where it and this document differ. The social-core SQL from §2 onward is the proposed schema for later phases, not a deployed migration.*

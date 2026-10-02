@@ -20,9 +20,9 @@ as architecture rather than as a settings page.
 | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Platform         | Mobile-first responsive **web** first; native later off the same API                                                  |
 | Minimum age      | 18+                                                                                                                   |
-| Admission        | **Open to everyone**, two lanes: vouched by a trusted member, or a reviewed queue                                     |
-| Gender screening | **None, in either lane.** Admission is never based on appearance or identity.                                         |
-| Identity         | Real name **required and verified at signup**; public display is **opt-in**. The handle is shown by default.          |
+| Admission        | **Open registration.** Everyone is welcome; there is no invite, vouch, or approval queue.                              |
+| Gender screening | **None anywhere.** Membership is never based on appearance or identity.                                                |
+| Identity         | Real name **required at signup**; public display is **opt-in**. The handle is shown by default.                        |
 | Inclusivity      | Trans women are women and are fully included. Non-negotiable.                                                         |
 | Removal          | Conduct-based, applied equally regardless of gender                                                                   |
 | Direct messages  | In the first release, with photo attachments                                                                          |
@@ -39,15 +39,17 @@ standard is behaviour, not identity.
 
 ## Why names are collected but not displayed
 
-Every member is known to the platform — real names are required and verified
-at signup, so nobody here is anonymous and ban evasion stays hard. What the
+Every member is known to the platform — real names are required at signup,
+so nobody here is anonymous and ban evasion stays hard. What the
 _public_ sees is a handle, unless a member chooses otherwise. This is
 pseudonymity with accountability, and it matters because a member may be
 hiding from someone specific.
 
 ## Status
 
-Phase 1 (admission, identity, roles, audit) is built. See `PROGRESS.md`.
+Phase 1 (identity, open signup, roles, audit) is built, and the former
+vouch/admission gate has been removed in favour of open registration.
+See `PROGRESS.md`.
 
 ## Development
 

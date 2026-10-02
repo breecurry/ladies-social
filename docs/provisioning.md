@@ -89,7 +89,9 @@ CLI, with **no dashboard clicking**:
    and rest services report `ACTIVE_HEALTHY`.
 5. **Enable `pg_cron`** via `POST /v1/projects/{ref}/database/query`
    (`create extension if not exists pg_cron;`) — done **before** migrations so
-   migration `…010_jobs.sql` can schedule the vouch-lapse job.
+   migrations that manage scheduled jobs can run. (Migration 0010's vouch-lapse
+   job is removed again by migration 0011 now that admission is gone; pg_cron
+   stays for the job load of later phases.)
 6. **Apply migrations** with `supabase link --project-ref … && supabase db push
    --linked` (history-tracked in `supabase_migrations.schema_migrations`;
    re-runs skip applied migrations; no Docker needed for push).
