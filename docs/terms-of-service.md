@@ -178,13 +178,17 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 **7.2 Message requests.** Direct messages from members you do not follow are delivered to a separate "Requests" area, not your primary inbox. You are not required to open or respond to message requests.
 
-**7.3 Privacy of messages.** Your direct messages are private communications between you and the recipient(s). We do not routinely read, monitor, or review the content of direct messages. See §7.6 for technical limitations on DM privacy that apply alongside this commitment.
+**7.3 Privacy of messages.** Your direct messages are private communications between you and the recipient(s). We do not routinely read, monitor, or review the content of direct messages. See §7.6 through §7.8 for technical limitations on DM privacy and the circumstances in which DM content may be accessed.
 
 **7.4 Reporting and safety.** If you report a direct message for a violation of these Terms or the Guidelines, the content of that reported message may be accessed by our moderation team to investigate the report. By submitting a report of a direct message, you authorize us to access the reported message content for the purpose of evaluating the report. Our handling of message content is described in our Privacy Policy.
 
 **7.5 Prohibited use of DMs.** The Guidelines apply in full to direct messages. Harassment, threats, unsolicited sexual content, spam, and all other prohibited conduct remain prohibited when communicated via DM. Reporting a DM for abuse triggers the same enforcement process as a report of public content.
 
 **7.6 Technical access and automated scanning.** Direct messages are not end-to-end encrypted -- the platform has the technical ability to access DM content, including text and images, under the circumstances described in §7.4 and in our Privacy Policy. Every image sent in a direct message is automatically scanned for child sexual abuse material using automated hash-matching, the same process applied to images in public posts; no human reviews your DM images as part of that scanning, but a match triggers staff involvement and mandatory reporting to NCMEC. This is a deliberate safety design choice: we chose the architecture that can respond to a harassment report over the one that cannot. Our Privacy Policy, Section 5 ("Direct Messages: An Important Disclosure"), explains this disclosure in full, including exactly when and why DM content may be accessed.
+
+**7.7 Safety investigations.** Platform administrators may access the content of direct messages when investigating a credible safety concern, even when no member has filed a report. **[OWNER DECISION REQUIRED: The scope of this access pathway -- specifically what qualifies as a "credible safety concern" sufficient to trigger administrator-initiated access to DM content without a member report -- has not been defined and is a pending decision for the platform owner, with attorney input. Do not publish this section without resolving this definition.]** When this access occurs, it is logged in the platform's audit record.
+
+**7.8 Legal process.** If we receive a valid legal order, subpoena, warrant, or other lawful process requiring us to produce direct message content, we are required to comply. We will notify you of such legal demands where we are lawfully permitted to do so. Our Privacy Policy, Section 5, describes this access pathway in full.
 
 ---
 
