@@ -43,11 +43,19 @@ redact() { sed -e "s/${SUPABASE_ACCESS_TOKEN:-__nope__}/[REDACTED-PAT]/g" \
                -e "s/${SUPABASE_DB_PASSWORD:-__nope__}/[REDACTED-DBPASS]/g"; }
 
 # Fingerprint a value without revealing it.
+# SECURITY: a 4-char prefix is safe for tokens whose prefix is a PUBLIC namespace
+# (e.g. "sbp_"), but it is NOT safe for passwords — those 4 characters are real
+# secret material, they get printed to a terminal, and terminals get screenshotted
+# and pasted into chat. Pass "secret" as $3 to suppress the prefix entirely.
 fp() {
-  local name="$1" val="${2:-}"
+  local name="$1" val="${2:-}" mode="${3:-}"
   if [[ -z "$val" ]]; then printf '    %-28s absent\n' "$name:" >&2; return; fi
-  local len=${#val} pre="${val:0:4}"
-  printf '    %-28s present (len=%s, prefix=%s…)\n' "$name:" "$len" "$pre" >&2
+  local len=${#val}
+  if [[ "$mode" == "secret" ]]; then
+    printf '    %-28s present (len=%s, value hidden)\n' "$name:" "$len" >&2
+  else
+    printf '    %-28s present (len=%s, prefix=%s…)\n' "$name:" "$len" "${val:0:4}" >&2
+  fi
 }
 
 # Secure scratch file for API bodies; one file, reused, shred on exit.
@@ -123,9 +131,9 @@ OWNER_PHONE="${OWNER_PHONE:-}"
 
 info "inputs (fingerprints only — no values are printed):"
 fp "SUPABASE_ACCESS_TOKEN" "$SUPABASE_ACCESS_TOKEN"
-fp "SUPABASE_DB_PASSWORD"  "$SUPABASE_DB_PASSWORD"
+fp "SUPABASE_DB_PASSWORD"  "$SUPABASE_DB_PASSWORD" secret
 fp "OWNER_EMAIL"           "$OWNER_EMAIL"
-fp "OWNER_PASSWORD"        "$OWNER_PASSWORD"
+fp "OWNER_PASSWORD"        "$OWNER_PASSWORD" secret
 fp "OWNER_HANDLE"          "$OWNER_HANDLE"
 fp "OWNER_PHONE"           "$OWNER_PHONE"
 info "project=\"$PROJECT_NAME\" region=$REGION size=$INSTANCE_SIZE site=$SITE_URL rp_id=$WEBAUTHN_RP_ID"
@@ -292,7 +300,7 @@ fs.writeFileSync(path,txt,{mode:0o600});
 info "wrote NEXT_PUBLIC_SUPABASE_URL + anon + service-role key to .env.local (chmod 600)"
 fp "NEXT_PUBLIC_SUPABASE_URL" "$PROJECT_URL"
 fp "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
-fp "SUPABASE_SERVICE_ROLE_KEY" "$SECRET_KEY"
+fp "SUPABASE_SERVICE_ROLE_KEY" "$SECRET_KEY" secret
 
 # ----------------------------------------------------------------------------
 # 8. Seed the Owner + system account (guarded so a re-run is a no-op)
