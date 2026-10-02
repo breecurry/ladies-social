@@ -10,7 +10,7 @@ United Feminist is a social platform built for women and for the people who stan
 
 We opened this platform to anyone genuinely committed to its purpose, because we believe the work of building feminist community does not benefit from shutting out allies. A safe space for women is not measured by who it excludes — it is defined by what it demands. Everyone here is expected to show up as an ally. The question is whether you actually do.
 
-Members arrive through a community-grounded admission process: either someone who knows you personally has vouched for you and actively confirmed it, or your application has been reviewed for good-faith signals and admitted that way. Either way, a place here means the community has a reasonable basis for trust in you.
+Members arrive knowing the rules. Membership is fully open -- no invite, no vouching process, no application queue. Anyone who agrees to these guidelines and is 18 or older is welcome to join. Trust is built through how you show up here, not through how you arrived.
 
 These guidelines exist to protect that space. They are not an exhaustive legal document — that is what our Terms of Service are for. This is the human version: what we expect from you, what you can expect from us, and what happens when things go wrong.
 
@@ -29,7 +29,7 @@ This platform is inclusive of all women, including:
 
 Men and people of any gender who are committed to this community's values are welcome here as allies. What being an ally means in practice is described in the section below.
 
-Membership is open to anyone willing to abide by these guidelines. New members either join through the vouching process — where someone who knows them personally actively confirms their membership — or through a review of their application for good-faith signals. No one's appearance is evaluated. There is no gender screening. The only basis for admission is whether the community has a reasonable foundation for trust in you. The only basis for removal is your conduct.
+Membership is open to anyone willing to abide by these guidelines. Registration is fully open -- no invite required, no vouching process, no application review. No one's appearance is evaluated. There is no gender screening. The only basis for removal is your conduct.
 
 ---
 
@@ -262,18 +262,7 @@ This platform is 18+ only. If you become aware of a minor using the platform, pl
 
 ### 12. Evading Enforcement
 
-If your account has been suspended or banned, you may not create a new account to get around it. If you are under a content restriction or warning, you may not use a second account to post content you could not post from your primary account.
-
-**Admission abuse** is a specific form of enforcement evasion. In the vouching lane, this includes:
-- Vouching for someone you know to be banned or recently removed for serious violations
-- Selling, trading, or giving invite tokens to strangers for commercial gain
-- Coordinating with others to flood the invite system to get around account limits
-
-In the reviewed queue, it includes:
-- Submitting false or misleading information about your identity or intentions in order to pass review
-- Creating multiple applications under different contact details to work around a denial
-
-The admission system's value depends entirely on its integrity. We treat abuse of it seriously.
+If your account has been suspended or banned, you may not create a new account to get around it. If you are under a content restriction or warning, you may not use a second account to post content you could not post from your primary account. Using someone else's account, or lending your account to a person under suspension or ban, to work around an enforcement action is treated the same as direct evasion. We enforce across accounts, not just the one we acted on.
 
 ---
 
@@ -320,26 +309,9 @@ Your account is permanently closed. This is the outcome for:
 - Coordinated harassment campaigns
 - Ban evasion
 
-Permanent removal means your account is closed, your invitations are cancelled, and future accounts created by you are subject to removal.
+Permanent removal means your account is closed and future accounts created by you are subject to removal.
 
 ---
-
-### Inviter Accountability
-
-Every member who joined through the vouching process arrived because someone stood behind them. That accountability runs in both directions.
-
-If someone you vouched for violates these guidelines, here is what it means for your account:
-
-| What happened to your invitee | What it means for you |
-|---|---|
-| Minor violation — warning only | No impact on you |
-| Temporary suspension of 7 days or more | One invite slot removed from your next period; you will be notified |
-| Permanent removal for a serious violation | All invite privileges frozen; your account is reviewed |
-| CSAM or illegal content | Your account suspended pending investigation |
-
-**If two or more people you personally vouched for are permanently removed for serious violations within any six-month period, your ability to invite new members is permanently ended.** Your account may continue — this is about whether we can trust your vouching judgment, not about penalizing you for someone else's choices.
-
-This accountability structure is what makes the vouching system worth anything. Please vouch only for people you actually know and whose presence here you are genuinely willing to stand behind.
 
 ---
 

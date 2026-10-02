@@ -62,7 +62,7 @@ This policy is incorporated into and made part of our Terms of Service.
 
 **1.1 Who we are.** United Feminist is operated by Curry Co LLC, a Tennessee limited liability company. Our mailing address is 466 E Broadway Blvd, Jefferson City, TN 37760. Privacy questions and requests can be sent to legal@unitedfeminist.com.
 
-**1.2 What this platform does.** United Feminist is a text-first social platform designed as a safe space for women and their allies. Members post publicly, reply in threads, follow each other, and send direct messages including photos. Admission requires either a vouch from an existing member or review of a membership application. Because both the platform's safety mission and our legal obligations require it, we collect and verify the real identity of every member while giving members control over what the public sees.
+**1.2 What this platform does.** United Feminist is a text-first social platform designed as a safe space for women and their allies. Members post publicly, reply in threads, follow each other, and send direct messages including photos. Membership is fully open -- anyone who agrees to our Terms of Service and is 18 or older can create an account. Because both the platform's safety mission and our legal obligations require it, we collect and verify the real identity of every member while giving members control over what the public sees.
 
 **1.3 Geographic scope.** The Platform currently serves members in the United States only. This policy is written for that context. If we expand to the European Union, the United Kingdom, or other jurisdictions, this policy will be updated and reviewed before that expansion occurs. Nothing in this policy creates rights under the GDPR or UK GDPR.
 
@@ -82,7 +82,6 @@ When you apply for membership, we collect:
 - **Email address.** Used to verify your account, send you security notifications, and communicate about your membership.
 - **Phone number.** Used to verify that you are a real person and to detect duplicate accounts. We use Twilio to verify that the number is valid and not associated with a high-risk VOIP or prepaid service.
 - **@handle.** The public name you choose for your account. This is what other members see when you post.
-- **Voucher information.** If you named an existing member who invited you, we record that relationship. If no one vouched for you, we record that fact as well.
 
 ### 2.2 Account and profile data
 
@@ -151,7 +150,7 @@ We use the information we collect for the following purposes:
 
 **Security.** Detecting and responding to unauthorized access, attacks, and abuse.
 
-**Communications.** Sending you account-related emails -- verification, security alerts, vouch notifications, and moderation decisions. We do not send marketing emails without your separate consent.
+**Communications.** Sending you account-related emails -- verification, security alerts, and moderation decisions. We do not send marketing emails without your separate consent.
 
 **Legal compliance.** Fulfilling obligations under applicable law, including responding to valid legal process and preserving evidence as required.
 
