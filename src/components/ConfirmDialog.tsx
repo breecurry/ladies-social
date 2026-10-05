@@ -13,6 +13,7 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  cancelLabel = "Cancel",
   busy = false,
   onCancel,
   onConfirm,
@@ -21,6 +22,8 @@ export function ConfirmDialog({
   title: string;
   body: ReactNode;
   confirmLabel: string;
+  /** A distinct safe verb (e.g. "Keep conversation") where the irreversibility rule wants one. */
+  cancelLabel?: string;
   busy?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -37,7 +40,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="min-h-11 rounded-md px-4 text-label text-accent hover:bg-accent-subtle"
           >
-            Cancel
+            {cancelLabel}
           </button>
           <button
             type="button"

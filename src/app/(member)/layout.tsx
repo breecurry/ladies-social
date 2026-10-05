@@ -3,6 +3,7 @@ import { Warning } from "@phosphor-icons/react/dist/ssr";
 import { getViewer } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell, type ModMenuInfo } from "@/components/shell/AppShell";
+import { dmFeatureOn } from "@/lib/dm/server";
 import { Providers } from "@/components/shell/Providers";
 import { Card } from "@/components/ui";
 import { modTier, TIER_LABEL, REASON_LABEL } from "@/lib/moderation";
@@ -79,6 +80,16 @@ export default async function MemberLayout({ children }: { children: React.React
     .select("id", { count: "exact", head: true })
     .is("read_at", null);
 
+  // The DM feature flag (Phase 2C). Both layers must agree, and any
+  // error — including the migration not yet being applied — reads as
+  // off, so the shell simply has no Messages entry.
+  const dmEnabled = await dmFeatureOn();
+  let dmUnread = 0;
+  if (dmEnabled) {
+    const { data: unreadTotal } = await supabase.rpc("dm_unread_total");
+    dmUnread = typeof unreadTotal === "number" ? unreadTotal : 0;
+  }
+
   let restrictionNotice: string | null = null;
   if (profile.status === "restricted" && profile.status_expires_at !== null) {
     const { data: statusRows } = await supabase.rpc("my_account_status");
@@ -91,7 +102,14 @@ export default async function MemberLayout({ children }: { children: React.React
 
   return (
     <Providers viewer={{ id: viewer.user.id, handle: profile.handle }}>
-      <AppShell handle={profile.handle} isOwner={viewer.isOwner} mod={mod} initialUnread={count ?? 0}>
+      <AppShell
+        handle={profile.handle}
+        isOwner={viewer.isOwner}
+        mod={mod}
+        initialUnread={count ?? 0}
+        dmEnabled={dmEnabled}
+        dmUnread={dmUnread}
+      >
         {restrictionNotice ? (
           <div
             role="status"

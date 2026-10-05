@@ -7,6 +7,7 @@ import {
   House,
   MagnifyingGlass,
   Bell,
+  ChatCircle,
   PencilSimple,
   CaretLeft,
   CaretUp,
@@ -35,12 +36,18 @@ export function AppShell({
   isOwner,
   mod,
   initialUnread,
+  dmEnabled = false,
+  dmUnread = 0,
   children,
 }: {
   handle: string;
   isOwner: boolean;
   mod: ModMenuInfo | null;
   initialUnread: number;
+  /** The DM feature flag (design 2C §8); when false, no Messages entry exists anywhere. */
+  dmEnabled?: boolean;
+  /** Unread accepted conversations — a count, never a name or content. */
+  dmUnread?: number;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -79,6 +86,15 @@ export function AppShell({
         {navItems.map((item) => (
           <RailLink key={item.href} {...item} />
         ))}
+        {dmEnabled ? (
+          <RailLink
+            href="/messages"
+            label="Messages"
+            icon={ChatCircle}
+            active={pathname.startsWith("/messages")}
+            badge={dmUnread}
+          />
+        ) : null}
         <RailLink
           href={`/u/${handle}`}
           label="Profile"
@@ -107,6 +123,22 @@ export function AppShell({
           ) : (
             <BackButton />
           )}
+          {dmEnabled ? (
+            <Link
+              href="/messages"
+              aria-label={dmUnread > 0 ? `Messages, ${dmUnread} unread` : "Messages"}
+              className="ml-auto flex size-11 items-center justify-center rounded-md text-text-primary"
+            >
+              <span className="relative">
+                <ChatCircle
+                  size={24}
+                  weight={pathname.startsWith("/messages") ? "fill" : "regular"}
+                  aria-hidden
+                />
+                <UnreadBadge count={dmUnread} />
+              </span>
+            </Link>
+          ) : null}
         </header>
         <main className="flex-1 pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-8">
           {children}

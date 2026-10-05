@@ -5,6 +5,7 @@ const PROTECTED_PREFIXES = [
   "/home",
   "/search",
   "/notifications",
+  "/messages",
   "/post",
   "/u",
   "/settings",
