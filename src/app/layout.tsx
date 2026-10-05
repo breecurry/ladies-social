@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
+import { SITE_INDEXABLE } from "@/lib/seo";
 import "./globals.css";
 
 const hanken = Hanken_Grotesk({
@@ -15,9 +16,10 @@ export const metadata: Metadata = {
   },
   description:
     "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
-  // Member surfaces are never indexed. Public, per-profile indexing is a
-  // later, opt-in (search_indexable) per-route decision.
-  robots: { index: false, follow: false },
+  // Search visibility is controlled by the single SITE_INDEXABLE flag
+  // (src/lib/seo.ts), which also drives the X-Robots-Tag header and
+  // /robots.txt. Default is noindex until moderation tooling ships.
+  robots: SITE_INDEXABLE ? undefined : { index: false, follow: false },
 };
 
 export const viewport: Viewport = {

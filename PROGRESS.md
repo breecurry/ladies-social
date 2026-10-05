@@ -63,8 +63,9 @@ finding from both is fixed by migration 0014
   skipped, and moderation-removed posts can never surface as parent
   excerpts or notification excerpts.
 - **Security response headers shipped** in `next.config.ts`:
-  `Referrer-Policy: strict-origin-when-cross-origin` (an external link
-  click no longer broadcasts *whose profile the member was viewing*),
+  `Referrer-Policy: no-referrer` (tightened at deploy 2026-10-05 from
+  `strict-origin-when-cross-origin`, which still broadcast the bare origin
+  — i.e. *membership of this platform* — on every outbound external click),
   `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a
   restrictive `Permissions-Policy`.
 - **OverflowMenu closes on Escape** and returns focus to its trigger
@@ -82,6 +83,46 @@ of repeating `harassment`, which the new duplicate guard would refuse.
 groundwork), the age gate screens (spec §17), reshares/quotes (schema
 arrives additively with the feature), image upload of any kind (hard-
 gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
+
+## Deployment (going live on unitedfeminist.com)
+
+**Host: Vercel** (first-party Next.js 16; `src/middleware.ts` auth gate runs
+natively on every protected prefix). **DNS: Cloudflare in DNS-only / grey-cloud
+mode** for the app records — Vercel issues and renews the Let's Encrypt
+certificate and does the HTTP→HTTPS redirect itself. Do **not** turn on
+Cloudflare's orange-cloud proxy in front of Vercel at launch: it interferes with
+certificate issuance and blinds Vercel's firewall. Canonical hostname is the
+apex `unitedfeminist.com` (matches the provisioned Supabase `site_url`); `www`
+301/308-redirects to it via Vercel domain settings.
+
+Runtime env vars on the host (server-only unless `NEXT_PUBLIC_`):
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` (**server-only — never `NEXT_PUBLIC_`, never in a
+client bundle; verified absent from `.next/static` at build**),
+`IDENTIFIER_HASH_PEPPER` (server-only). `supabase/config.toml` is local-dev
+config and does **not** push auth settings to the hosted project; set Site URL
+and the redirect allow-list in the Supabase dashboard (Authentication → URL
+Configuration).
+
+**Shipped "dark" (noindex) on purpose.** Registration is open but there is no
+moderation action path yet (the `reports` table has no UPDATE route for any
+role — that is Phase 2B), so the site must be reachable by a direct link but not
+search-discoverable. Three layers — the `X-Robots-Tag: noindex, nofollow`
+response header, a disallow-all `/robots.txt`, and the per-page `robots` meta
+tag — are all driven by one flag, `SITE_INDEXABLE` (see `src/lib/seo.ts`).
+Default/unset = noindex (fail-safe).
+
+### How to go public (flip when moderation tooling ships)
+
+1. In Vercel → **Settings → Environment Variables**, add `SITE_INDEXABLE` with
+   value `true` (Production scope).
+2. **Redeploy** (Deployments → latest → Redeploy, or push a commit). That single
+   flag flips the header to absent, `/robots.txt` to `Allow: /`, and the meta tag
+   to indexable in one step. To go dark again, delete the var (or set it to
+   anything other than `true`) and redeploy.
+3. Do this **only after** report-review / ban tooling exists, because open
+   registration + no moderation path + search-discoverable is the combination
+   this flag exists to prevent.
 
 ## Done
 
