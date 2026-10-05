@@ -12,10 +12,18 @@ import {
   CaretUp,
   GearSix,
   SignOut,
+  ShieldCheck,
   ShieldStar,
 } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useCompose } from "@/components/shell/ComposeProvider";
+
+/** Shown in the account menu for staff roles only (design doc §1, §2.4). */
+export interface ModMenuInfo {
+  label: string;
+  openCount: number;
+  criticalCount: number;
+}
 
 /**
  * The application shell (spec §1): desktop left rail (>=lg) with a
@@ -25,11 +33,13 @@ import { useCompose } from "@/components/shell/ComposeProvider";
 export function AppShell({
   handle,
   isOwner,
+  mod,
   initialUnread,
   children,
 }: {
   handle: string;
   isOwner: boolean;
+  mod: ModMenuInfo | null;
   initialUnread: number;
   children: ReactNode;
 }) {
@@ -84,7 +94,7 @@ export function AppShell({
           Compose
         </button>
         <div className="mt-auto">
-          <AccountMenu handle={handle} isOwner={isOwner} />
+          <AccountMenu handle={handle} isOwner={isOwner} mod={mod} />
         </div>
       </nav>
 
@@ -254,7 +264,15 @@ function BackButton() {
   );
 }
 
-function AccountMenu({ handle, isOwner }: { handle: string; isOwner: boolean }) {
+function AccountMenu({
+  handle,
+  isOwner,
+  mod,
+}: {
+  handle: string;
+  isOwner: boolean;
+  mod: ModMenuInfo | null;
+}) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -273,6 +291,36 @@ function AccountMenu({ handle, isOwner }: { handle: string; isOwner: boolean }) 
           aria-label="Account"
           className="absolute bottom-full left-1 mb-1 w-56 rounded-md bg-surface-raised py-2 shadow-e2"
         >
+          {mod ? (
+            // The queue count is information, not alarm (§2.4): plain
+            // secondary text, "Clear" in success when empty, and the
+            // one red dot reserved for open CRITICAL cases, where a
+            // delay is itself a harm.
+            <Link
+              role="menuitem"
+              href="/mod"
+              onClick={() => setOpen(false)}
+              className="flex min-h-11 items-center gap-3 px-4 text-body text-text-primary hover:bg-accent-subtle"
+            >
+              <span className="relative">
+                <ShieldCheck size={20} aria-hidden />
+                {mod.criticalCount > 0 ? (
+                  <span
+                    aria-label={`${mod.criticalCount} critical case${mod.criticalCount === 1 ? "" : "s"}`}
+                    className="absolute -right-1 -top-0.5 size-2 rounded-full bg-danger-fill"
+                  />
+                ) : null}
+              </span>
+              Moderation
+              {mod.openCount > 0 ? (
+                <span className="ml-auto text-caption text-text-secondary">
+                  {mod.openCount} open
+                </span>
+              ) : (
+                <span className="ml-auto text-caption text-success">Clear</span>
+              )}
+            </Link>
+          ) : null}
           <Link
             role="menuitem"
             href="/settings"

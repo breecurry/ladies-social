@@ -68,6 +68,11 @@ export default async function NotificationsPage() {
                     · {relativeTime(item.created_at)}
                   </span>
                 </p>
+                {item.body ? (
+                  <p className="whitespace-pre-wrap break-words text-body text-text-secondary">
+                    {item.body}
+                  </p>
+                ) : null}
                 {item.post_excerpt ? (
                   <p className="truncate text-caption text-text-tertiary">{item.post_excerpt}</p>
                 ) : null}

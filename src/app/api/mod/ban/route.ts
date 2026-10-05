@@ -33,6 +33,48 @@ const bodySchema = z.object({
 });
 
 /**
+ * GET /api/mod/ban?target=<uuid> — which ban-evasion signal CATEGORIES
+ * exist for this account (booleans only, never values), so the ban
+ * dialog can show de-identified toggles. Admin/Owner only.
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const target = request.nextUrl.searchParams.get("target") ?? "";
+  if (!z.string().uuid().safeParse(target).success) {
+    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+  }
+
+  // Role check via the caller's own (RLS-scoped) role assignments.
+  const { data: roles } = await auth.supabase
+    .from("role_assignments")
+    .select("role")
+    .eq("user_id", auth.user.id)
+    .is("revoked_at", null);
+  const isAdminOrOwner = (roles ?? []).some((r) => r.role === "admin" || r.role === "owner");
+  if (!isAdminOrOwner) {
+    return NextResponse.json({ ok: false, error: "Not permitted." }, { status: 403 });
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: priv } = await admin
+    .from("user_private")
+    .select("email, phone_e164, device_fingerprint_hash")
+    .eq("user_id", target)
+    .maybeSingle();
+
+  return NextResponse.json({
+    ok: true,
+    signals: {
+      email: Boolean(priv?.email),
+      phone: Boolean(priv?.phone_e164),
+      device: Boolean(priv?.device_fingerprint_hash),
+    },
+  });
+}
+
+/**
  * POST /api/mod/ban — permanent ban, the one unrecoverable console
  * action. ADMIN AND OWNER ONLY, enforced inside mod_ban() at the
  * database (which also refuses the Owner and the system account).
