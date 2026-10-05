@@ -26,6 +26,17 @@ export type ReportReason =
 export type ReportStatus = "open" | "in_review" | "actioned" | "dismissed" | "escalated";
 export type ReportRouting = "standard" | "admin_only" | "owner_conflict";
 export type NotifType = "follow" | "like" | "reply" | "mention" | "system";
+export type ModAction =
+  | "dismiss"
+  | "warn"
+  | "remove_content"
+  | "restore_content"
+  | "restrict"
+  | "suspend"
+  | "lift"
+  | "ban"
+  | "unban"
+  | "escalate";
 
 export type ProfileRow = {
   user_id: string;
@@ -159,8 +170,47 @@ export type NotificationRow = {
   actor_id: string | null;
   type: NotifType;
   post_id: number | null;
+  body: string | null;
   created_at: string;
   read_at: string | null;
+};
+
+/**
+ * One enforcement action (the console's history). Keyed to user ids
+ * that every surface resolves to @handles — the row itself carries no
+ * name. `message` is what the member was told; `note` never leaves
+ * staff surfaces. No app role reads or writes this table directly.
+ */
+export type ModerationActionRow = {
+  id: number;
+  target_user_id: string;
+  post_id: number | null;
+  action: ModAction;
+  rule: ReportReason | null;
+  duration_days: number | null;
+  message: string | null;
+  note: string | null;
+  actor_id: string;
+  actor_role: string;
+  created_at: string;
+  expires_at: string | null;
+};
+
+/**
+ * The durable queue for the safety@ email copy of every report
+ * (owner decision: two traceable copies). Written only inside
+ * file_report(); the dispatcher may only mark rows sent.
+ */
+export type SafetyEmailOutboxRow = {
+  id: number;
+  report_id: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  created_at: string;
+  sent_at: string | null;
+  attempts: number;
+  last_error: string | null;
 };
 
 export type NotificationPrefsRow = {
@@ -245,8 +295,104 @@ export type NotificationItem = {
   actor_handle: string;
   post_id: number | null;
   post_excerpt: string | null;
+  body: string | null;
   created_at: string;
   read_at: string | null;
+};
+
+/** One case row from mod_queue(): reports grouped by accused (+post). */
+export type ModQueueCase = {
+  accused_id: string;
+  accused_handle: string;
+  accused_status: AccountStatus;
+  subject_post_id: number | null;
+  top_reason: ReportReason;
+  report_count: number;
+  reporter_count: number;
+  newest_at: string;
+  case_state: string;
+  priority: "critical" | "high" | "normal";
+  assigned_handle: string | null;
+};
+
+/** Row shape returned by mod_queue_counts(). */
+export type ModQueueCounts = {
+  open_count: number;
+  critical_count: number;
+  in_review_count: number;
+};
+
+/** One report inside a case (reporter identity deliberately absent). */
+export type ModCaseReport = {
+  report_id: string;
+  reason: ReportReason;
+  details: string | null;
+  status: ReportStatus;
+  created_at: string;
+  assigned_handle: string | null;
+  resolution_note: string | null;
+};
+
+/** Row shape returned by mod_view_reporters() (an audited reveal). */
+export type ModReporterRow = {
+  report_id: string;
+  reporter_handle: string;
+  reporter_reports_24h: number;
+};
+
+/** One post in the in-case thread context. Removed content stubs to "". */
+export type ModContextPost = {
+  id: number;
+  parent_post_id: number | null;
+  depth: number;
+  author_handle: string;
+  body: string;
+  visibility: PostVisibility;
+  author_deleted: boolean;
+  created_at: string;
+  is_subject: boolean;
+};
+
+/** One recent post on an account-level case. */
+export type ModAccountPost = {
+  id: number;
+  body: string;
+  visibility: PostVisibility;
+  is_reply: boolean;
+  created_at: string;
+};
+
+/** The account-context strip for a case. */
+export type ModAccountContext = {
+  handle: string;
+  status: AccountStatus;
+  status_expires_at: string | null;
+  joined_at: string;
+  post_count: number;
+  prior_actions: number;
+  is_staff: boolean;
+};
+
+/** One row of an account's enforcement trail (staff surface). */
+export type ModEnforcementRow = {
+  action: ModAction;
+  rule: ReportReason | null;
+  duration_days: number | null;
+  actor_role: string;
+  actor_handle: string | null;
+  note: string | null;
+  created_at: string;
+  expires_at: string | null;
+};
+
+/** The member's own "what happened to me" status. */
+export type MyAccountStatus = {
+  status: AccountStatus;
+  status_expires_at: string | null;
+  last_action: ModAction | null;
+  last_rule: ReportReason | null;
+  last_message: string | null;
+  last_action_at: string | null;
 };
 
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
@@ -273,6 +419,8 @@ export type Database = {
       reports: TableDef<ReportRow>;
       notifications: TableDef<NotificationRow>;
       notification_prefs: TableDef<NotificationPrefsRow>;
+      moderation_actions: TableDef<ModerationActionRow>;
+      safety_email_outbox: TableDef<SafetyEmailOutboxRow>;
       age_gate_blocks: TableDef<AgeGateBlockRow>;
     };
     Views: Record<string, never>;
@@ -384,6 +532,78 @@ export type Database = {
         Returns: NotificationItem[];
       };
       notif_mark_all_read: { Args: Record<string, never>; Returns: undefined };
+      mod_claim: { Args: { p_target: string; p_post?: number | null }; Returns: number };
+      mod_dismiss: {
+        Args: { p_target: string; p_post?: number | null; p_note?: string | null };
+        Returns: number;
+      };
+      mod_reopen: { Args: { p_target: string; p_post?: number | null }; Returns: number };
+      mod_warn: {
+        Args: {
+          p_target: string;
+          p_rule: ReportReason;
+          p_message: string;
+          p_post?: number | null;
+          p_remove?: boolean;
+          p_note?: string | null;
+        };
+        Returns: undefined;
+      };
+      mod_remove_post: {
+        Args: { p_post: number; p_rule: ReportReason; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_restore_post: {
+        Args: { p_post: number; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_restrict: {
+        Args: { p_target: string; p_days: number; p_rule: ReportReason; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_suspend: {
+        Args: { p_target: string; p_days: number; p_rule: ReportReason; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_lift: { Args: { p_target: string; p_note?: string | null }; Returns: undefined };
+      mod_escalate: {
+        Args: { p_target: string; p_post?: number | null; p_note?: string | null };
+        Returns: number;
+      };
+      mod_ban: {
+        Args: {
+          p_target: string;
+          p_rule: ReportReason;
+          p_note: string;
+          p_email_hash?: string | null;
+          p_phone_hash?: string | null;
+          p_ban_device?: boolean;
+        };
+        Returns: undefined;
+      };
+      owner_unban: { Args: { p_target: string; p_note?: string | null }; Returns: undefined };
+      mod_queue: { Args: { p_state?: string; p_limit?: number }; Returns: ModQueueCase[] };
+      mod_queue_counts: { Args: Record<string, never>; Returns: ModQueueCounts[] };
+      mod_case: {
+        Args: { p_target: string; p_post?: number | null };
+        Returns: ModCaseReport[];
+      };
+      mod_view_reporters: {
+        Args: { p_target: string; p_post?: number | null };
+        Returns: ModReporterRow[];
+      };
+      mod_post_context: { Args: { p_post: number }; Returns: ModContextPost[] };
+      mod_account_posts: {
+        Args: { p_target: string; p_limit?: number };
+        Returns: ModAccountPost[];
+      };
+      mod_account_context: { Args: { p_target: string }; Returns: ModAccountContext[] };
+      mod_enforcement_history: {
+        Args: { p_target: string };
+        Returns: ModEnforcementRow[];
+      };
+      my_account_status: { Args: Record<string, never>; Returns: MyAccountStatus[] };
+      refresh_my_status: { Args: Record<string, never>; Returns: boolean };
       record_age_gate_block: {
         Args: { p_fingerprint_hash: string | null };
         Returns: AgeGateBlockResult[];
@@ -409,6 +629,7 @@ export type Database = {
       report_status: ReportStatus;
       report_routing: ReportRouting;
       notif_type: NotifType;
+      mod_action: ModAction;
     };
     CompositeTypes: Record<string, never>;
   };

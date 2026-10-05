@@ -69,17 +69,27 @@ export function ReportDialog({
     if (!reason) return;
     setBusy(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
-    const { error: rpcError } = await supabase.rpc("file_report", {
-      p_subject: postId !== undefined ? "post" : "user",
-      p_post: postId ?? null,
-      p_user: postId !== undefined ? null : subjectUserId,
-      p_reason: reason,
-      p_details: details.trim() === "" ? null : details.trim(),
+    // Filed through the server route (not a direct RPC) so the safety@
+    // email copy — queued by the same database transaction — is
+    // dispatched at filing time. Routing stays server-computed and the
+    // flow is identical whoever the accused is (spec §10.5).
+    const response = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: postId !== undefined ? "post" : "user",
+        postId,
+        userId: postId !== undefined ? undefined : subjectUserId,
+        reason,
+        details: details.trim() === "" ? undefined : details.trim(),
+      }),
     });
+    const result = (await response.json().catch(() => null)) as
+      | { ok: boolean; error?: string }
+      | null;
     setBusy(false);
-    if (rpcError) {
-      setError(rpcError.message);
+    if (!result?.ok) {
+      setError(result?.error ?? "Something went wrong. Please try again.");
       return;
     }
     setStep("done");
