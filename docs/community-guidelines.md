@@ -1,6 +1,7 @@
 # Hersciety — Community Guidelines
 
 *Effective date: October 1, 2026*
+*Last updated: October 5, 2026*
 
 ---
 
@@ -297,10 +298,10 @@ For first-time or minor violations where the harm is limited and the intent appe
 The specific post, image, DM, or thread is removed. Your account remains active. This applies to violations that clearly cross a line but do not require suspending you.
 
 **Temporary suspension**
-Your account is suspended for a defined period — typically 3 to 30 days, depending on severity and history. During suspension, you cannot post, interact, or use DMs. Your profile remains visible unless we also remove your public content.
+Your account is suspended for a defined period — typically 3 to 30 days, depending on severity and history. For the duration of your suspension, your account and your content are removed from the platform. Nobody can see your profile or your posts while your suspension is active. When the suspension ends — or is lifted early by a moderator — your account and all of your content come back.
 
 **Permanent removal**
-Your account is permanently closed. This is the outcome for:
+Your account and all of your content are permanently removed from the platform. This is the outcome for:
 - Any CSAM-related violation
 - Non-consensual intimate imagery
 - Serious, credible threats of violence
@@ -309,7 +310,7 @@ Your account is permanently closed. This is the outcome for:
 - Coordinated harassment campaigns
 - Ban evasion
 
-Permanent removal means your account is closed and future accounts created by you are subject to removal.
+Permanent removal means your account and your content are gone and do not come back. Future accounts created by you are subject to the same removal.
 
 ---
 

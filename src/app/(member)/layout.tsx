@@ -155,7 +155,8 @@ function SuspendedScreen({
       <Card className="flex flex-col gap-3">
         <p className="text-body text-text-primary">
           Your account is suspended{expiresAt ? ` until ${formatDate(expiresAt)}` : ""}. During
-          this time you cannot post, reply, like, or follow. Your profile stays visible.
+          this time your profile and posts are not visible to anyone, and you cannot post, reply,
+          like, or follow. When your suspension ends, your account and content will be restored.
         </p>
         {status?.last_rule ? (
           <p className="text-body text-text-secondary">
