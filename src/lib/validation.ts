@@ -4,12 +4,16 @@ export const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/;
 
 /**
  * Handles reserved for the platform; unavailable regardless of state.
- * Mirrored in the database (reserved_handles table + trigger, migration
- * 0015) — this list gives the polite field-level signup error, the
+ * Mirrored in the database (reserved_handles table + trigger, migrations
+ * 0015/0016) — this list gives the polite field-level signup error, the
  * database enforces the floor. Keep the two in sync.
+ * "herciety" (no S) is a misspelling of the brand and stays reserved
+ * permanently as an impersonation guard.
  */
 export const RESERVED_HANDLES = new Set([
+  "hersciety",
   "herciety",
+  "her_society",
   "unitedfeminist",
   "united_feminist",
   "admin",

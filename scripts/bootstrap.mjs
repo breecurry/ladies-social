@@ -1,5 +1,5 @@
 /**
- * One-time setup: creates the Owner account and the "Herciety" system
+ * One-time setup: creates the Owner account and the "Hersciety" system
  * account against a Supabase project with the Phase 1 migrations
  * applied. Idempotence is enforced in the database — bootstrap_owner()
  * and create_system_account() refuse to run twice.
@@ -60,7 +60,7 @@ console.warn("Owner account bootstrapped.");
 
 // System account: random unguessable password; it is never logged into.
 // The address stays on unitedfeminist.com — the company domain owns all
-// email (Resend DKIM is verified there, not on herciety.com).
+// email (Resend DKIM is verified there, not on hersciety.com).
 const systemPassword = crypto.randomUUID() + crypto.randomUUID();
 const systemId = await createAuthUser(
   env("SYSTEM_EMAIL", "system@unitedfeminist.com"),
@@ -68,7 +68,7 @@ const systemId = await createAuthUser(
 );
 const { error: systemError } = await supabase.rpc("create_system_account", {
   p_user: systemId,
-  p_handle: "herciety",
+  p_handle: "hersciety",
 });
 if (systemError) {
   console.error(`create_system_account failed: ${systemError.message}`);

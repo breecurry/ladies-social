@@ -5,8 +5,8 @@
 -- (P2-2), the maximum reply depth (P2-4), parent-excerpt visibility
 -- (P2-6) — plus structural EXECUTE-privilege guards (P1-3, P2-8) so a
 -- future migration cannot quietly reopen the holes.
--- Also covers migration 0015 (rebrand): the system account is
--- @herciety / "Herciety", and reserved handles are enforced in the
+-- Also covers migrations 0015/0016 (rebrand): the system account is
+-- @hersciety / "Hersciety", and reserved handles are enforced in the
 -- database, not only in the signup route.
 \set ON_ERROR_STOP on
 set search_path = public, extensions;
@@ -21,7 +21,7 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000008', 'eve@test');
 
 select bootstrap_owner('00000000-0000-0000-0000-000000000001', 'bree', 'Bree Curry', '1990-01-01', 'owner@test', null);
-select create_system_account('00000000-0000-0000-0000-000000000007', 'herciety');
+select create_system_account('00000000-0000-0000-0000-000000000007', 'hersciety');
 select create_member('00000000-0000-0000-0000-000000000003', 'ada@test', 'Ada Lovelace', '1995-05-05', 'ada', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000004', 'bea@test', 'Bea Arthur',   '1995-05-05', 'bea', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000005', 'cat@test', 'Cat Stevens',  '1995-05-05', 'cat', null, null, null, '{}'::jsonb, false);
@@ -318,7 +318,7 @@ end $$;
 rollback;
 
 -- ============================================================
--- 0015: the rebranded system account and reserved-handle enforcement.
+-- 0015/0016: the rebranded system account and reserved-handle enforcement.
 -- Run in its own transaction so a trigger-raised exception above
 -- cannot mask these.
 -- ============================================================
@@ -327,29 +327,30 @@ begin;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000007', 'system@test'),
   ('00000000-0000-0000-0000-000000000009', 'mallory@test');
-select create_system_account('00000000-0000-0000-0000-000000000007', 'herciety');
+select create_system_account('00000000-0000-0000-0000-000000000007', 'hersciety');
 
 -- The system account carries the brand name and handle.
 do $$ declare v record; begin
   select handle, display_name into v from profiles where is_system;
-  if v.handle is distinct from 'herciety' or v.display_name is distinct from 'Herciety' then
-    raise exception 'FAIL (0015): system account is @% / %, expected @herciety / Herciety',
+  if v.handle is distinct from 'hersciety' or v.display_name is distinct from 'Hersciety' then
+    raise exception 'FAIL (0016): system account is @% / %, expected @hersciety / Hersciety',
       v.handle, v.display_name;
   end if;
 end $$;
 
 -- create_member() refuses reserved handles: the freed @unitedfeminist
--- must never be claimable by a member (impersonation guard), and the
--- check lives in the database, beneath the signup route.
+-- and the brand misspelling @herciety (whose matching domain belongs to
+-- a third party) must never be claimable by a member (impersonation
+-- guard), and the check lives in the database, beneath the signup route.
 do $$
 declare h text;
 begin
-  foreach h in array array['unitedfeminist', 'united_feminist', 'official'] loop
+  foreach h in array array['unitedfeminist', 'united_feminist', 'herciety', 'her_society', 'official'] loop
     begin
       perform create_member('00000000-0000-0000-0000-000000000009', 'mallory@test',
                             'Mallory Mal', '1990-01-01', h::citext,
                             null, null, null, '{}'::jsonb, false);
-      raise exception 'FAIL (0015): a member claimed the reserved handle %', h;
+      raise exception 'FAIL (0015/0016): a member claimed the reserved handle %', h;
     exception when others then
       if sqlerrm <> 'handle_reserved' then raise; end if;
     end;
@@ -361,8 +362,8 @@ end $$;
 do $$ begin
   begin
     insert into profiles (user_id, handle, trust_level)
-    values ('00000000-0000-0000-0000-000000000009', 'herciety', 'member');
-    raise exception 'FAIL (0015): direct INSERT claimed the brand handle';
+    values ('00000000-0000-0000-0000-000000000009', 'hersciety', 'member');
+    raise exception 'FAIL (0016): direct INSERT claimed the brand handle';
   exception when others then
     if sqlerrm <> 'handle_reserved' then raise; end if;
   end;
