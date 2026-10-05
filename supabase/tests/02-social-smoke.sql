@@ -412,8 +412,11 @@ end $$;
 reset role;
 
 -- ============================================================
--- 8. Reports: DEFINER-only writes, conduct-only reasons, routing,
---    owner_conflict invisibility.
+-- 8. Reports: DEFINER-only writes, conduct-only reasons, routing.
+--    OWNER DECISION (2026-10-05, supersedes the 0013 owner_conflict
+--    sealed lane): a report naming the Owner routes 'admin_only' and
+--    IS visible to the Owner in the normal admin panel; every report
+--    also queues an email copy to safety@unitedfeminist.com.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', false);
@@ -433,11 +436,11 @@ do $$ declare rid uuid; r reports%rowtype; begin
   select * into r from reports where id = rid;
   if r.routing <> 'standard' then raise exception 'FAIL: routing % for ordinary accused', r.routing; end if;
   if r.subject_user_id <> '00000000-0000-0000-0000-000000000005' then raise exception 'FAIL: accused not derived from post'; end if;
-  -- owner_conflict: the Owner accused
+  -- the Owner accused: routes to the normal admin panel (admin_only)
   rid := file_report('user', null, '00000000-0000-0000-0000-000000000001', 'other', null);
   select * into r from reports where id = rid;
-  if r.routing <> 'owner_conflict' then raise exception 'FAIL: routing % for Owner accused', r.routing; end if;
-  perform set_config('t.report_oc', rid::text, false);
+  if r.routing <> 'admin_only' then raise exception 'FAIL: routing % for Owner accused', r.routing; end if;
+  perform set_config('t.report_owner', rid::text, false);
 end $$;
 -- the reporter's own history shows both, with identical shape
 do $$ declare n int; begin
@@ -451,16 +454,35 @@ do $$ declare n int; begin
   select count(*) into n from reports;
   if n <> 0 then raise exception 'FAIL: non-reporter non-staff sees % reports', n; end if;
 end $$;
--- the OWNER cannot see the owner_conflict report, even at aal2
+-- the OWNER sees the report about herself in the normal panel (her
+-- decision, verbatim: "reports against me should still go to the admin
+-- report panel"), and its email copy is queued for safety@.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","aal":"aal2","session_id":"so"}', false);
 do $$ declare n int; begin
+  select count(*) into n from reports
+    where id = current_setting('t.report_owner')::uuid;
+  if n <> 1 then raise exception 'FAIL: report about the Owner not visible to the Owner'; end if;
+  -- nothing writes owner_conflict any more
   select count(*) into n from reports where routing = 'owner_conflict';
-  if n <> 0 then raise exception 'FAIL: owner_conflict report visible to the Owner'; end if;
-  -- the standard report IS visible to the Owner (moderator-or-above queue)
+  if n <> 0 then raise exception 'FAIL: a report still carries owner_conflict routing'; end if;
+  -- the standard report IS visible to the Owner (reviewer-or-above queue)
   select count(*) into n from reports where routing = 'standard';
   if n <> 1 then raise exception 'FAIL: Owner sees % standard reports, expected 1', n; end if;
 end $$;
+reset role;
+-- every report queued its safety@ email copy, and the copy names no
+-- reporter and carries no report text
+do $$ declare n int; bad int; begin
+  select count(*) into n from safety_email_outbox;
+  if n <> 2 then raise exception 'FAIL: % safety email copies queued, expected 2', n; end if;
+  select count(*) into bad from safety_email_outbox
+    where recipient <> 'safety@unitedfeminist.com'
+       or body like '%test details%'
+       or body like '%bea%';
+  if bad <> 0 then raise exception 'FAIL: safety email copy leaks details or reporter, or has wrong recipient'; end if;
+end $$;
+set role authenticated;
 -- admin_only: a report about a moderator routes past moderators
 select grant_role('00000000-0000-0000-0000-000000000005', 'moderator');
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', false);
