@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { passkeyErrorMessage } from "@/lib/passkeys";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
 
@@ -45,6 +46,27 @@ export function LoginForm() {
     router.refresh();
   };
 
+  // Passkeys are discoverable credentials: the authenticator identifies
+  // the account, so no email is asked for first.
+  const onPasskey = async () => {
+    setSubmitting(true);
+    setError(null);
+    const supabase = createSupabaseBrowserClient();
+    const captchaToken = captchaTokenRef.current;
+    const { error: signInError } = await supabase.auth.signInWithPasskey(
+      captchaToken ? { options: { captchaToken } } : undefined,
+    );
+    if (signInError) {
+      // A dismissed prompt maps to null — stay quiet about a choice.
+      setError(passkeyErrorMessage(signInError, "signin"));
+      turnstileRef.current?.reset();
+      setSubmitting(false);
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  };
+
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -68,6 +90,14 @@ export function LoginForm() {
       />
       <Button type="submit" disabled={submitting}>
         {submitting ? "Signing in…" : "Sign in"}
+      </Button>
+      <div className="flex items-center gap-3" aria-hidden>
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-caption text-text-tertiary">or</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      <Button type="button" variant="secondary" disabled={submitting} onClick={() => void onPasskey()}>
+        Sign in with a passkey
       </Button>
     </form>
   );
