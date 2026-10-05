@@ -2,32 +2,24 @@
 
 ---
 
-## ⚠️ ATTORNEY REVIEW REQUIRED BEFORE PUBLICATION
+## INTERNAL NOTE — COUNSEL REVIEW PENDING
 
-**This is a comprehensive draft, not legal advice, and not a substitute for qualified legal counsel.**
+These Terms of Service were published on October 5, 2026 at the owner's direction. **Counsel review has not yet occurred.** This note records that fact; it is stripped from the public page by `loadLegalDocument()` and is not rendered to members.
 
-Hersciety operates an open-membership social platform for adults that handles user-generated content including images and video, operates a direct-messaging system, and uses fully open registration with conduct-based enforcement. Before these Terms of Service are published, the owner must have them reviewed by a lawyer who is:
+Open items requiring attorney attention:
+1. Open registration and conduct-based enforcement framework — confirm appropriate framing under anti-discrimination law.
+2. Age verification posture — self-attestation only. Review exposure under Tennessee's Protecting Children from Social Media Act (Public Chapter 899 / HB 1891).
+3. Section 230 scope and any exceptions relevant to this platform's content and moderation model.
+4. CSAM reporting obligations under 18 U.S.C. § 2258A as amended by the REPORT Act.
+5. Arbitration clause (§13.3) and class action waiver (§13.5) — enforceability in California and other restrictive jurisdictions; compliance with AAA consumer arbitration rules.
+6. Direct messages section (§7) — describes platform access rights. Confirm framing is consistent with the current (non-E2E) architecture described in the Privacy Policy once that document is reviewed.
 
-- Licensed to practice in Tennessee and familiar with applicable state, federal, and (when EU/UK launch occurs) international law
-- Knowledgeable about platform liability, Section 230 of the Communications Decency Act, and its current scope
-- Familiar with data protection law including the California Consumer Privacy Act and its amendments, and applicable state laws
-- Aware of applicable anti-discrimination laws including state public accommodation statutes in jurisdictions where the platform operates
-- Experienced with content moderation platforms and trust-and-safety legal obligations
-
-**Specific areas of elevated legal risk on this platform that require attorney attention:**
-1. Open registration and conduct-based enforcement -- the Platform uses fully open registration with no admission screening, no invite, no vouch, and no gender screening of any kind. Whether the conduct-based enforcement framework -- applied equally to all members regardless of gender or any other personal characteristic -- is appropriately framed under applicable anti-discrimination law requires attorney review.
-2. Age verification posture -- the Platform uses self-attestation (a date-of-birth field plus a Terms checkbox affirming 18+) as its age-assurance method, with no document verification. Tennessee's Protecting Children from Social Media Act (Public Chapter 899 / HB 1891) requires social media platforms to verify the age of prospective account holders. Curry Co LLC is a Tennessee entity. The platform's current age-assurance approach and any exposure under that statute require attorney review before launch.
-3. Section 230 protections, their scope, and any exceptions relevant to this platform's content and moderation model
-4. CSAM reporting obligations under 18 U.S.C. § 2258A as amended by the REPORT Act, and the platform's obligations and liability exposure
-5. Arbitration clause enforceability, particularly for users in jurisdictions that restrict mandatory arbitration
-6. The Privacy Policy has been drafted and is available at hersciety.com/privacy-policy, but it must be reviewed by counsel before publication — particularly given the end-to-end encryption design for direct messages, the updated retention periods now specified in Section 8 of that document, and the fact that image upload does not currently exist and the CSAM posture described in both documents reflects that reality
-
-Do not publish these Terms of Service without counsel review.
+Do not treat this document as legally finalized.
 
 ---
 
 *Effective date: October 1, 2026*
-*Last updated: October 7, 2026*
+*Last updated: October 5, 2026*
 
 These Terms of Service ("Terms") are a binding legal agreement between you and Curry Co LLC ("Company," "we," "us," or "our"), the operator of the Hersciety platform available at hersciety.com (the "Platform"). By creating an account or using the Platform in any way, you agree to be bound by these Terms. If you do not agree, do not use the Platform.
 
@@ -245,13 +237,11 @@ We reserve the right to assume exclusive control of the defense of any claim for
 
 **13.2 Informal resolution.** Before initiating any formal dispute process, you agree to contact us at legal@unitedfeminist.com and attempt to resolve the dispute informally. We will try to resolve the dispute within 30 days. If we cannot resolve it informally, either party may proceed as described below.
 
-**13.3 Binding arbitration.** [ATTORNEY NOTE: This arbitration clause requires review for enforceability in applicable jurisdictions, including California (which restricts certain arbitration provisions), and for compliance with AAA/JAMS consumer arbitration rules or whichever set of rules is selected. The class action waiver below also requires review. Do not publish without counsel review.]
-
-Subject to Section 13.4 below, any dispute arising from or related to these Terms or your use of the Platform that is not resolved informally will be submitted to binding individual arbitration administered by the American Arbitration Association (AAA) under its applicable rules. The arbitration will be conducted in Tennessee or remotely as agreed. The arbitrator's decision is final and binding, and judgment on the award may be entered in any court of competent jurisdiction.
+**13.3 Binding arbitration.** Subject to Section 13.4 below, any dispute arising from or related to these Terms or your use of the Platform that is not resolved informally will be submitted to binding individual arbitration administered by the American Arbitration Association (AAA) under its applicable rules. The arbitration will be conducted in Tennessee or remotely as agreed. The arbitrator's decision is final and binding, and judgment on the award may be entered in any court of competent jurisdiction.
 
 **13.4 Exceptions to arbitration.** Either party may bring: (a) individual claims in small claims court if the claim qualifies; and (b) claims for injunctive or other equitable relief to prevent unauthorized use of intellectual property or irreparable harm, in a court of competent jurisdiction.
 
-**13.5 Class action waiver.** You agree that any dispute resolution proceeding — whether in arbitration or court — will be conducted on an individual basis only. You waive any right to bring or participate in a class action, collective action, or representative proceeding. [ATTORNEY NOTE: Review for enforceability under applicable state and federal law.]
+**13.5 Class action waiver.** You agree that any dispute resolution proceeding — whether in arbitration or court — will be conducted on an individual basis only. You waive any right to bring or participate in a class action, collective action, or representative proceeding.
 
 **13.6 Jury trial waiver.** To the extent permitted by applicable law, you waive any right to a jury trial for any claims arising from or related to these Terms or the Platform.
 

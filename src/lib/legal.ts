@@ -7,19 +7,19 @@ import path from "node:path";
  * truth. Pages render them from disk so a change to the document is a
  * change to the page, with no copy drift.
  *
- * `published` is the publication switch for each document. The Terms of
- * Service and Privacy Policy are still being finalised with counsel
- * (they contain unresolved owner decisions — see the bracketed notes in
- * the markdown), so their routes show an interim notice instead of
- * draft legal text. When a document receives sign-off, flipping its
- * `published` flag to `true` here is the ONLY change needed to put the
- * real text live at its existing URL.
+ * `published` is the publication switch for each document. When a
+ * document is published, its route renders the real text from docs/;
+ * when unpublished, the route shows an interim notice instead. The
+ * Terms of Service and Privacy Policy were published on October 5, 2026
+ * after substantive corrections to the Privacy Policy (see internal
+ * notes at the top of each document). Community Guidelines have been
+ * published since launch.
  */
 export type LegalSlug = "terms-of-service" | "privacy-policy" | "community-guidelines";
 
 export const LEGAL_DOCS: Record<LegalSlug, { title: string; published: boolean }> = {
-  "terms-of-service": { title: "Terms of Service", published: false },
-  "privacy-policy": { title: "Privacy Policy", published: false },
+  "terms-of-service": { title: "Terms of Service", published: true },
+  "privacy-policy": { title: "Privacy Policy", published: true },
   "community-guidelines": { title: "Community Guidelines", published: true },
 };
 
