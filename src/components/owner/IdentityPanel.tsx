@@ -2,29 +2,75 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Lock } from "@phosphor-icons/react/dist/ssr";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { IdentityRevealRow } from "@/lib/database.types";
+import { passkeyErrorMessage, type SensitiveAuthMethod } from "@/lib/passkeys";
 import { Alert } from "@/components/ui";
 
 /**
  * The identity panel (Phase 2D spec §7): where the browsable surface
  * ends and the identity surface begins. Closed by default, visually
  * unlike everything else on the page, and opening it is an event, not
- * a view: Owner at AAL2, a mandatory stated reason, and an entry in
- * the hash-chained audit log — all enforced by the database function,
- * which writes the log BEFORE returning a byte. This component is
- * only ever the polite front of that gate, never the gate itself.
+ * a view: Owner with a fresh verification — AAL2 or a passkey used
+ * within the last five minutes — a mandatory stated reason, and an
+ * entry in the hash-chained audit log, all enforced by the database
+ * function, which writes the log BEFORE returning a byte. This
+ * component is only ever the polite front of that gate, never the
+ * gate itself.
+ *
+ * When the gate finds the session stale, the panel offers to re-run
+ * the passkey ceremony in place (which refreshes the amr timestamp —
+ * and rotates the session id, which only the audit trail records).
  *
  * The revealed data lives in local state, so leaving the member
  * detail re-collapses it; nothing is cached or left open.
  */
-export function IdentityPanel({ userId, aal2 }: { userId: string; aal2: boolean }) {
+export function IdentityPanel({
+  userId,
+  authMethod,
+}: {
+  userId: string;
+  /** Which method currently satisfies the gate, per the server. */
+  authMethod: SensitiveAuthMethod | null;
+}) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [identity, setIdentity] = useState<IdentityRevealRow | null>(null);
+  // Bridges the moment between a successful in-place passkey check and
+  // the server re-render catching up via router.refresh().
+  const [confirmed, setConfirmed] = useState(false);
+
+  const gateOk = authMethod !== null || confirmed;
+
+  const confirmWithPasskey = async () => {
+    setBusy(true);
+    setError(null);
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { session: before },
+    } = await supabase.auth.getSession();
+    const { data, error: authError } = await supabase.auth.signInWithPasskey();
+    setBusy(false);
+    if (authError) {
+      // A dismissed prompt maps to null — a choice, not an error.
+      setError(passkeyErrorMessage(authError, "signin"));
+      return;
+    }
+    if (before && data.user && data.user.id !== before.user.id) {
+      // The picker offered more than one account and a different one
+      // was chosen; that account is now signed in. Don't reveal.
+      setError("That passkey belongs to a different account, which is now signed in instead.");
+      router.refresh();
+      return;
+    }
+    setConfirmed(true);
+    router.refresh();
+  };
 
   const reveal = async () => {
     setBusy(true);
@@ -37,7 +83,14 @@ export function IdentityPanel({ userId, aal2 }: { userId: string; aal2: boolean 
     setBusy(false);
     const row = data?.[0];
     if (rpcError || !row) {
-      setError("Could not reveal identity details. Step up to AAL2 and try again.");
+      if (rpcError?.message.toLowerCase().includes("fresh verification")) {
+        // The amr timestamp went stale while the panel was open.
+        setConfirmed(false);
+        setError("That verification has expired — confirm it's you again.");
+        router.refresh();
+        return;
+      }
+      setError("Could not reveal identity details. Verify it's you and try again.");
       return;
     }
     setIdentity(row);
@@ -110,15 +163,33 @@ export function IdentityPanel({ userId, aal2 }: { userId: string; aal2: boolean 
         >
           Reveal identity details
         </button>
-      ) : !aal2 ? (
-        <div className="mt-4">
+      ) : !gateOk ? (
+        <div className="mt-4 flex flex-col gap-3">
           <Alert tone="warning">
-            Seeing identity details requires your security key or authenticator.{" "}
-            <Link className="underline" href="/settings/security">
-              Step up first
-            </Link>
-            .
+            Seeing identity details needs a fresh check that it&apos;s you — a passkey
+            confirmation, or an authenticator-app step-up.
           </Alert>
+          {error ? (
+            <p role="alert" className="text-caption text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void confirmWithPasskey()}
+              className="min-h-11 rounded-md border border-border-strong bg-surface px-4 text-label text-text-primary hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "Waiting for your passkey…" : "Confirm with your passkey"}
+            </button>
+            <Link
+              className="text-label text-accent underline-offset-4 hover:underline"
+              href="/settings/security"
+            >
+              Use your authenticator app instead
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth";
+import { sensitiveAuthMethod } from "@/lib/passkeys";
 import { absoluteDate, STAFF_ROLE_LABEL } from "@/lib/directory";
 import { caseKey, REASON_LABEL } from "@/lib/moderation";
 import { Avatar } from "@/components/Avatar";
@@ -17,7 +18,7 @@ export const metadata: Metadata = { title: "Member" };
  * The member-detail glance view (Phase 2D spec §6): everything needed
  * to understand an account's standing and conduct, and nothing that
  * identifies the person behind it. Conduct is at a glance; identity is
- * behind the AAL2 step-up at the foot of the page (spec §7), a
+ * behind a fresh verification (AAL2 or a fresh passkey) at the foot of the page (spec §7), a
  * different action on the same screen, logged when taken.
  */
 export default async function OwnerMemberDetailPage({
@@ -42,7 +43,13 @@ export default async function OwnerMemberDetailPage({
     p_target: member.user_id,
   });
   const history = enforcement ?? [];
-  const aal2 = aalData?.currentLevel === "aal2";
+  // The method currently satisfying the sensitive-action gate: AAL2, a
+  // fresh passkey, or nothing. UI hint only — owner_reveal_identity
+  // re-derives this server-side from the JWT.
+  const authMethod = sensitiveAuthMethod(
+    aalData?.currentLevel ?? null,
+    aalData?.currentAuthenticationMethods,
+  );
 
   const standing: string[] = [
     `Joined ${absoluteDate(member.joined_at)}`,
@@ -123,7 +130,7 @@ export default async function OwnerMemberDetailPage({
         </Link>
       </Card>
 
-      <IdentityPanel userId={member.user_id} aal2={aal2} />
+      <IdentityPanel userId={member.user_id} authMethod={authMethod} />
     </div>
   );
 }

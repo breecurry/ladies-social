@@ -52,7 +52,7 @@ export default async function OwnerRolesPage() {
         <Alert tone="warning">
           Role changes require AAL2.{" "}
           <Link className="underline" href="/settings/security">
-            Step up with your security key or authenticator app
+            Step up with your authenticator app
           </Link>{" "}
           first.
         </Alert>

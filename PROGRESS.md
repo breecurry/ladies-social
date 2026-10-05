@@ -1007,3 +1007,32 @@ Four working increments on main (fc417b7, 9379aba, 78879c4, ccb0d91):
    hashtag cap 40 on both sides (Owner decision); profile Reposts tab
    via `profile_posts(p_reposts => true)`. Suites 05/14 updated,
    suite 15 added; all 15 suites pass on a locally migrated database.
+
+## Passkeys + the identity-reveal gate (2026-10-05)
+
+**Status: SHIPPED (code); migration `20261019000001` WRITTEN, NOT APPLIED**
+
+Three working increments on main:
+
+1. **Passkey registration and management.** The old "Add a passkey /
+   security key" button called a WebAuthn-as-MFA API the auth backend
+   refuses to enable — a guaranteed failure for every member. It now
+   uses real passkey registration; Settings → Security lists, renames
+   (authenticator-derived friendly names), and removes passkeys, with
+   plain-language error copy that names no vendor. TOTP enrollment and
+   step-up untouched. Browser client opts into the beta passkey API.
+2. **Passkey sign-in.** A secondary "Sign in with a passkey" button on
+   the login page (discoverable credentials — no email asked).
+   Password sign-in unchanged.
+3. **The gate.** `owner_reveal_identity` accepts AAL2 OR a passkey
+   authentication fresh within 5 minutes, read server-side from the
+   JWT `amr` claim (array of `{method, timestamp}` objects). The
+   audit entry now records which method satisfied the gate. Every
+   other AAL2 requirement is deliberately unchanged. IdentityPanel
+   offers an in-place passkey re-confirmation when the session is
+   stale. Suite 16 added; suites 01–16 pass on a locally migrated
+   database (fresh apply + re-run of the new migration).
+
+The new migration is NOT applied to the live project — until it is,
+the identity reveal keeps requiring AAL2 exactly as before (the shipped
+UI degrades to the authenticator-app path).

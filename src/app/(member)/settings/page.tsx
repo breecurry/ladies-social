@@ -36,10 +36,10 @@ export default async function AccountSettingsPage() {
       <Card className="flex flex-col gap-2">
         <h3 className="text-heading">Security</h3>
         <p className="max-w-prose text-body text-text-secondary">
-          Add a passkey/security key or an authenticator app. Required for privileged actions.
+          Add a passkey for password-free sign-in, or an authenticator app for privileged actions.
         </p>
         <Link className="text-body text-accent underline" href="/settings/security">
-          Manage two-factor authentication
+          Manage sign-in and verification
         </Link>
       </Card>
       <Card className="flex flex-col gap-2">

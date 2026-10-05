@@ -133,6 +133,54 @@ reporter shared; the platform cannot pull more context.
   residual risk); mitigations are CSP (still pending platform-wide),
   and the external audit gate.
 
+## Passkeys and the sensitive-action gate (built 2026-10-05)
+
+**The two WebAuthn features are not the same thing.** WebAuthn as a
+SECOND FACTOR (`auth.mfa.webauthn.*`) is NOT supported by the auth
+backend (enabling it is refused with HTTP 422) — the old
+SecurityPanel button that called it failed for every member and is
+gone. What IS enabled is **Passkeys** (`registerPasskey()`,
+`signInWithPasskey()`, `auth.passkey.*`): passwordless PRIMARY
+sign-in, a **beta API that may change without notice** — pin-check
+`@supabase/supabase-js` behavior on upgrade. Project config (set,
+do not touch): `passkey_enabled=true`, RP ID `hersciety.com`, origins
+`https://www.hersciety.com` + `https://hersciety.com`.
+🔒 **Changing the RP ID invalidates every existing passkey.** It is
+locked.
+
+- The browser client (`src/lib/supabase/browser.ts`) opts into
+  `auth.experimental.passkey` — deprecated/ignored in the installed
+  SDK (passkeys are on by default since ~2.105) but kept against
+  version drift.
+- A passkey session is **aal1**. Passkeys do NOT raise the assurance
+  level; TOTP remains the only AAL2 factor. Members can still enroll
+  an authenticator app — passkeys are an addition, not a replacement.
+- **The sensitive-action gate** (migration `20261019000001`): ONLY
+  `owner_reveal_identity` accepts "aal2 OR fresh passkey". Fresh =
+  the JWT `amr` claim (ARRAY OF OBJECTS `{method, timestamp}`, never
+  a string match) has a `passkey` entry whose timestamp — the
+  authentication time, which SURVIVES token refresh — is within
+  **5 minutes**. Enforced server-side in
+  `owner_sensitive_auth_method()` / `require_owner_sensitive_auth()`;
+  mirrored client-side only as a hint (`src/lib/passkeys.ts`,
+  `PASSKEY_FRESHNESS_SECONDS` — change both together). The audit
+  entry records `auth_method: 'aal2'|'passkey'`.
+- **Everything else stays AAL2-only on purpose**: grant/revoke
+  role+privilege, owner_unban, and the RLS reads of `audit_log` and
+  `user_private`. Do not widen any of these without an explicit Owner
+  decision.
+- Step-up = re-running `signInWithPasskey()` (IdentityPanel offers
+  it). That **rotates the session id**; nothing is keyed to session
+  id except per-row attribution in `audit_log`, which is correct as
+  recorded. The ceremony can also surface a different account from
+  the picker — IdentityPanel detects the user-id change and refuses
+  to reveal.
+- Error copy lives in `src/lib/passkeys.ts` and never names a vendor;
+  a dismissed browser prompt maps to `null` (show nothing). SSO and
+  anonymous users cannot register passkeys; a user with verified MFA
+  factors must be at aal2 to MANAGE passkeys (`insufficient_aal` is
+  mapped to plain copy).
+
 ## Migrations
 
 Forward-only, idempotent, never edit an applied file. `main`
@@ -145,11 +193,12 @@ applies it after review.
 
 ## Tests
 
-`supabase/tests/` 01-15 against local Postgres per tests/README.md.
+`supabase/tests/` 01-16 against local Postgres per tests/README.md.
 09-dm-smoke covers the DM invariants; 14-phase2f covers hashtags,
 mention policy and caps, reposts, quotes, trending, and tag
 suppression; 15 covers the profile Reposts tab walls and the
-40-character tag cap; `npm run test:dm-crypto` unit-tests the protocol
+40-character tag cap; 16 covers the identity-reveal gate (AAL2 or a
+fresh passkey) and that no other AAL2 requirement widened; `npm run test:dm-crypto` unit-tests the protocol
 under Node. Extend suites; never replace them.
 
 ## Hashtags, mentions, reposts (Phase 2F, built 2026-10-10)
