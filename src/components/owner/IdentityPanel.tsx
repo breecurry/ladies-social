@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Lock } from "@phosphor-icons/react/dist/ssr";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { IdentityRevealRow } from "@/lib/database.types";
-import { passkeyErrorMessage, type SensitiveAuthMethod } from "@/lib/passkeys";
+import { stepUpWithPasskey, type SensitiveAuthMethod } from "@/lib/passkeys";
 import { Alert } from "@/components/ui";
 
 /**
@@ -51,21 +51,14 @@ export function IdentityPanel({
     setBusy(true);
     setError(null);
     const supabase = createSupabaseBrowserClient();
-    const {
-      data: { session: before },
-    } = await supabase.auth.getSession();
-    const { data, error: authError } = await supabase.auth.signInWithPasskey();
+    const result = await stepUpWithPasskey(supabase);
     setBusy(false);
-    if (authError) {
-      // A dismissed prompt maps to null — a choice, not an error.
-      setError(passkeyErrorMessage(authError, "signin"));
-      return;
-    }
-    if (before && data.user && data.user.id !== before.user.id) {
-      // The picker offered more than one account and a different one
-      // was chosen; that account is now signed in. Don't reveal.
-      setError("That passkey belongs to a different account, which is now signed in instead.");
-      router.refresh();
+    if (!result.ok) {
+      // A dismissed prompt maps to null — a choice, not an error. A
+      // switched account (the picker chose someone else, who is now
+      // signed in) must never reveal; refresh to the real session.
+      setError(result.message);
+      if (result.switchedAccount) router.refresh();
       return;
     }
     setConfirmed(true);

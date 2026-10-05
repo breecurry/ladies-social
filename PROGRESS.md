@@ -1,6 +1,7 @@
 # PROGRESS: Hersciety
 
-Updated: 2026-10-10
+Updated: 2026-10-05 (some older section headings below carry day stamps a
+few days ahead of the real calendar — their content and order are correct)
 
 ## 🟢 LIVE STATUS — https://www.hersciety.com is UP (verified 2026-10-07)
 
@@ -17,16 +18,15 @@ Migration `20261014000001` (admin dashboard) **is applied to the live
 project** (Grove, 2026-10-09; three idempotent runs, verified in the live
 schema): `/owner/members` and `/owner/insights` are live.
 
-All migrations through `20261016000001` are applied to the live project, and
+All migrations through `20261019000001` are applied to the live project, and
 the avatar storage layer is configured and live.
-**Phase 2F (hashtags, @-mentions, reposts and quote-posts) is BUILT
-(2026-10-10) — see "Where things stand". ⚠️ Its migration
-`20261017000001` is written and tested but NOT YET APPLIED to the live
+**⚠️ Migration `20261020000001` (the extended passkey gate — see its
+section below) is written and tested but NOT YET APPLIED to the live
 project; the deployed code degrades gracefully until it is applied.**
-Next, in order: **apply migration `20261017000001`** → **Grove-Test**
+Next, in order: **apply migration `20261020000001`** → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
-the Owner's MFA enrolment → counsel sign-off, then flip `published: true`
-in `src/lib/legal.ts` (one line per document).
+the Owner's passkey walkthrough end to end → counsel sign-off, then flip
+`published: true` in `src/lib/legal.ts` (one line per document).
 
 Everything the older version of this list named is now done: the Supabase
 Site URL is `https://www.hersciety.com`, Resend SMTP is configured and
@@ -1036,3 +1036,41 @@ Three working increments on main:
 The new migration is NOT applied to the live project — until it is,
 the identity reveal keeps requiring AAL2 exactly as before (the shipped
 UI degrades to the authenticator-app path).
+
+## The passkey gate extended to all Owner sensitive operations (2026-10-05)
+
+**Status: SHIPPED (code); migration `20261020000001` WRITTEN, NOT APPLIED**
+
+By explicit Owner decision (she uses a passkey, not an authenticator
+app, and was locked out of running her own platform), the
+"AAL2 OR fresh passkey" gate now covers everything that was aal2-only:
+
+1. **`grant_role` / `revoke_role` / `owner_unban`** call
+   `require_owner_sensitive_auth()` instead of `require_owner_aal2()`;
+   their audit entries record `auth_method: 'aal2'|'passkey'`
+   (`mod_record_action` gained a trailing optional parameter for the
+   unban — the old signature is dropped, exactly one remains; every
+   other moderation action's audit entry is byte-identical).
+   `grant_privilege`/`revoke_privilege` no longer exist (dropped in
+   `20261002000001`) — nothing to widen.
+2. **The RLS policies `audit_owner_read` and `user_private_owner`**
+   now use `is_owner() and owner_sensitive_auth_method() is not null`.
+   To make that evaluable by the querying role,
+   `owner_sensitive_auth_method()` is EXECUTE-granted to
+   `authenticated` (it reads only the caller's own JWT and returns a
+   string the client already knows; the raising variant stays
+   internal). The orphaned `require_owner_aal2()` is dropped.
+3. **Authorization unchanged everywhere**: every operation keeps its
+   Owner check; suite 17 proves an ADMIN with a seconds-old passkey is
+   refused all five operations and reads zero gated rows.
+4. **Client:** `/owner/roles` and `/owner/audit` now offer the same
+   in-place "Confirm with your passkey" as IdentityPanel (shared
+   `stepUpWithPasskey()` helper in `src/lib/passkeys.ts`, including
+   the switched-account refusal), with the authenticator path
+   alongside. Suite 17 added; suites 01–17 pass on a locally migrated
+   database (fresh apply of all migrations + re-run of the new one).
+
+The new migration is NOT applied to the live project — until it is,
+role changes, unbans and the audit-log/user_private reads keep
+requiring AAL2 exactly as before (the new prompts degrade to a refused
+action with the server's step-up message).

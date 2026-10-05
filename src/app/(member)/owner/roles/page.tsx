@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth";
-import { Alert, Badge, Card } from "@/components/ui";
+import { sensitiveAuthMethod } from "@/lib/passkeys";
+import { Badge, Card } from "@/components/ui";
+import { PasskeyStepUpPrompt } from "@/components/PasskeyStepUpPrompt";
 import { RoleManager } from "@/components/RoleManager";
 
 export const metadata: Metadata = { title: "Roles" };
@@ -29,7 +31,13 @@ export default async function OwnerRolesPage() {
     : { data: [] as { user_id: string; handle: string }[] };
   const handles = new Map((subjectProfiles ?? []).map((p) => [p.user_id, p.handle]));
 
-  const needsStepUp = aalData?.currentLevel !== "aal2";
+  // The method currently satisfying the sensitive-action gate: AAL2, a
+  // fresh passkey, or nothing. UI hint only — grant_role/revoke_role
+  // re-derive this server-side from the JWT.
+  const authMethod = sensitiveAuthMethod(
+    aalData?.currentLevel ?? null,
+    aalData?.currentAuthenticationMethods,
+  );
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -48,14 +56,8 @@ export default async function OwnerRolesPage() {
         </p>
       </div>
 
-      {needsStepUp ? (
-        <Alert tone="warning">
-          Role changes require AAL2.{" "}
-          <Link className="underline" href="/settings/security">
-            Step up with your authenticator app
-          </Link>{" "}
-          first.
-        </Alert>
+      {authMethod === null ? (
+        <PasskeyStepUpPrompt description="Changing roles needs a fresh check that it's you — a passkey confirmation, or an authenticator-app step-up." />
       ) : null}
 
       <Card className="flex flex-col gap-3">

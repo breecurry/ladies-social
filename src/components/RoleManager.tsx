@@ -7,7 +7,8 @@ import { Alert, Button, Field, Input } from "@/components/ui";
 /**
  * Owner-only forms for role management. The browser is the least
  * trusted layer here: the database trigger + SECURITY DEFINER
- * functions enforce Owner + AAL2 regardless of what this form submits.
+ * functions enforce Owner + a fresh verification (AAL2 or a fresh
+ * passkey) regardless of what this form submits.
  */
 export function RoleManager() {
   const router = useRouter();

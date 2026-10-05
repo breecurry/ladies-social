@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth";
-import { Alert, Card } from "@/components/ui";
+import { sensitiveAuthMethod } from "@/lib/passkeys";
+import { Card } from "@/components/ui";
+import { PasskeyStepUpPrompt } from "@/components/PasskeyStepUpPrompt";
 import { AuditVerify } from "@/components/AuditVerify";
 
 export const metadata: Metadata = { title: "Audit log" };
 
 /**
- * Owner-only, AAL2-gated (enforced by RLS — this page just renders what
- * the database permits). The log is append-only and hash-chained; no
- * update or delete path exists for any application role.
+ * Owner-only, behind the sensitive-action gate — AAL2 or a fresh
+ * passkey — enforced by RLS (the audit_owner_read policy); this page
+ * just renders what the database permits. The log is append-only and
+ * hash-chained; no update or delete path exists for any application
+ * role.
  */
 export default async function OwnerAuditPage() {
   const viewer = await getViewer();
@@ -30,7 +33,13 @@ export default async function OwnerAuditPage() {
       .limit(200),
   ]);
 
-  const needsStepUp = aalData?.currentLevel !== "aal2";
+  // The method currently satisfying the sensitive-action gate: AAL2, a
+  // fresh passkey, or nothing. UI hint only — the audit_owner_read RLS
+  // policy re-derives this server-side from the JWT.
+  const authMethod = sensitiveAuthMethod(
+    aalData?.currentLevel ?? null,
+    aalData?.currentAuthenticationMethods,
+  );
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -42,14 +51,8 @@ export default async function OwnerAuditPage() {
         </p>
       </div>
 
-      {needsStepUp ? (
-        <Alert tone="warning">
-          Reading the audit log requires AAL2.{" "}
-          <Link className="underline" href="/settings/security">
-            Step up first
-          </Link>
-          .
-        </Alert>
+      {authMethod === null ? (
+        <PasskeyStepUpPrompt description="Reading the audit log needs a fresh check that it's you — a passkey confirmation, or an authenticator-app step-up." />
       ) : (
         <>
           <Card>

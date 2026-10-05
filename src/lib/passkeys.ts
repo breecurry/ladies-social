@@ -1,4 +1,5 @@
-import type { AMREntry } from "@supabase/supabase-js";
+import type { AMREntry, SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 /**
  * Shared passkey plumbing: plain-language error copy for the WebAuthn
@@ -59,6 +60,49 @@ export function passkeyPromptDismissed(error: unknown): boolean {
 }
 
 export type PasskeyErrorContext = "register" | "manage" | "signin";
+
+export type PasskeyStepUpResult =
+  | { ok: true }
+  | {
+      ok: false;
+      /** Plain-language copy, or null when the prompt was dismissed
+       *  (a choice, not a failure — show nothing for it). */
+      message: string | null;
+      /** True when the ceremony signed in a DIFFERENT account. The
+       *  caller must refresh and must NOT proceed with the sensitive
+       *  action. */
+      switchedAccount: boolean;
+    };
+
+/**
+ * Re-run the passkey ceremony as an in-place confirmation for a
+ * sensitive action (refreshing the `amr` timestamp the database gate
+ * checks). This is THE shared step-up path — every surface that offers
+ * "Confirm with your passkey" goes through here, because it carries a
+ * non-obvious safety check: `signInWithPasskey()` can return a
+ * DIFFERENT account from the device's picker, and that account is then
+ * signed in. The before/after user-id comparison catches that; on
+ * mismatch the caller must refuse the action and refresh.
+ */
+export async function stepUpWithPasskey(
+  supabase: SupabaseClient<Database>,
+): Promise<PasskeyStepUpResult> {
+  const {
+    data: { session: before },
+  } = await supabase.auth.getSession();
+  const { data, error } = await supabase.auth.signInWithPasskey();
+  if (error) {
+    return { ok: false, message: passkeyErrorMessage(error, "signin"), switchedAccount: false };
+  }
+  if (before && data.user && data.user.id !== before.user.id) {
+    return {
+      ok: false,
+      message: "That passkey belongs to a different account, which is now signed in instead.",
+      switchedAccount: true,
+    };
+  }
+  return { ok: true };
+}
 
 /**
  * Plain-language copy for a failed passkey operation, or `null` when

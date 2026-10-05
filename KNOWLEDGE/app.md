@@ -155,26 +155,37 @@ locked.
 - A passkey session is **aal1**. Passkeys do NOT raise the assurance
   level; TOTP remains the only AAL2 factor. Members can still enroll
   an authenticator app — passkeys are an addition, not a replacement.
-- **The sensitive-action gate** (migration `20261019000001`): ONLY
-  `owner_reveal_identity` accepts "aal2 OR fresh passkey". Fresh =
+- **The sensitive-action gate**: migration `20261019000001` built it
+  for `owner_reveal_identity`; migration `20261020000001` extends it —
+  BY EXPLICIT OWNER DECISION (she uses a passkey, not an authenticator
+  app) — to every remaining Owner sensitive operation: `grant_role`,
+  `revoke_role`, `owner_unban`, and the Owner RLS reads of `audit_log`
+  and `user_private`. Each accepts "aal2 OR fresh passkey". Fresh =
   the JWT `amr` claim (ARRAY OF OBJECTS `{method, timestamp}`, never
   a string match) has a `passkey` entry whose timestamp — the
   authentication time, which SURVIVES token refresh — is within
   **5 minutes**. Enforced server-side in
   `owner_sensitive_auth_method()` / `require_owner_sensitive_auth()`;
   mirrored client-side only as a hint (`src/lib/passkeys.ts`,
-  `PASSKEY_FRESHNESS_SECONDS` — change both together). The audit
-  entry records `auth_method: 'aal2'|'passkey'`.
-- **Everything else stays AAL2-only on purpose**: grant/revoke
-  role+privilege, owner_unban, and the RLS reads of `audit_log` and
-  `user_private`. Do not widen any of these without an explicit Owner
-  decision.
-- Step-up = re-running `signInWithPasskey()` (IdentityPanel offers
-  it). That **rotates the session id**; nothing is keyed to session
-  id except per-row attribution in `audit_log`, which is correct as
-  recorded. The ceremony can also surface a different account from
-  the picker — IdentityPanel detects the user-id change and refuses
-  to reveal.
+  `PASSKEY_FRESHNESS_SECONDS` — change both together). Every audit
+  entry for these operations records `auth_method: 'aal2'|'passkey'`.
+- **Authentication changed, authorization did not.** Every operation
+  above is still Owner-only (`is_owner()` first, claims second), and
+  the RLS policies keep their `is_owner()` condition. `grant_privilege`
+  / `revoke_privilege` no longer exist (dropped in `20261002000001`).
+  `require_owner_aal2()` is DROPPED by `20261020000001` (zero callers
+  remained). `owner_sensitive_auth_method()` is EXECUTE-granted to
+  `authenticated` ONLY so the two RLS policies can evaluate it as the
+  querying role — it reads nothing but the caller's own JWT and leaks
+  nothing; the raising variant stays internal.
+- Step-up = re-running `signInWithPasskey()`. That **rotates the
+  session id**; nothing is keyed to session id except per-row
+  attribution in `audit_log`, which is correct as recorded. The
+  ceremony can also surface a DIFFERENT account from the picker — the
+  shared `stepUpWithPasskey()` helper in `src/lib/passkeys.ts` detects
+  the user-id change and refuses; EVERY step-up surface (IdentityPanel,
+  PasskeyStepUpPrompt on /owner/roles and /owner/audit) must go through
+  that helper, never reimplement the ceremony.
 - Error copy lives in `src/lib/passkeys.ts` and never names a vendor;
   a dismissed browser prompt maps to `null` (show nothing). SSO and
   anonymous users cannot register passkeys; a user with verified MFA
@@ -189,16 +200,24 @@ must degrade gracefully against the un-migrated database (every DM
 entry point treats errors as "feature off"). Migration
 `20261011000001` is written and tested (fresh, re-run, single
 transaction, populated) but NOT applied to the live project — Grove
-applies it after review.
+applies it after review. Migration `20261020000001` (the extended
+passkey gate) is likewise written, tested fresh + re-run locally, and
+NOT applied — until Grove applies it, role changes, unbans and the
+audit_log/user_private reads still demand aal2 and the new passkey
+step-up prompts degrade to a refused action (same deploy-skew posture
+as `20261019000001`).
 
 ## Tests
 
-`supabase/tests/` 01-16 against local Postgres per tests/README.md.
+`supabase/tests/` 01-17 against local Postgres per tests/README.md.
 09-dm-smoke covers the DM invariants; 14-phase2f covers hashtags,
 mention policy and caps, reposts, quotes, trending, and tag
 suppression; 15 covers the profile Reposts tab walls and the
 40-character tag cap; 16 covers the identity-reveal gate (AAL2 or a
-fresh passkey) and that no other AAL2 requirement widened; `npm run test:dm-crypto` unit-tests the protocol
+fresh passkey); 17 covers the gate's extension to grant_role /
+revoke_role / owner_unban and the audit_log / user_private RLS reads —
+including that a non-owner with a perfectly fresh passkey is still
+refused everywhere; `npm run test:dm-crypto` unit-tests the protocol
 under Node. Extend suites; never replace them.
 
 ## Hashtags, mentions, reposts (Phase 2F, built 2026-10-10)

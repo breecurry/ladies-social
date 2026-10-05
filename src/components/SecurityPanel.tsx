@@ -19,9 +19,9 @@ interface FactorInfo {
  * Sign-in and verification management: passkeys (passwordless sign-in,
  * which also acts as a fresh confirmation for the Owner's sensitive
  * actions) plus TOTP authenticator apps as the second factor behind
- * AAL2. Privileged database functions demand AAL2 or — for the audited
- * identity reveal only — a fresh passkey, so the Owner enrolls and
- * steps up here.
+ * AAL2. The Owner's sensitive operations — role changes, unbans, the
+ * audit log, contact details, the identity reveal — accept AAL2 OR a
+ * fresh passkey confirmation, so either path enrolled here works.
  */
 export function SecurityPanel() {
   const router = useRouter();
@@ -204,8 +204,8 @@ export function SecurityPanel() {
         </div>
         <p className="text-body text-text-secondary">
           Privileged actions (granting roles, reading the audit log, viewing contact details)
-          require AAL2: a second factor verified in this session. The audited identity reveal also
-          accepts a fresh passkey confirmation.
+          need a fresh check that it&apos;s you: a second factor verified in this session, or a
+          passkey confirmation made in the moment.
         </p>
       </Card>
 

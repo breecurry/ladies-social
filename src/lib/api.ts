@@ -24,7 +24,8 @@ export async function requireUser(): Promise<
  */
 export function rpcError(error: PostgrestError): NextResponse {
   const denied = error.message.includes("Only the Owner") || error.code === "42501";
-  const stepUp = error.message.includes("Re-authentication");
+  const stepUp =
+    error.message.includes("Re-authentication") || error.message.includes("Fresh verification");
   return NextResponse.json(
     { ok: false, error: error.message },
     { status: stepUp ? 403 : denied ? 403 : 400 },

@@ -31,7 +31,7 @@ const TOOLS = [
     href: "/owner/roles",
     icon: IdentificationCard,
     label: "Roles",
-    description: "Grant and revoke staff roles. Owner-only, AAL2, audited.",
+    description: "Grant and revoke staff roles. Owner-only, freshly verified, audited.",
   },
   {
     href: "/owner/audit",

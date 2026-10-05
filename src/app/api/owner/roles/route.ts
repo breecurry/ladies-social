@@ -18,8 +18,9 @@ const bodySchema = z.object({
  * POST /api/owner/roles — grant or revoke a role. The endpoint only
  * resolves the handle; authority is enforced at the DATABASE: the
  * grant_role()/revoke_role() SECURITY DEFINER functions re-check Owner
- * + AAL2, a BEFORE trigger rejects non-Owner grants, and no app role —
- * service_role included — holds INSERT/UPDATE on role_assignments.
+ * + a fresh verification (AAL2 or a fresh passkey), a BEFORE trigger
+ * rejects non-Owner grants, and no app role — service_role included —
+ * holds INSERT/UPDATE on role_assignments.
  * The owner role itself is never grantable, here or anywhere.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
