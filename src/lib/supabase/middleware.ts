@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/home", "/settings", "/owner"];
+const PROTECTED_PREFIXES = [
+  "/home",
+  "/search",
+  "/notifications",
+  "/post",
+  "/u",
+  "/settings",
+  "/owner",
+];
 
 /**
  * Session refresh + coarse auth gate. Role and account-status checks

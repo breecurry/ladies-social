@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/auth";
-import { LogoutButton } from "@/components/LogoutButton";
 
+/**
+ * Public (signed-out) marketing header. Signed-in members are
+ * redirected into the app shell by the public pages themselves; if a
+ * session exists the header simply offers the way back in.
+ */
 export async function SiteHeader() {
   const viewer = await getViewer();
 
@@ -16,20 +20,20 @@ export async function SiteHeader() {
         </Link>
         <div className="flex items-center gap-1">
           {viewer ? (
-            <>
-              <HeaderLink href="/home" label="Home" />
-              <HeaderLink href="/settings" label="Settings" />
-              {viewer.isOwner ? (
-                <>
-                  <HeaderLink href="/owner/roles" label="Roles" />
-                  <HeaderLink href="/owner/audit" label="Audit" />
-                </>
-              ) : null}
-              <LogoutButton />
-            </>
+            <Link
+              href="/home"
+              className="inline-flex min-h-11 items-center rounded-md bg-accent-fill px-4 text-label text-on-accent transition-colors duration-(--duration-fast) hover:bg-accent-hover"
+            >
+              Open the app
+            </Link>
           ) : (
             <>
-              <HeaderLink href="/login" label="Log in" />
+              <Link
+                href="/login"
+                className="inline-flex min-h-11 items-center rounded-md px-3 text-label text-text-secondary transition-colors duration-(--duration-fast) hover:bg-accent-subtle hover:text-accent"
+              >
+                Log in
+              </Link>
               <Link
                 href="/signup"
                 className="inline-flex min-h-11 items-center rounded-md bg-accent-fill px-4 text-label text-on-accent transition-colors duration-(--duration-fast) hover:bg-accent-hover"
@@ -41,16 +45,5 @@ export async function SiteHeader() {
         </div>
       </nav>
     </header>
-  );
-}
-
-function HeaderLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex min-h-11 items-center rounded-md px-3 text-label text-text-secondary transition-colors duration-(--duration-fast) hover:bg-accent-subtle hover:text-accent"
-    >
-      {label}
-    </Link>
   );
 }

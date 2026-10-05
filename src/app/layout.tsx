@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
-import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
 const hanken = Hanken_Grotesk({
@@ -16,7 +15,9 @@ export const metadata: Metadata = {
   },
   description:
     "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
-  robots: { index: false, follow: false }, // member surfaces are never indexed
+  // Member surfaces are never indexed. Public, per-profile indexing is a
+  // later, opt-in (search_indexable) per-route decision.
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
@@ -26,12 +27,18 @@ export const viewport: Viewport = {
   ],
 };
 
+// Applies a saved theme choice before first paint so there is no flash.
+// "system" (the default) sets no attribute and the CSS media query rules.
+const themeInit = `try{var t=localStorage.getItem("uf-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;}}catch(e){}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={hanken.variable}>
+    <html lang="en" className={hanken.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body className="min-h-dvh bg-background font-sans text-text-primary antialiased">
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-3xl px-4 py-8">{children}</main>
+        {children}
       </body>
     </html>
   );

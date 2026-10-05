@@ -36,6 +36,11 @@
   --focus-ring: #6d28d9;
   --scrim: rgba(31, 27, 21, 0.45);
 
+  /* Phase 2 decorative additions (design spec §15) */
+  --thread-rail: rgba(109, 40, 217, 0.16);
+  --skeleton-base: #ece6dc;
+  --skeleton-sheen: #f6f2ec;
+
   --shadow-e1: 0 1px 2px rgba(31, 27, 21, 0.06), 0 1px 1px rgba(31, 27, 21, 0.04);
   --shadow-e2: 0 4px 12px rgba(31, 27, 21, 0.1), 0 1px 3px rgba(31, 27, 21, 0.06);
   --shadow-e3: 0 16px 40px rgba(31, 27, 21, 0.16), 0 4px 12px rgba(31, 27, 21, 0.08);
@@ -71,6 +76,10 @@
     --focus-ring: #c4b5fd;
     --scrim: rgba(11, 9, 7, 0.6);
 
+    --thread-rail: rgba(167, 139, 250, 0.16);
+    --skeleton-base: #262019;
+    --skeleton-sheen: #312a22;
+
     /* Dark elevation = surface lift + border, not shadow */
     --shadow-e1: 0 0 0 1px var(--border);
     --shadow-e2: 0 0 0 1px var(--border);
@@ -105,6 +114,9 @@
   --danger-subtle: #2a1616;
   --focus-ring: #c4b5fd;
   --scrim: rgba(11, 9, 7, 0.6);
+  --thread-rail: rgba(167, 139, 250, 0.16);
+  --skeleton-base: #262019;
+  --skeleton-sheen: #312a22;
   --shadow-e1: 0 0 0 1px var(--border);
   --shadow-e2: 0 0 0 1px var(--border);
   --shadow-e3: 0 0 0 1px var(--border);
@@ -139,6 +151,9 @@
   --color-danger-subtle: var(--danger-subtle);
   --color-focus-ring: var(--focus-ring);
   --color-scrim: var(--scrim);
+  --color-thread-rail: var(--thread-rail);
+  --color-skeleton-base: var(--skeleton-base);
+  --color-skeleton-sheen: var(--skeleton-sheen);
   --color-white: #ffffff;
   --color-transparent: transparent;
 
@@ -212,6 +227,29 @@
   --duration-base: 180ms;
   --duration-slow: 240ms;
   --duration-sheet: 320ms;
+}
+
+@layer components {
+  /* Loading placeholder (spec §11.1): skeletons for content surfaces. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    background-color: var(--skeleton-base);
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    animation: skeleton-sheen 1.2s linear infinite;
+  }
+  @keyframes skeleton-sheen {
+    to {
+      transform: translateX(100%);
+    }
+  }
 }
 
 @layer base {
