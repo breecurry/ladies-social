@@ -1,6 +1,6 @@
 # PROGRESS: Hersciety
 
-Updated: 2026-10-09
+Updated: 2026-10-10
 
 ## 🟢 LIVE STATUS — https://www.hersciety.com is UP (verified 2026-10-07)
 
@@ -13,13 +13,16 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: **profile pictures / avatars** (designed in `docs/design-phase2e-profile-pictures.md`;
-unblocked now that the moderation console is live; PhotoDNA is voluntary and
-NCMEC pre-registration is not required) → **admin dashboard** (designed in
-`docs/design-phase2d-admin-dashboard-and-metrics.md`) → **Grove-Test**
-(adversarial) → **Grove-Security** (mandatory before any public launch) →
-the Owner's MFA enrolment → counsel sign-off, then flip `published: true` in
-`src/lib/legal.ts` (one line per document).
+Next, in order: **apply migration `20261014000001` (admin dashboard) to the
+live project** — the Phase 2D code is on main but its seven `owner_*`
+functions do not exist in production until Grove applies it (write-then-review
+protocol, same as every migration) → **profile pictures / avatars** (designed
+in `docs/design-phase2e-profile-pictures.md`; unblocked now that the
+moderation console is live; PhotoDNA is voluntary and NCMEC pre-registration
+is not required) → **Grove-Test** (adversarial) → **Grove-Security**
+(mandatory before any public launch) → the Owner's MFA enrolment → counsel
+sign-off, then flip `published: true` in `src/lib/legal.ts` (one line per
+document).
 
 Everything the older version of this list named is now done: the Supabase
 Site URL is `https://www.hersciety.com`, Resend SMTP is configured and
@@ -59,6 +62,61 @@ one of them. If the Owner enrolled a passkey before this change, she must
 re-enroll it once. Do not change this value again.
 
 ## Where things stand
+
+**The Owner's admin dashboard is built (Phase 2D, 2026-10-10).** The
+Owner-tools cluster is now a hub at `/owner` with two new rooms alongside
+Roles, Audit log, and Age gate:
+
+- **`/owner/members` — the member directory**, search-first per the spec: it
+  opens on the total member count, an exact-and-prefix `@handle` search,
+  status/staff/joined/activity filters (all URL state), and the most recent
+  arrivals under a recent-window cap — never an endless scroll of everyone.
+  Rows are `@handle`, join date, status chip, role chip, and a **coarse
+  activity bucket whose label is derived server-side from
+  `user_private.last_login_at`; no raw activity timestamp ever reaches the
+  browser on a browsable surface** (`profiles` has no `last_active_at` and
+  must never gain one). Deleted accounts and the system account appear
+  nowhere and count nowhere. The directory has **no account-changing action
+  at all, bulk or single** (spec §9); its one bulk operation is the
+  identity-free, confirm-gated, audit-logged CSV export of the current view.
+- **The glance view** (`/owner/members/[handle]`) shows standing and conduct
+  — status, role, counts, de-identified enforcement history reused from
+  `mod_enforcement_history()`, a one-way link into `/mod` — and never the
+  person. **The identity panel** at its foot is the one place identity
+  exists: Owner-only, AAL2 step-up, a mandatory stated reason, and an
+  `identity.reveal` entry written to the hash-chained audit log by the
+  database *before* the data returns. Device signals are a count, never
+  hashes.
+- **`/owner/insights` — the metrics foundation**: a descriptor registry
+  (`src/lib/metrics.ts`) rendered by one `MetricCard`, so the twentieth
+  metric is a declaration, not a design. Day-one metrics: total members
+  (excluding system/deleted/banned from the headline), signups with series,
+  active members (fixed 30-day liveness window, deliberately not a daily
+  dial), posts, reports filed, reports resolved with median time to
+  resolution, and enforcement actions. Small-N suppression (k = 5) is
+  applied **server-side**: segmented breakdowns between 1 and 4 leave the
+  database as "suppressed", never as the number. Honest-at-tiny-N behaviour
+  throughout: framed zeros, no fake trends, absolute deltas with percentages
+  withheld below a base of 20, and the founding-posture line while the
+  community is small. **The refused metrics stay refused** (DAU/MAU,
+  stickiness, time-on-site, streaks, leaderboards, presence/last-seen,
+  virality) — the migration header and `src/lib/metrics.ts` both forbid
+  their later addition, and suite 11 asserts they are structurally absent.
+- **Everything is Owner-only, enforced at the data layer**: the `owner_*`
+  functions filter on `is_owner()` (zero rows for anyone else) or raise;
+  the pages' redirects are courtesy, not the gate. The spec's Admin
+  handle-lookup (§6.2) is deliberately not built yet — owner decision:
+  visibility is Owner-only for now and widening later is a deliberate act.
+- Suite `11-admin-dashboard.sql` proves the owner-only gate, the
+  no-raw-timestamp rule, the `display_name` structural absence, the reveal's
+  AAL2+reason+audit chain, the export log, suppression, and deleted-member
+  erasure.
+
+⚠️ **Migration `20261014000001_admin_dashboard.sql` is written, tested
+(fresh apply + repeated re-run clean), and NOT yet applied to the live
+project.** Until Grove applies it, the Members and Insights pages render
+their calm error state in production; nothing crashes. No new tables, so
+the 0-tables-without-RLS invariant is untouched.
 
 **The Discover feed is built (Phase 2B Part 2, 2026-10-09).** Home now has
 its two tabs (spec §4.1/§4.7): Following unchanged, and Discover — recent
