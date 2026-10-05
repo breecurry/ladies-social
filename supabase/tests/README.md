@@ -20,6 +20,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/07-moderation.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/08-tos-consent.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/09-dm-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/10-discover.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/11-admin-dashboard.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -335,3 +336,43 @@ Covers migration 0021 (Phase 2B Part 2 — the Discover feed):
   the feed (P2 spec §4.8) while keeping the account out of
   suggestions, and a suspended author's posts and moderation-removed
   posts never surface.
+
+## What the admin-dashboard suite (11) proves
+
+- **Owner-only is enforced at the data layer**: an ordinary member
+  calling `owner_directory()`, `owner_directory_count()`,
+  `owner_member_count()`, or `owner_member_detail()` directly gets
+  **zero rows**, and `owner_metrics()`, `owner_reveal_identity()`, and
+  `owner_directory_export()` raise — even at AAL2. Hiding the UI is
+  not the gate;
+- **no raw activity timestamp reaches a browsable surface**: the
+  directory, count, detail, and export functions return only the five
+  coarse bucket labels (checked structurally against their result
+  shapes — no `last_login`/`last_active` column exists on any of
+  them), `profiles` has not gained a `last_active_at` column, and the
+  bucket derivation from `user_private.last_login_at` is verified
+  behaviourally;
+- **no admin-dashboard function returns or even references
+  `display_name`** (checked structurally against `pg_proc`) — the
+  directory, the surface most tempted to show a legal name, is
+  @handle-only below the app layer;
+- the **identity reveal** is refused at aal1, refused without a stated
+  reason, refused for the system account, and at AAL2-with-reason it
+  returns the `user_private` record (device signals as a **count**,
+  never hashes) with an `identity.reveal` entry — handle and reason
+  included — in the hash-chained audit log;
+- the **export** is identity-free (glance columns only) and lands in
+  the audit log as `directory.export` with the filter set and row
+  count;
+- **metrics are honest and suppression holds**: top-line totals are
+  exact while every segmented breakdown below the floor (k = 5) is
+  suppressed to `null` server-side; zeros read as real `0`s; the
+  all-time range fabricates no previous-period comparison; active
+  members is the fixed 30-day window; and the refused engagement
+  metrics (DAU/MAU, stickiness, time-on-site, streaks, leaderboards,
+  presence, virality) are structurally absent from the payload;
+- **deleted members are gone from every surface** — directory (even
+  when asked for by explicit status filter), detail, member count, and
+  the metrics headline — and the system account appears nowhere;
+- search is exact-and-prefix `@handle` only (substrings do not match),
+  and keyset pagination pages without overlap.
