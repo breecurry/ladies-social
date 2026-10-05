@@ -13,15 +13,18 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: **apply migrations `20261014000001` (admin dashboard),
-`20261015000001` (avatars) and `20261016000001` (analytics) to the live
-project** — the code for all three is on main but their functions and tables
-do not exist in production until Grove applies them (write-then-review
-protocol, same as every migration) → **R2 buckets + media-zone env for
-avatars** (see "Where things stand") → **Grove-Test** (adversarial) →
-**Grove-Security** (mandatory before any public launch) → the Owner's MFA
-enrolment → counsel sign-off, then flip `published: true` in
-`src/lib/legal.ts` (one line per document).
+Migration `20261014000001` (admin dashboard) **is applied to the live
+project** (Grove, 2026-10-09; three idempotent runs, verified in the live
+schema): `/owner/members` and `/owner/insights` are live.
+
+Next, in order: **apply migrations `20261015000001` (avatars) and
+`20261016000001` (full analytics) to the live project** — both are written,
+tested, and on main, and neither exists in production until Grove applies
+them (write-then-review protocol, same as every migration) → **R2 buckets +
+media-zone env for avatars** (see "Where things stand") → **Grove-Test**
+(adversarial) → **Grove-Security** (mandatory before any public launch) →
+the Owner's MFA enrolment → counsel sign-off, then flip `published: true`
+in `src/lib/legal.ts` (one line per document).
 
 Everything the older version of this list named is now done: the Supabase
 Site URL is `https://www.hersciety.com`, Resend SMTP is configured and
@@ -165,21 +168,24 @@ Roles, Audit log, and Age gate:
   `identity.reveal` entry written to the hash-chained audit log by the
   database *before* the data returns. Device signals are a count, never
   hashes.
-- **`/owner/insights` — the metrics foundation**: a descriptor registry
-  (`src/lib/metrics.ts`) rendered by one `MetricCard`, so the twentieth
-  metric is a declaration, not a design. Day-one metrics: total members
-  (excluding system/deleted/banned from the headline), signups with series,
-  active members (fixed 30-day liveness window, deliberately not a daily
-  dial), posts, reports filed, reports resolved with median time to
-  resolution, and enforcement actions. Small-N suppression (k = 5) is
-  applied **server-side**: segmented breakdowns between 1 and 4 leave the
-  database as "suppressed", never as the number. Honest-at-tiny-N behaviour
-  throughout: framed zeros, no fake trends, absolute deltas with percentages
-  withheld below a base of 20, and the founding-posture line while the
-  community is small. **The refused metrics stay refused** (DAU/MAU,
-  stickiness, time-on-site, streaks, leaderboards, presence/last-seen,
-  virality) — the migration header and `src/lib/metrics.ts` both forbid
-  their later addition, and suite 11 asserts they are structurally absent.
+- **`/owner/insights` — full analytics**: a descriptor registry
+  (`src/lib/metrics.ts`) rendered by one `MetricCard`, so the fiftieth
+  metric is a declaration, not a design. 26 metrics in six sections —
+  membership (total with exact status breakdown, **real net change**:
+  +joined −departed +reinstated from recorded departure events, active
+  members), engagement (**DAU/WAU/MAU and stickiness, sessions, time on
+  site, online now, precise per-member last-seen, streaks**), growth
+  (signups, follows with per-member follower growth, **1/7/30-day cohort
+  retention**), content (posts, posts per member, likes, likes per post,
+  reply depth), **per-member leaderboards** (most posts, likes given,
+  likes received, most active by sessions), and safety (reports filed and
+  resolved, median time to resolution, enforcement actions). **Every
+  number is literal** — the owner's decision (2026-10): the original
+  build's k=5 suppression, percentage-withholding, "not enough data"
+  states, and "refused metrics" prohibition were a design preference that
+  was never hers, and they are deleted — from the SQL, from
+  `src/lib/metrics.ts`, from the card, and from suite 11's assertions.
+  Per-member figures are @handle-keyed; the identity line is untouched.
 - **Everything is Owner-only, enforced at the data layer**: the `owner_*`
   functions filter on `is_owner()` (zero rows for anyone else) or raise;
   the pages' redirects are courtesy, not the gate. The spec's Admin
@@ -190,11 +196,19 @@ Roles, Audit log, and Age gate:
   AAL2+reason+audit chain, the export log, suppression, and deleted-member
   erasure.
 
-⚠️ **Migration `20261014000001_admin_dashboard.sql` is written, tested
-(fresh apply + repeated re-run clean), and NOT yet applied to the live
-project.** Until Grove applies it, the Members and Insights pages render
-their calm error state in production; nothing crashes. No new tables, so
-the 0-tables-without-RLS invariant is untouched.
+Migration `20261014000001_admin_dashboard.sql` **is applied to the live
+project** (2026-10-09). ⚠️ **Migration `20261016000001_full_analytics.sql`
+is written, tested (fresh apply over all 24 migrations + repeated re-run
+clean, suites 01-13 green), and NOT yet applied to the live project.** It
+supersedes `owner_metrics()`, adds the collection the new metrics need —
+`member_sessions` (client heartbeat via `session_heartbeat()`, RLS
+own-rows-read, function-only writes), `account_status_events` plus
+`deactivated_at`/`banned_at`/`deleted_at` departure stamps on `profiles`
+(trigger-maintained, so "down by one" is a real recorded event), and
+`analytics_collection` tracked-since labels (no fabricated history) — all
+with RLS; the 0-tables-without-RLS invariant holds. Until Grove applies
+it, Insights renders its calm error state in production; nothing crashes.
+Suite 13 covers the new behaviour; `display_name` appears in none of it.
 
 **The Discover feed is built (Phase 2B Part 2, 2026-10-09).** Home now has
 its two tabs (spec §4.1/§4.7): Following unchanged, and Discover — recent
