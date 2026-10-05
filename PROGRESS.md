@@ -1,6 +1,6 @@
 # PROGRESS: Hersciety
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## 🟢 LIVE STATUS — https://www.hersciety.com is UP (verified 2026-10-07)
 
@@ -13,12 +13,21 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: set the Supabase **Site URL to `https://www.hersciety.com`**
-(with the www — see the warning in Deployment), re-add the Resend SMTP
-credentials on the rebuilt project, re-raise the auth rate limits, enroll MFA,
-then the rest of Phase 2B (Discover feed; the age gate and the **moderation
-console both shipped** — apply migration `20261010000001` to the live project
-via `npm run provision` to turn the console's data layer on).
+Next, in order: **Discover feed** (designed in `docs/design-phase2b-moderation
+-and-discover.md`) → **profile pictures / avatars** (unblocked now that the
+moderation console is live; PhotoDNA is voluntary and NCMEC pre-registration
+is not required) → **admin dashboard** (designed in
+`docs/design-phase2d-admin-dashboard-and-metrics.md`) → **Grove-Test**
+(adversarial) → **Grove-Security** (mandatory before any public launch) →
+the Owner's MFA enrolment → counsel sign-off, then flip `published: true` in
+`src/lib/legal.ts` (one line per document).
+
+Everything the older version of this list named is now done: the Supabase
+Site URL is `https://www.hersciety.com`, Resend SMTP is configured and
+sending, the auth rate limits were raised, Turnstile captcha is **on** and
+enforcement is proven, and migrations `…0009` (age gate), `…0010`
+(moderation), `…0011` (direct messages) and `…0012` (ToS consent) are all
+applied to the live project.
 
 ## Naming (decided 2026-10-06, spelling corrected 2026-10-07; do not re-litigate)
 
@@ -52,6 +61,26 @@ re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
+**The brand mark is live (2026-10-08).** The owner's logo — a purple
+"Hersciety" wordmark whose dotted `i` is a speech bubble — is now real
+assets rather than a loose file: `public/wordmark-light.png` and
+`public/wordmark-dark.png` (1024×265), `src/app/icon.png`,
+`src/app/apple-icon.png`, `src/app/favicon.ico` and
+`src/app/opengraph-image.png`, all rendered by
+`src/components/BrandWordmark.tsx` in the desktop rail, the mobile top bar,
+the public header and the landing hero. The spec is
+`docs/design-brand-mark-integration.md`. Two things to know before anyone
+regenerates these: the source PNG carries a halo of **alpha 1-8 ghost
+pixels** that poisons a naive bounding box (measure with a threshold — the
+true trimmed ratio is 3.865:1, not the padded canvas's 2.74:1, and the halo
+must be zeroed before resampling), and the icons are **auto-wired by Next.js
+file convention**, so `layout.tsx` must NOT gain an `icons` or
+`openGraph.images` block. The logo purple `#6901E2` is deliberately left
+different from the UI token `--accent #6d28d9`; in dark mode the wordmark
+renders in `#a78bfa`, because raw `#6901E2` measures 2.38:1 on the dark
+background and is unreadable. `robots` / `SITE_INDEXABLE` was not touched —
+the site is still **noindex** until the owner says otherwise.
+
 **Direct messages are built — end-to-end encrypted, text-only, 1:1 —
 and ship DARK behind the `dm_e2e_enabled` feature flag (Phase 2C,
 2026-10-05).** The server stores ciphertext only: migration
@@ -76,7 +105,15 @@ external cryptographic audit passes and both flag layers are flipped —
 `DM_E2E_ENABLED` in the environment and the `dm_e2e_enabled` row in
 app_config; see KNOWLEDGE/app.md for the exact go-live order.** There
 is no readable-by-the-platform fallback: off means the surfaces do not
-exist. ⚠️ Migration 0020 is NOT applied to the live project.
+exist. ✅ **Migration `20261011000001` WAS APPLIED to the live project on
+2026-10-08** (via the Supabase management API, HTTP 201; re-run twice more
+against production, clean both times, so idempotency is proven on live).
+Verified after: five DM tables with RLS on all of them, 18 DM functions,
+`message` added to both `report_subject` and `notif_type`, zero tables
+without RLS database-wide, both accounts intact. It also closed a real
+pre-existing hole — `user_devices` and `one_time_prekeys` have had NO RLS
+since 0007 created them, and now do. 🔒 **`dm_e2e_enabled` has 0 rows in
+`app_config`: the feature is dark at the database layer, not just the UI.**
 
 **The moderation console is built (Phase 2B, 2026-10-05).** Reports can
 finally be actioned. Migration `20261010000001` is the data layer: the full
@@ -527,19 +564,25 @@ export to S3 Object Lock.
 - [ ] Apply migration `20261010000001` to the live project (`npm run provision`)
       — the moderation console's data layer; code is deployed and degrades
       gracefully until the apply happens
-- [ ] Add `RESEND_API_KEY` (a Resend API key, same account as the SMTP sender)
-      to the Vercel env so the per-report email copies to
-      safety@unitedfeminist.com actually send; until then every copy queues
-      durably in `safety_email_outbox` and sends on the first load after the
-      key exists
-- [ ] Commission the external cryptographic audit of the DM build —
-      the gate for turning messages on (budget guidance in the security
-      research: roughly $15k-$50k). Until it passes, both layers of the
-      `dm_e2e_enabled` flag stay off and no member can reach a DM
-      surface
-- [ ] After review, apply migration `20261011000001` to the live
-      project (Grove does this; the code is deployed and degrades
-      gracefully until then)
+- [x] **`RESEND_API_KEY` is in the Vercel production env** (added by Bree
+      2026-10-07, presence re-verified 2026-10-08). Per-report email copies
+      to safety@unitedfeminist.com send on the current deployment. Note it is
+      scoped to `production` only, so preview deploys do not send email —
+      deliberate, not a defect.
+- [ ] **Decide how the DM crypto gets independently reviewed** — the only
+      gate left before messages can be turned on. Options put to the owner
+      2026-10-08: (A) scoped review by one reputable crypto engineer —
+      **recommended**, because this is a textbook X3DH + Double Ratchet on
+      already-audited MIT primitives confined to roughly one module, not a
+      bespoke protocol; (B) ship with an honest in-product "not yet
+      independently reviewed" disclosure; (C) full firm audit now
+      (~$15k-$50k); (D) leave DMs dark until there are members worth
+      attacking. Until one is chosen, both flag layers stay off and no member
+      can reach a DM surface.
+- [x] **Apply migration `20261011000001` to the live project — DONE
+      2026-10-08 by Grove**, verified and proven idempotent on production
+      (three total runs). `…0011` is now USED; the next migration writer
+      must take a fresh timestamp after `20261012000001`.
 - [ ] Choose the founding cohort (the first 10-50 people she asks to join)
 - [ ] Decide on point-in-time database recovery (~$100/mo) at launch
 
