@@ -1,24 +1,32 @@
-# PROGRESS: Herciety
+# PROGRESS: Hersciety
 
 Updated: 2026-10-06
 
-## Naming (decided 2026-10-06; do not re-litigate)
+## Naming (decided 2026-10-06, spelling corrected 2026-10-07; do not re-litigate)
 
 Three layers, each with its own name. Confusing them breaks things:
 
-- **Herciety is the product brand and the canonical domain.** Everything a
-  user reads says Herciety, and the app lives at **herciety.com**.
+- **Hersciety is the product brand and the canonical domain.** Everything a
+  user reads says Hersciety (H-E-R-S-C-I-E-T-Y, with an S), and the app lives
+  at **hersciety.com**.
+  ⚠️ **"Herciety" (no S) is a misspelling that briefly shipped on
+  2026-10-06, and herciety.com is a DIFFERENT domain owned by an unrelated
+  third party. Never reference the misspelling or that domain anywhere; do
+  not "correct" the spelling back.** The misspelled handle @herciety stays
+  permanently reserved in the database (migration 0016) purely as an
+  impersonation guard.
 - **United Feminist is the company.** unitedfeminist.com is the secondary
-  domain and redirects to herciety.com, but it **still owns all email**: the
+  domain and redirects to hersciety.com, but it **still owns all email**: the
   four live contact aliases (safety@ / appeals@ / support@ / legal@
   unitedfeminist.com) and the transactional sender address stay put, because
   they are routed, working, named by address in the legal documents, and the
   email provider's DKIM is verified for unitedfeminist.com only.
 - **Curry Co LLC (Tennessee) is the legal entity.** Legal documents read
-  "Herciety, a service operated by Curry Co LLC."
+  "Hersciety, a service operated by Curry Co LLC."
 
-**WEBAUTHN_RP_ID changed to `herciety.com` in the same pass (2026-10-06).**
-This was safe only because the database was rebuilt the same day, has exactly
+**WEBAUTHN_RP_ID is `hersciety.com` (set 2026-10-06, spelling corrected
+2026-10-07).** Changing it was safe only because the database was rebuilt the
+same day, has exactly
 two accounts, and has never been deployed: a relying-party ID is effectively
 permanent once members hold passkeys, because changing it invalidates every
 one of them. If the Owner enrolled a passkey before this change, she must
@@ -106,7 +114,7 @@ groundwork), the age gate screens (spec §17), reshares/quotes (schema
 arrives additively with the feature), image upload of any kind (hard-
 gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
 
-## Deployment (going live on herciety.com)
+## Deployment (going live on hersciety.com)
 
 **Host: Vercel** (first-party Next.js 16; `src/middleware.ts` auth gate runs
 natively on every protected prefix). **DNS: Cloudflare in DNS-only / grey-cloud
@@ -114,9 +122,9 @@ mode** for the app records — Vercel issues and renews the Let's Encrypt
 certificate and does the HTTP→HTTPS redirect itself. Do **not** turn on
 Cloudflare's orange-cloud proxy in front of Vercel at launch: it interferes with
 certificate issuance and blinds Vercel's firewall. Canonical hostname is the
-apex `herciety.com` (set the Supabase `site_url` to match); `www`
+apex `hersciety.com` (set the Supabase `site_url` to match); `www`
 301/308-redirects to it via Vercel domain settings, and the secondary
-`unitedfeminist.com` redirects to `herciety.com` as well.
+`unitedfeminist.com` redirects to `hersciety.com` as well.
 
 Runtime env vars on the host (server-only unless `NEXT_PUBLIC_`):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
@@ -185,12 +193,12 @@ Default/unset = noindex (fail-safe).
 
 1. **Provision the rebuilt live project.** The original Supabase project was
    deleted by accident on 2026-10-06. The live project is now ref
-   `hiphjzhlwiztqgezzipf` (named `Herciety`, Curry Co org, us-east-1), with
+   `hiphjzhlwiztqgezzipf` (named `Hersciety`, Curry Co org, us-east-1), with
    migrations 0001-0015 applied but **no auth configuration set yet** — it
    all has to be configured fresh. Run `npm run provision` with
    `SUPABASE_PROJECT_REF=hiphjzhlwiztqgezzipf` to assert the auth posture
    (30-minute JWTs, refresh rotation, required email confirmation, TOTP, Site
-   URL `https://herciety.com`) and to seed the Owner + the @herciety system
+   URL `https://hersciety.com`) and to seed the Owner + the @hersciety system
    account (both steps are skipped automatically if already done). The script
    now refuses to create a new project unless `SUPABASE_ALLOW_CREATE=yes` is
    passed explicitly, so a name or ref mismatch stops loudly instead of
@@ -266,7 +274,7 @@ export to S3 Object Lock.
 
 - [ ] Attorney review of the Terms and Guidelines (after the open-registration
       revision)
-- [ ] Trademark search on "Herciety" (the earlier "United Feminist" name was
+- [ ] Trademark search on "Hersciety" (the earlier "United Feminist" name was
       never cleared either)
 - [ ] NCMEC CyberTipline registration, required **before** any image upload ships
 - [ ] PhotoDNA application, free, roughly a week's lead time

@@ -11,8 +11,8 @@ const hanken = Hanken_Grotesk({
 
 export const metadata: Metadata = {
   title: {
-    default: "Herciety",
-    template: "%s · Herciety",
+    default: "Hersciety",
+    template: "%s · Hersciety",
   },
   description:
     "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",

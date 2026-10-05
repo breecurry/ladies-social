@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# provision.sh — one-command Supabase provisioning for Herciety.
+# provision.sh — one-command Supabase provisioning for Hersciety.
 #
 # Given a Supabase personal access token (PAT) and a handful of values, this
 # creates the project, applies the migrations, turns on every security setting
@@ -120,12 +120,12 @@ info "tooling: curl, node $(node -v), supabase $(supabase --version 2>/dev/null 
 : "${OWNER_DOB:?set OWNER_DOB (YYYY-MM-DD)}"
 
 # Optional inputs with sensible, product-correct defaults.
-# The hosted project is named "Herciety" (renamed 2026-10-06; it was
+# The hosted project is named "Hersciety" (renamed 2026-10-06; it was
 # rebuilt the same day after the original project was deleted by
 # accident). Prefer SUPABASE_PROJECT_REF below — a ref is immutable,
 # a name is not, and a name mismatch is exactly how the duplicate-
 # project accident happened.
-PROJECT_NAME="${SUPABASE_PROJECT_NAME:-Herciety}"
+PROJECT_NAME="${SUPABASE_PROJECT_NAME:-Hersciety}"
 # The project ref (the 20-char id in the dashboard URL). When set, the
 # script uses it directly and the name is not consulted at all.
 PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
@@ -136,8 +136,8 @@ PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
 ALLOW_CREATE="${SUPABASE_ALLOW_CREATE:-no}"
 REGION="${SUPABASE_REGION:-us-east-1}"               # US-only launch
 INSTANCE_SIZE="${SUPABASE_INSTANCE_SIZE:-micro}"     # Pro includes one Micro
-SITE_URL="${SITE_URL:-https://herciety.com}"
-WEBAUTHN_RP_ID="${WEBAUTHN_RP_ID:-herciety.com}"
+SITE_URL="${SITE_URL:-https://hersciety.com}"
+WEBAUTHN_RP_ID="${WEBAUTHN_RP_ID:-hersciety.com}"
 OWNER_PHONE="${OWNER_PHONE:-}"
 
 [[ ${#SUPABASE_DB_PASSWORD} -ge 12 ]] || die "SUPABASE_DB_PASSWORD must be at least 12 characters."
@@ -317,7 +317,7 @@ if(process.env.SB_SMTP==="yes"){
   b.smtp_user=process.env.SMTP_USER;
   b.smtp_pass=process.env.SMTP_PASS;
   b.smtp_admin_email=process.env.SMTP_ADMIN_EMAIL||"no-reply@unitedfeminist.com";
-  b.smtp_sender_name=process.env.SMTP_SENDER_NAME||"Herciety";
+  b.smtp_sender_name=process.env.SMTP_SENDER_NAME||"Hersciety";
 }
 fs.writeFileSync(process.argv[1],JSON.stringify(b),{mode:0o600});
 ' "$BODY"

@@ -1,12 +1,12 @@
 # Decision Record: Age Assurance
 
 **Date:** October 2, 2026
-**Author:** Curry Co LLC (Herciety platform owner)
+**Author:** Curry Co LLC (Hersciety platform owner)
 **Status:** Decided
 
 ---
 
-**This is an internal decision record, not legal advice. It documents the owner's deliberate, reasoned choice on age assurance for the Herciety platform. It does not substitute for attorney review.**
+**This is an internal decision record, not legal advice. It documents the owner's deliberate, reasoned choice on age assurance for the Hersciety platform. It does not substitute for attorney review.**
 
 ---
 
@@ -26,7 +26,7 @@ COPPA (Children's Online Privacy Protection Act) governs collection of personal 
 
 ### Adult-content age-verification statutes: not applicable
 
-Twenty-seven states have enacted laws requiring age verification for online content, following the Supreme Court's decision in *Free Speech Coalition, Inc. v. Paxton*, 606 U.S. 461 (decided June 27, 2025). Those statutes cover sites where more than one third of content is sexually explicit. Herciety is a text-first community platform and is plainly outside their scope.
+Twenty-seven states have enacted laws requiring age verification for online content, following the Supreme Court's decision in *Free Speech Coalition, Inc. v. Paxton*, 606 U.S. 461 (decided June 27, 2025). Those statutes cover sites where more than one third of content is sexually explicit. Hersciety is a text-first community platform and is plainly outside their scope.
 
 ### Industry norm
 
@@ -113,7 +113,7 @@ The decision is not that verification is unimportant. It is that the available v
 
 These are the explicit triggers. If any of them materialises, the decision is revisited -- not assumed to still hold.
 
-1. **The Tennessee law survives remand** (the district court denies a preliminary injunction a second time) **and any signal of enforcement reaches small platforms** -- a letter, a complaint, an investigation of a platform materially similar in size to Herciety.
+1. **The Tennessee law survives remand** (the district court denies a preliminary injunction a second time) **and any signal of enforcement reaches small platforms** -- a letter, a complaint, an investigation of a platform materially similar in size to Hersciety.
 
 2. **A minor is discovered on the platform**, or any incident involving a minor occurs.
 

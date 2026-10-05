@@ -1,4 +1,4 @@
-# Provisioning a Supabase project for Herciety
+# Provisioning a Supabase project for Hersciety
 
 Nothing in this product runs until a Supabase project exists. This document
 describes the **one-command** path to a fully configured project, and — honestly
@@ -62,12 +62,12 @@ Set these in your shell before running. **Values are never committed or printed.
 | `OWNER_PHONE` | no | Owner phone in E.164 (`+1…`), optional. |
 | `SUPABASE_ORG_SLUG` | no | Which organization to create the project in. Auto-detected if you belong to exactly one; required if you belong to several. Find it in the dashboard org URL `…/org/<slug>`. |
 | `SUPABASE_PROJECT_REF` | no, but preferred | The live project's ref — the 20-character id in the dashboard URL (currently `hiphjzhlwiztqgezzipf`). When set, the script uses the project directly and never matches by name. |
-| `SUPABASE_PROJECT_NAME` | no | Defaults to `Herciety`, the hosted project's exact current name (renamed 2026-10-06). Only consulted when no ref is given; if nothing matches, the script stops rather than creating a project. |
+| `SUPABASE_PROJECT_NAME` | no | Defaults to `Hersciety`, the hosted project's exact current name (renamed 2026-10-06). Only consulted when no ref is given; if nothing matches, the script stops rather than creating a project. |
 | `SUPABASE_ALLOW_CREATE` | no | Set to exactly `yes` to allow creating a brand-new project (first-time setup only). This is deliberately not the default: silent project creation on a name mismatch is how the original project got duplicated and then deleted by accident on 2026-10-06. |
 | `SUPABASE_REGION` | no | Defaults to `us-east-1` (US launch). |
 | `SUPABASE_INSTANCE_SIZE` | no | Defaults to `micro` (the compute the Pro plan includes). Needs a Pro org. |
-| `SITE_URL` | no | Defaults to `https://herciety.com` (the canonical domain). Sets the auth Site URL and redirect allow-list. |
-| `WEBAUTHN_RP_ID` | no | Defaults to `herciety.com`. The WebAuthn Relying-Party ID — **permanent once members hold passkeys** (changing it then invalidates all of them). |
+| `SITE_URL` | no | Defaults to `https://hersciety.com` (the canonical domain). Sets the auth Site URL and redirect allow-list. |
+| `WEBAUTHN_RP_ID` | no | Defaults to `hersciety.com`. The WebAuthn Relying-Party ID — **permanent once members hold passkeys** (changing it then invalidates all of them). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_ADMIN_EMAIL`, `SMTP_SENDER_NAME` | strongly recommended | Custom SMTP (Resend). Without these, email confirmation stays **on** (as required) but the built-in mailer only sends to org-team addresses at ~2/hour — fine for your own first login, useless for public signups. Create a Resend SMTP credential in the Resend dashboard. |
 
 Run it:

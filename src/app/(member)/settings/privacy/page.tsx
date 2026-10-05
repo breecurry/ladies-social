@@ -46,7 +46,7 @@ export default async function PrivacySettingsPage() {
         <h3 className="text-heading">Search and discoverability</h3>
         <SearchIndexToggle initial={viewer.profile.search_indexable} />
         <p className="text-caption text-text-tertiary">
-          Inside Herciety, members can always find you by your @handle. Never by your legal
+          Inside Hersciety, members can always find you by your @handle. Never by your legal
           name.
         </p>
       </Card>

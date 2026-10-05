@@ -1,14 +1,19 @@
-# Herciety
+# Hersciety
 
 A social platform built as a safe space for women and their allies.
 Threads-like in function, its own thing in identity.
 
-> `ladies-social` is the original repo name. The product is **Herciety**.
-> Three naming layers, deliberately distinct: **Herciety** is the brand and
-> the canonical domain (herciety.com); **United Feminist** is the company,
+> `ladies-social` is the original repo name. The product is **Hersciety** —
+> spelled H-E-R-S-C-I-E-T-Y, with an S.
+> Three naming layers, deliberately distinct: **Hersciety** is the brand and
+> the canonical domain (hersciety.com); **United Feminist** is the company,
 > whose unitedfeminist.com is the secondary domain (it redirects to
-> herciety.com) and still owns all email addresses; **Curry Co LLC** is the
+> hersciety.com) and still owns all email addresses; **Curry Co LLC** is the
 > legal entity. Do not "fix" one layer into another.
+> ⚠️ **"Herciety" (no S) is a MISSPELLING, and herciety.com is a different
+> domain owned by an unrelated third party. Never reference either; do not
+> "correct" the spelling back.** The misspelled handle stays reserved in the
+> database purely as an impersonation guard.
 
 ## What this is
 
@@ -87,7 +92,7 @@ or exact name; creating a new one requires an explicit
 `pg_cron`, sets the required auth posture (30-minute JWTs, refresh-token
 rotation, mandatory email confirmation, TOTP + WebAuthn MFA), writes the app
 keys into `.env.local`, and runs `npm run bootstrap` to create the Owner and the
-"Herciety" system account. It is idempotent and never prints a secret.
+"Hersciety" system account. It is idempotent and never prints a secret.
 The env vars it needs, and the few steps that are irreducibly manual (upgrading
 the org to Pro, minting the access token), are documented in
 [`docs/provisioning.md`](docs/provisioning.md).

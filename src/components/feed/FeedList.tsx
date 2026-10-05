@@ -50,7 +50,7 @@ export function FeedList({ initialPosts }: { initialPosts: FeedPost[] }) {
         <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
           <p className="text-heading text-text-primary">You are all caught up</p>
           <p className="text-body text-text-secondary">
-            Herciety is brand new, so this is everything for now. More arrives as the
+            Hersciety is brand new, so this is everything for now. More arrives as the
             community grows.
           </p>
         </div>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Herciety — design tokens
+   Hersciety — design tokens
    Source of truth: ladiessocial-design-system.md ("Calm paper,
    sharp tools"). Values are implemented verbatim, light and dark.
    Dark theme follows the system preference; [data-theme] wins
