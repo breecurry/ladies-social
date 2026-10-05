@@ -1,6 +1,23 @@
 # PROGRESS: Hersciety
 
-Updated: 2026-10-06
+Updated: 2026-10-07
+
+## 🟢 LIVE STATUS — https://www.hersciety.com is UP (verified 2026-10-07)
+
+Deployed and passing every production check: pages return 200; `/home`,
+`/search`, `/notifications`, `/settings`, `/u/*` all 307 to `/login` when
+logged out; the client bundle points at the correct Supabase project and
+contains no service-role key or pepper; all six security headers present;
+`robots.txt` disallows everything (still intentionally **noindex** — see
+Deployment below); row-level security blocks anonymous reads; owner
+`@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
+errors.
+
+Next, in order: set the Supabase **Site URL to `https://www.hersciety.com`**
+(with the www — see the warning in Deployment), re-add the Resend SMTP
+credentials on the rebuilt project, re-raise the auth rate limits, enroll MFA,
+then Phase 2B (Discover feed, age gate, and moderation/report-action tooling —
+nothing can action a report today, which is why the site stays noindex).
 
 ## Naming (decided 2026-10-06, spelling corrected 2026-10-07; do not re-litigate)
 
@@ -121,19 +138,51 @@ natively on every protected prefix). **DNS: Cloudflare in DNS-only / grey-cloud
 mode** for the app records — Vercel issues and renews the Let's Encrypt
 certificate and does the HTTP→HTTPS redirect itself. Do **not** turn on
 Cloudflare's orange-cloud proxy in front of Vercel at launch: it interferes with
-certificate issuance and blinds Vercel's firewall. Canonical hostname is the
-apex `hersciety.com` (set the Supabase `site_url` to match); `www`
-301/308-redirects to it via Vercel domain settings, and the secondary
-`unitedfeminist.com` redirects to `hersciety.com` as well.
+certificate issuance and blinds Vercel's firewall.
 
-Runtime env vars on the host (server-only unless `NEXT_PUBLIC_`):
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY` (**server-only — never `NEXT_PUBLIC_`, never in a
-client bundle; verified absent from `.next/static` at build**),
-`IDENTIFIER_HASH_PEPPER` (server-only). `supabase/config.toml` is local-dev
-config and does **not** push auth settings to the hosted project; set Site URL
-and the redirect allow-list in the Supabase dashboard (Authentication → URL
-Configuration).
+⚠️ **Canonical hostname is `www.hersciety.com`, NOT the apex.** An earlier
+version of this document said the apex was canonical; the deployed reality is
+the reverse and the deployment is the source of truth. Verified live:
+`hersciety.com` → **308** → `https://www.hersciety.com`, and
+`unitedfeminist.com` → **301** → `https://www.hersciety.com` preserving path
+and query. **Set the Supabase Site URL to `https://www.hersciety.com` (with
+the www) or auth links will break.**
+`WEBAUTHN_RP_ID` stays `hersciety.com` — an RP ID may be a registrable suffix
+of the origin, so it covers `www`. Do **not** narrow it to `www.`.
+
+### ⚠️ Env vars: the app reads EXACTLY FOUR. Everything else is a decoy.
+
+```
+NEXT_PUBLIC_SUPABASE_URL        NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY       IDENTIFIER_HASH_PEPPER
+```
+`SUPABASE_SERVICE_ROLE_KEY` and `IDENTIFIER_HASH_PEPPER` are **server-only —
+never `NEXT_PUBLIC_`, never in a client bundle; verified absent from
+`.next/static`**. Never change `IDENTIFIER_HASH_PEPPER`: stored hashes depend
+on it.
+
+🪤 **Vercel's Supabase integration auto-injects ~13 more variables with
+near-identical names** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWT_SECRET`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `POSTGRES_*`. **The application reads
+none of them.** On 2026-10-07 this cost a full outage: `SUPABASE_URL` had been
+updated to the new project while `NEXT_PUBLIC_SUPABASE_URL` was missing
+entirely, so every page returned HTTP 500 with
+`Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL`. If the site
+is down, read the Vercel runtime log first — it names the variable — and
+confirm the real list straight from the source:
+
+```sh
+grep -rhoE 'process\.env\.[A-Z0-9_]+' --include=*.ts --include=*.tsx src/
+grep -rhoE 'requireEnv\("[A-Z0-9_]+"\)' --include=*.ts src/   # env.ts wrapper
+```
+
+🚨 **`NEXT_PUBLIC_*` values are inlined at BUILD time. Saving a variable in
+Vercel changes nothing until a new deployment is built.**
+
+`supabase/config.toml` is local-dev config and does **not** push auth settings
+to the hosted project; set Site URL and the redirect allow-list in the Supabase
+dashboard (Authentication → URL Configuration).
 
 **Shipped "dark" (noindex) on purpose.** Registration is open but there is no
 moderation action path yet (the `reports` table has no UPDATE route for any
