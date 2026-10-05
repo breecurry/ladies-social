@@ -1,48 +1,46 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
-import { Card } from "@/components/ui";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ComposePrompt } from "@/components/feed/ComposePrompt";
+import { FeedList } from "@/components/feed/FeedList";
+import { EmptyFeed } from "@/components/feed/EmptyFeed";
+import { WelcomeCard } from "@/components/feed/WelcomeCard";
 
 export const metadata: Metadata = { title: "Home" };
 
+/**
+ * Home: the Following feed (fan-out-on-read, reverse chronological).
+ * The Discover tab arrives in Phase 2B alongside its moderation
+ * groundwork; until then Home is a single calm stream.
+ */
 export default async function HomePage() {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
 
-  if (!viewer.isActiveMember) {
-    return (
-      <div className="flex flex-col gap-6">
-        <h1 className="text-title">Account unavailable</h1>
-        <Card className="flex flex-col gap-3">
-          <p className="text-body text-text-secondary">
-            This account is currently suspended or closed. If you believe this is a mistake,
-            contact{" "}
-            <a className="text-accent underline" href="mailto:appeals@unitedfeminist.com">
-              appeals@unitedfeminist.com
-            </a>
-            .
-          </p>
-        </Card>
-      </div>
-    );
-  }
+  const supabase = await createSupabaseServerClient();
+  const [{ data: posts }, { count: followCount }, { count: ownPostCount }] = await Promise.all([
+    supabase.rpc("feed_following", { p_limit: 20 }),
+    supabase
+      .from("follows")
+      .select("followee_id", { count: "exact", head: true })
+      .eq("follower_id", viewer.user.id),
+    supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", viewer.user.id),
+  ]);
+
+  const feed = posts ?? [];
+  const hasFollows = (followCount ?? 0) > 0;
+  const isNew = !hasFollows && (ownPostCount ?? 0) === 0;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-title">Welcome, @{viewer.profile?.handle}</h1>
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-heading">You&apos;re in</h2>
-        <p className="text-body text-text-secondary">
-          Posts, replies and the feed arrive in the next phase. For now you can manage your account
-          and choose how your name appears.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Link className="text-body text-accent underline" href="/settings">
-            Settings
-          </Link>
-        </div>
-      </Card>
+    <div className="flex flex-col lg:mt-6 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
+      <h1 className="sr-only">Home</h1>
+      {isNew ? <WelcomeCard /> : null}
+      <ComposePrompt />
+      {feed.length === 0 ? <EmptyFeed hasFollows={hasFollows} /> : <FeedList initialPosts={feed} />}
     </div>
   );
 }

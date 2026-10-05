@@ -39,7 +39,7 @@ export default async function MemberLayout({ children }: { children: React.React
     .is("read_at", null);
 
   return (
-    <Providers viewerHandle={viewer.profile.handle}>
+    <Providers viewer={{ id: viewer.user.id, handle: viewer.profile.handle }}>
       <AppShell handle={viewer.profile.handle} isOwner={viewer.isOwner} initialUnread={count ?? 0}>
         {children}
       </AppShell>
