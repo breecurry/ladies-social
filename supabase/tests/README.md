@@ -13,7 +13,8 @@ for f in migrations/*.sql; do psql -v ON_ERROR_STOP=1 -d uf_test -f "$f"; done
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/01-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/02-social-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/03-adversarial-regressions.sql
-psql -d uf_test -f tests/04-known-vulnerabilities.sql   # no ON_ERROR_STOP: see header
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/04-known-vulnerabilities.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/05-hardening-regressions.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -106,34 +107,52 @@ blocked party's own reply; mentions never cross a block; repeated
 mentions of the same handle dedupe to one row/notification; and
 `file_report` refuses a self-report.
 
-## Confirmed vulnerabilities (04) — OPEN, not fixed by QA
+## Confirmed vulnerabilities (04) — ALL FIXED by migration 0014, now a hard gate
 
-`04-known-vulnerabilities.sql` is a deliberately non-aborting proof of
-six findings from the same adversarial pass that do NOT currently hold.
-Per the QA mandate (find, never fix), the migration was not patched.
-Each check prints a `PASS`/`FAIL (FINDING N, OPEN)` notice and the file
-always completes cleanly, so it is safe to run without breaking an
-automated pass; flip an assertion to a hard `raise exception` once its
-finding is fixed so it gates the suite like 01-03 do. Summary (full
-detail and severity in the finding's own comment block and in the QA
-report):
+`04-known-vulnerabilities.sql` began life as a deliberately non-aborting
+proof of six findings from the QA adversarial pass. Migration 0014
+(`20261006000001_social_core_hardening.sql`) fixed all six, and — per the
+file's original header — every assertion has been converted to a hard
+`raise exception`, so the file now runs with `ON_ERROR_STOP` and gates
+the suite exactly like 01-03. What it locks down:
 
-1. **`blocked_either(uuid, uuid)`** is callable by any member with two
-   ARBITRARY other members' ids and leaks whether a block exists
-   between them — not scoped to the caller.
-2. **`blocked_by(uuid)`** lets the caller directly confirm whether an
-   arbitrary target has blocked her, contradicting the migration's own
-   "the other person is never told" design intent.
-3. **`notif_enabled(uuid, text)`** leaks an arbitrary member's
-   notification-preference setting, bypassing `notification_prefs`'
-   own-row-only RLS.
-4. **`search_people()`** does not escape `_` before building its `LIKE`
-   pattern, so a query containing `_` matches any character there
-   (e.g. `a_a` matches `ada`).
-5. The **mention regexp** has no boundary before `@`, so a handle-shaped
-   substring inside ordinary text (e.g. `noreply@cat`) is parsed as a
-   real mention and notifies that handle.
-6. **`feed_following`** pagination has no tiebreaker beyond
-   `created_at`; two posts sharing an identical timestamp cause the
-   page boundary to silently skip one of them.
+1. **`blocked_either(uuid, uuid)`** refuses an uninvolved third party:
+   `public.blocked_either` lost EXECUTE for app roles entirely, and the
+   RLS-facing twin `internal.blocked_either` (which `authenticated` must
+   be able to execute for the policies to work, but which PostgREST does
+   not expose) raises unless `auth.uid()` is one of the two parties.
+2. **`blocked_by(uuid)`** can no longer answer "did she block me?" over
+   RPC — no app role holds EXECUTE; the policy uses `internal.blocked_by`.
+3. **`notif_enabled(uuid, text)`** is DEFINER-internal only (EXECUTE
+   revoked from every app role).
+4. **`search_people()`** escapes LIKE metacharacters; `a_a` no longer
+   matches `ada`, while ordinary search still works.
+5. The **mention parser** requires a word boundary before `@`:
+   `noreply@cat` mentions nobody; `@cat` at start or after
+   whitespace/punctuation still mentions.
+6. **Pagination is deterministic under `created_at` ties** via a
+   composite `(created_at, id)` cursor; the test walks a fully tied
+   feed one row at a time and proves no skips and no repeats.
+
+## Hardening regressions (05) — direct coverage for the 0014 fixes
+
+`05-hardening-regressions.sql` asserts the fixes that 02/03/04 do not
+already cover: the `follows_read` block filter (a blocked member cannot
+enumerate her blocker's follow graph by reading the table directly,
+while uninvolved members still see it); the report duplicate guard
+(one per reporter/accused/reason per 24h) and the 10-per-hour cap with
+a calm refusal; `get_thread` returning nothing — not a tombstone — for
+a blocked author's root post while in-thread tombstones keep working;
+the 30-level reply-depth cap; moderation-removed parents contributing
+no excerpt/handle to `profile_posts`; and structural EXECUTE-privilege
+guards (trigger functions, `notif_enabled`, and the paged functions'
+authenticated-only grants) so a future migration cannot quietly reopen
+any of this.
+
+One historical note: the original suites' blind spot was that they only
+ever exercised the helper functions in their intended internal role,
+never as an uninvolved third party with arbitrary arguments — which is
+exactly where findings 1-3 lived. 04 and 05 now exercise that calling
+pattern explicitly; keep doing so for any future SECURITY DEFINER
+helper that is (or must be) executable by `authenticated`.
 

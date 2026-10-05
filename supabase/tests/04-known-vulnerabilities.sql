@@ -1,19 +1,16 @@
--- Confirmed vulnerabilities found during Grove-Test's adversarial pass on
--- migration 0013 (2026-10-05), NOT fixed here — per the QA mandate, this
--- role finds and reports, it never patches production code or the
--- migration under test. This file is a durable, runnable proof of each
--- finding for Grove-Code to fix and for a future QA pass to re-run.
+-- Regression suite for the six vulnerabilities found during Grove-Test's
+-- adversarial pass on migration 0013 (2026-10-05). ALL SIX ARE FIXED by
+-- migration 0014 (20261006000001_social_core_hardening.sql), so this
+-- file is now a HARD-FAILING gate in the style of 01/02/03: every
+-- assertion raises on failure and the file runs with ON_ERROR_STOP.
+-- (Its first life was NOTICE-based, documenting the then-open findings;
+-- per its own header it was converted the moment the fixes landed.)
 --
--- UNLIKE 01/02/03, this file does NOT \set ON_ERROR_STOP and does NOT
--- raise exceptions on failure: every check below reports PASS/FAIL via
--- RAISE NOTICE and the file always completes, specifically so a FAIL
--- here is visible without crashing the whole local-verification run.
--- When Grove-Code fixes a finding, flip its assertion to a hard
--- `raise exception` (matching 01/02/03's style) so it gates the suite
--- like every other regression from then on.
---
--- STATUS AS OF 2026-10-05: findings 1-3 and 5 are OPEN (FAIL). Finding 4
--- (search underscore wildcard) is OPEN (FAIL) but cosmetic/low severity.
+-- The blind spot that let findings 1-3 through originally: the earlier
+-- suites only exercised the helper functions in their intended internal
+-- role, never as an UNINVOLVED THIRD PARTY with arbitrary arguments.
+-- That calling pattern is exactly what this file now locks down.
+\set ON_ERROR_STOP on
 set search_path = public, extensions;
 begin;
 
@@ -41,84 +38,104 @@ insert into blocks (blocker_id, blocked_id) values
 reset role;
 
 -- ============================================================
--- FINDING 1 (MAJOR / P1): blocked_either(uuid, uuid) is directly
--- callable via RPC by ANY authenticated member with TWO ARBITRARY
--- third-party ids and answers whether ANY block exists between them —
--- not scoped to the caller at all. A member who is party to neither
--- block can map the block graph between other members.
--- File: supabase/migrations/20261005000001_social_core.sql:124-131
--- (definition), :1001 (grant execute ... to authenticated).
--- Reachable from the browser: supabase/config.toml exposes the
--- `public` schema to PostgREST, and this function sits in `public`
--- with EXECUTE granted to `authenticated`.
+-- FINDING 1 (was MAJOR/P1, FIXED in 0014): blocked_either(uuid, uuid)
+-- must not answer an uninvolved member probing two OTHER members' ids.
+-- Fixed twice over: public.blocked_either lost EXECUTE for app roles
+-- (only SECURITY DEFINER internals call it now), and the RLS-facing
+-- twin internal.blocked_either — which `authenticated` must be able to
+-- execute for the policies to work, but which PostgREST does not
+-- expose (config.toml exposes `public` only) — carries a caller-
+-- scoping guard that raises unless auth.uid() is one of the parties.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000004","aal":"aal1","session_id":"sb"}', false);
-do $$ declare leaked boolean; begin
+do $$ begin
   -- bea is not ada, not cat, and party to no block whatsoever
-  select blocked_either('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000005')
-    into leaked;
-  if leaked then
-    raise notice 'FAIL (FINDING 1, OPEN): an uninvolved member learned, via a direct RPC call, that two OTHER members have a block between them. blocked_either(uuid,uuid) must not be callable with arguments that do not include auth.uid(), or must not be granted to authenticated at all.';
-  else
-    raise notice 'PASS (FINDING 1 FIXED): blocked_either no longer leaks third-party block state.';
+  begin
+    perform blocked_either('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000005');
+    raise exception 'FAIL (FINDING 1 REGRESSED): public.blocked_either answered an uninvolved third party.';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform internal.blocked_either('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000005');
+    raise exception 'FAIL (FINDING 1 REGRESSED): internal.blocked_either answered an uninvolved third party.';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+-- The caller-scoped path still works for a PARTY to the block: ada may
+-- see her own block state (she holds the blocks row under RLS anyway).
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000003","aal":"aal1","session_id":"sa"}', false);
+do $$ begin
+  if not internal.blocked_either('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000005') then
+    raise exception 'FAIL: caller-scoped blocked_either broke the legitimate party path';
   end if;
 end $$;
 reset role;
 
 -- ============================================================
--- FINDING 2 (MAJOR / P1): blocked_by(uuid) is directly callable via
--- RPC and lets the CALLER learn, for ANY target she names, whether
--- that target has blocked her — the exact fact the migration's own
--- header comment says must stay hidden ("the other person is never
--- told"). A stalker who knows (or looks up via search_people) his
--- target's user_id can ask the platform point-blank whether she has
--- blocked him.
--- File: supabase/migrations/20261005000001_social_core.sql:136-142
--- (definition), :1002 (grant execute ... to authenticated).
+-- FINDING 2 (was MAJOR/P1, FIXED in 0014): blocked_by(uuid) let the
+-- CALLER ask point-blank "has she blocked me?" and get a straight
+-- answer. public.blocked_by now has no app-role EXECUTE at all, so the
+-- RPC path is dead. (profiles_read uses internal.blocked_by, which
+-- PostgREST does not expose; the only residual signal a blocked member
+-- gets is the profile/posts becoming unavailable, which is
+-- indistinguishable from a deleted account.)
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000005', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000005","aal":"aal1","session_id":"sc"}', false);
-do $$ declare learned boolean; begin
+do $$ begin
   -- cat IS the blocked party here; she asks point-blank "does ada block me?"
-  select blocked_by('00000000-0000-0000-0000-000000000003') into learned;
-  if learned then
-    raise notice 'FAIL (FINDING 2, OPEN): the blocked member (cat) directly confirmed, via RPC, that ada has blocked her. This defeats "the other person is never told" by design.';
-  else
-    raise notice 'PASS (FINDING 2 FIXED): blocked_by no longer confirms block status to the blocked party.';
-  end if;
+  begin
+    perform blocked_by('00000000-0000-0000-0000-000000000003');
+    raise exception 'FAIL (FINDING 2 REGRESSED): blocked_by confirmed block status to the blocked party.';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 reset role;
+-- Structural guards: a future migration must not quietly re-grant the
+-- public helpers to app roles, and the policies' internal twins must
+-- stay executable by authenticated (RLS checks EXECUTE on the QUERYING
+-- role) — exactly the configuration 0014 established.
+do $$ begin
+  if has_function_privilege('authenticated', 'public.blocked_either(uuid,uuid)', 'execute') then
+    raise exception 'FAIL: authenticated regained EXECUTE on public.blocked_either';
+  end if;
+  if has_function_privilege('authenticated', 'public.blocked_by(uuid)', 'execute') then
+    raise exception 'FAIL: authenticated regained EXECUTE on public.blocked_by';
+  end if;
+  if not has_function_privilege('authenticated', 'internal.blocked_either(uuid,uuid)', 'execute')
+     or not has_function_privilege('authenticated', 'internal.blocked_by(uuid)', 'execute') then
+    raise exception 'FAIL: authenticated lost EXECUTE on the internal RLS helpers (policies would break)';
+  end if;
+end $$;
 
 -- ============================================================
--- FINDING 3 (MINOR-MODERATE / P2): notif_enabled(uuid, text) is
--- directly callable via RPC with an ARBITRARY target user id, leaking
--- another member's notification preference for a given type — data
--- that notification_prefs' own RLS (own-row-select-only) deliberately
--- does not expose to anyone else.
--- File: supabase/migrations/20261005000001_social_core.sql:265-270
--- (definition), :1003 (grant execute ... to authenticated).
+-- FINDING 3 (was MINOR-MODERATE/P2, FIXED in 0014): notif_enabled no
+-- longer answers an arbitrary caller about another member's
+-- notification preferences — EXECUTE revoked from all app roles; it is
+-- only called inside SECURITY DEFINER functions.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000004","aal":"aal1","session_id":"sb"}', false);
-do $$ declare leaked boolean; begin
-  perform notif_enabled('00000000-0000-0000-0000-000000000003', 'like');
-  leaked := true; -- reaching here at all means the call was not rejected
-  raise notice 'FAIL (FINDING 3, OPEN): bea read ada''s notification_prefs via notif_enabled(uuid,text), bypassing notification_prefs'' own RLS entirely.';
-exception when insufficient_privilege then
-  raise notice 'PASS (FINDING 3 FIXED): notif_enabled no longer answers for an arbitrary target.';
+do $$ begin
+  begin
+    perform notif_enabled('00000000-0000-0000-0000-000000000003', 'like');
+    raise exception 'FAIL (FINDING 3 REGRESSED): bea read ada''s notification_prefs via notif_enabled.';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 reset role;
 
 -- ============================================================
--- FINDING 4 (MINOR / P2, correctness not identity): search_people()
--- does not escape '_' before building its LIKE pattern, so '_' in a
--- query acts as a SQL wildcard (matches any single character) rather
--- than a literal underscore. 'a_a' matches handle 'ada'.
--- File: supabase/migrations/20261005000001_social_core.sql:677-694.
+-- FINDING 4 (was MINOR/P2, FIXED in 0014): '_' in a search query is a
+-- literal underscore, not a LIKE wildcard. 'a_a' must NOT match 'ada',
+-- and ordinary search must still work.
 -- ============================================================
 set role authenticated;
 -- bea: a searcher with no block relationship to ada, so the block
@@ -128,24 +145,20 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 do $$ declare n int; begin
   select count(*) into n from search_people('a_a', 10) where handle = 'ada';
   if n > 0 then
-    raise notice 'FAIL (FINDING 4, OPEN): searching "a_a" (literal underscore intended) matched handle "ada" because "_" was passed unescaped into a LIKE pattern.';
-  else
-    raise notice 'PASS (FINDING 4 FIXED): underscore is treated as a literal character in search.';
+    raise exception 'FAIL (FINDING 4 REGRESSED): "a_a" matched handle "ada" (unescaped LIKE wildcard).';
+  end if;
+  select count(*) into n from search_people('ada', 10) where handle = 'ada';
+  if n <> 1 then
+    raise exception 'FAIL: escaping broke ordinary search (searching "ada" found % rows)', n;
   end if;
 end $$;
 reset role;
 
 -- ============================================================
--- FINDING 5 (MINOR-MODERATE / P2): the mention regexp has no
--- preceding word-boundary / non-identifier-character check, so a
--- handle-shaped substring following ANY character — not just
--- whitespace or start-of-string — is parsed as a mention. An
--- email-like string such as "noreply@cat" notifies the real handle
--- "cat" even though no human reading the post would call that an
--- intentional @mention. Lets an author quietly spam-notify a target
--- while the post reads as ordinary text.
--- File: supabase/migrations/20261005000001_social_core.sql:390-412
--- (regexp '@([A-Za-z0-9_]{3,30})').
+-- FINDING 5 (was MINOR-MODERATE/P2, FIXED in 0014): the mention parser
+-- requires a word boundary before '@'. "noreply@cat" is an email-shaped
+-- string, not a mention; "@cat" at start of text, after whitespace, or
+-- after punctuation still mentions.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000008', false);
@@ -154,23 +167,24 @@ do $$ declare v bigint; n int; begin
   v := create_post('contact me at noreply@cat for questions, not a real mention');
   select count(*) into n from post_mentions where post_id = v;
   if n > 0 then
-    raise notice 'FAIL (FINDING 5, OPEN): "noreply@cat" (plainly not an @mention to a human reader) created a real post_mentions row and notification for handle "cat".';
-  else
-    raise notice 'PASS (FINDING 5 FIXED): the mention parser now requires a boundary before "@".';
+    raise exception 'FAIL (FINDING 5 REGRESSED): "noreply@cat" created a real mention/notification for @cat.';
+  end if;
+  v := create_post('@cat starts this one, and (@cat) sits after punctuation');
+  select count(*) into n from post_mentions
+    where post_id = v and mentioned_user_id = '00000000-0000-0000-0000-000000000005';
+  if n <> 1 then
+    raise exception 'FAIL: boundary rule broke real mentions (% rows, expected 1 deduped)', n;
   end if;
 end $$;
 reset role;
 
 -- ============================================================
--- FINDING 6 (MINOR, correctness): feed_following's cursor pagination
--- has no tiebreaker beyond created_at. Two posts sharing the exact
--- same created_at (demonstrated here by creating both inside one
--- transaction, where now() is fixed for the whole transaction) cause
--- the second page to silently SKIP the tied post that was not
--- returned on the first page, because the WHERE clause is a strict
--- "<". Not identity- or safety-relevant, but a real, demonstrated
--- correctness bug: a post can vanish from a viewer's paged feed.
--- File: supabase/migrations/20261005000001_social_core.sql:512-549.
+-- FINDING 6 (was MINOR/P2, FIXED in 0014): pagination is deterministic
+-- under created_at ties. Everything in this file shares one
+-- transaction timestamp, so eve's three root posts (the finding-5 pair
+-- above plus the two below) ALL tie on created_at — the worst case.
+-- With the composite (created_at, id) cursor, paging one at a time
+-- must walk every post exactly once, no skips, no repeats.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000008', false);
@@ -188,20 +202,44 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into follows (follower_id, followee_id) values
   ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000008')
   on conflict do nothing;
-do $$ declare cur timestamptz; seen_b boolean; begin
-  select created_at into cur from feed_following(null, 1) where id = current_setting('t.tieb')::bigint
-     or id = current_setting('t.tiea')::bigint
-   order by id limit 1; -- whichever page-1 returns (id ordering not guaranteed, just need its cursor)
-  select created_at into cur from feed_following(null, 1) limit 1;
-  select exists (select 1 from feed_following(cur, 1) where id = current_setting('t.tieb')::bigint
-                 or id = current_setting('t.tiea')::bigint) into seen_b;
-  if not seen_b then
-    raise notice 'FAIL (FINDING 6, OPEN): paging past a created_at tie skipped the other tied post entirely (cursor has no secondary tiebreaker such as id).';
-  else
-    raise notice 'PASS (FINDING 6 FIXED): tied posts no longer vanish across a page boundary.';
+do $$
+declare
+  total   int;
+  cur_ts  timestamptz;
+  cur_id  bigint;
+  page    record;
+  walked  bigint[] := '{}';
+  steps   int := 0;
+begin
+  select count(*) into total from feed_following(null, 50);
+  if total < 4 then
+    raise exception 'FAIL: expected at least 4 tied posts in the fixture feed, found %', total;
+  end if;
+  loop
+    select id, created_at into page
+      from feed_following(cur_ts, 1, cur_id) limit 1;
+    exit when not found;
+    if page.id = any (walked) then
+      raise exception 'FAIL (FINDING 6 REGRESSED): post % repeated across page boundaries', page.id;
+    end if;
+    walked := walked || page.id;
+    cur_ts := page.created_at;
+    cur_id := page.id;
+    steps := steps + 1;
+    if steps > total + 5 then
+      raise exception 'FAIL: pagination walk did not terminate';
+    end if;
+  end loop;
+  if array_length(walked, 1) <> total then
+    raise exception 'FAIL (FINDING 6 REGRESSED): one-at-a-time paging visited % of % posts (tied rows skipped)',
+      array_length(walked, 1), total;
+  end if;
+  if not (current_setting('t.tiea')::bigint = any (walked))
+     or not (current_setting('t.tieb')::bigint = any (walked)) then
+    raise exception 'FAIL (FINDING 6 REGRESSED): a tied post vanished from the paged feed';
   end if;
 end $$;
 reset role;
 
 rollback;
-\echo DONE -- see NOTICE lines above for PASS/FAIL per finding
+\echo ALL KNOWN-VULNERABILITY REGRESSION TESTS PASSED (findings 1-6 fixed and gated)

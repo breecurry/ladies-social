@@ -465,8 +465,12 @@ end $$;
 select grant_role('00000000-0000-0000-0000-000000000005', 'moderator');
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000004","aal":"aal1","session_id":"sb"}', false);
+-- (reason is 'spam' here, not 'harassment': bea already reported cat for
+-- harassment above, and since 0014 a second (reporter, accused, reason)
+-- report within 24h is refused by the duplicate guard — see
+-- 05-hardening-regressions.sql, which asserts that guard directly.)
 do $$ declare rid uuid; r reports%rowtype; begin
-  rid := file_report('user', null, '00000000-0000-0000-0000-000000000005', 'harassment', null);
+  rid := file_report('user', null, '00000000-0000-0000-0000-000000000005', 'spam', null);
   select * into r from reports where id = rid;
   if r.routing <> 'admin_only' then raise exception 'FAIL: routing % for moderator accused', r.routing; end if;
 end $$;
