@@ -16,6 +16,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/03-adversarial-regressions.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/04-known-vulnerabilities.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/05-hardening-regressions.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/06-age-gate.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/07-moderation.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -80,11 +81,14 @@ real project.
 - like counters stay exact through like and unlike, likes rows are
   visible only to their owner, and `notification_prefs` toggles are
   honoured;
-- report routing is computed server-side (`standard` / `admin_only` /
-  `owner_conflict`); the reporter always sees her own reports with an
-  identical shape, an accused moderator never sees the report about
-  herself, and an `owner_conflict` report is invisible in-app to
-  everyone, the Owner included;
+- report routing is computed server-side (`standard` / `admin_only`);
+  the reporter always sees her own reports with an identical shape, an
+  accused moderator never sees the report about herself, and — per the
+  owner's decision of 2026-10-05, which supersedes the original
+  `owner_conflict` sealed lane — a report naming the Owner routes
+  `admin_only`, IS visible to the Owner in the normal panel, and every
+  report queues an email copy for safety@unitedfeminist.com that names
+  no reporter and carries no report text;
 - notifications are readable by their owner only, `read_at` is the only
   writable column, and `notif_mark_all_read()` touches nobody else's
   rows;
@@ -182,3 +186,41 @@ Covers migration 0017 (spec §17 — the account-creation age gate):
   leaves the audit chain verifying end to end;
 - `create_member()` still refuses an under-18 date at the database, no
   matter what reaches it.
+
+## What the moderation suite (07) proves
+
+Covers migration 0018 (the moderation console's data layer):
+
+- **no moderation function returns or even references `display_name`**
+  (checked structurally against `pg_proc` for all 22 console and
+  enforcement functions): every console surface is @handle-only below
+  the app layer;
+- the locked role boundaries hold at the database, not just in the UI:
+  **a moderator cannot ban**, **a moderator cannot suspend or restrict
+  for more than 7 days**, **an admin can** (and 31 days is refused for
+  everyone — the guidelines' 30-day ceiling), a reviewer is read-only,
+  **the Owner can be neither suspended nor banned**, and nobody can
+  action herself or the system account;
+- the owner's report-routing decision (2026-10-05): a report naming
+  the Owner routes `admin_only` and is visible to her in the normal
+  panel; nothing writes `owner_conflict` any more; every report queues
+  its safety@ email copy, and the copy leaks no reporter, no report
+  text, and no legal name;
+- banning writes HMAC-only email/device signals to
+  `banned_identifiers` and `create_member()` then refuses a matching
+  signup — ban evasion enforced end to end;
+- reversing a permanent ban demands the Owner at AAL2 (an admin is
+  refused; the Owner at aal1 is refused);
+- csam reports arrive auto-escalated, admins and moderators cannot
+  resolve them (escalation is their only forward action), the Owner
+  can;
+- `moderation_actions` and `safety_email_outbox` are unreachable
+  directly by members AND by service_role (no insert/delete);
+- the member is told the rule and the action (`my_account_status`,
+  system notifications with a body), never the reporter or the acting
+  human; revealing reporters is a separate act that writes its own
+  audit entry;
+- **every enforcement action lands in the hash-chained `audit_log`**
+  (claim, warn, remove, suspend, lift, ban, dismiss, reporter-reveal,
+  filing), the ban entry records signal KINDS never values, and the
+  chain still verifies end to end afterwards.

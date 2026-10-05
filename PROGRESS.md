@@ -16,8 +16,9 @@ errors.
 Next, in order: set the Supabase **Site URL to `https://www.hersciety.com`**
 (with the www — see the warning in Deployment), re-add the Resend SMTP
 credentials on the rebuilt project, re-raise the auth rate limits, enroll MFA,
-then Phase 2B (Discover feed, age gate, and moderation/report-action tooling —
-nothing can action a report today, which is why the site stays noindex).
+then the rest of Phase 2B (Discover feed; the age gate and the **moderation
+console both shipped** — apply migration `20261010000001` to the live project
+via `npm run provision` to turn the console's data layer on).
 
 ## Naming (decided 2026-10-06, spelling corrected 2026-10-07; do not re-litigate)
 
@@ -50,6 +51,36 @@ one of them. If the Owner enrolled a passkey before this change, she must
 re-enroll it once. Do not change this value again.
 
 ## Where things stand
+
+**The moderation console is built (Phase 2B, 2026-10-05).** Reports can
+finally be actioned. Migration `20261010000001` is the data layer: the full
+enforcement ladder as SECURITY DEFINER functions (dismiss/reopen, warn,
+remove/restore content, restrict, suspend, permanent ban, escalate,
+owner-only unban), every action appended to the hash-chained audit log and to
+a `moderation_actions` history (2-year retention, pruned opportunistically).
+Role boundaries are enforced at the database, not just the UI: a reviewer is
+read-only, a moderator cannot ban and cannot suspend or restrict past 7 days,
+an admin tops out at the guidelines' 30-day band, the Owner and the system
+account can be neither suspended nor banned, and csam cases resolve only at
+the Owner (everyone else escalates). Banning writes HMAC-only email/device
+(and phone, when it exists) signals to `banned_identifiers`, which
+`create_member()` already refuses — "I can ban whoever I want including any
+new accounts they make" is now enforced end to end. **Owner decision
+implemented (supersedes the design doc's original §7): reports naming the
+Owner go to the normal admin panel, visible to her, and EVERY report queues
+an email copy to safety@unitedfeminist.com** (durable `safety_email_outbox`,
+sent via Resend once `RESEND_API_KEY` exists in the deployment env; the copy
+carries case reference + reason + accused @handle, never the reporter, the
+text, or a legal name). The console UI lives at `/mod` (account-menu entry
+for staff, calm queue counts, the one red dot reserved for Critical), with
+case-grouped reports, in-case thread context, audited reporter reveal, the
+typed-@handle ban gate with de-identified evasion toggles, and the
+member-facing states: restriction banner, suspension interstitial, banned
+terminal screen with an appeal reference — the member always learns the rule
+and the action, never the reporter. No moderation query returns
+`display_name`, proven structurally by the new smoke suite
+`tests/07-moderation.sql`. ⚠️ Not yet applied to the live project — see
+"Needs the owner".
 
 **Legal pages are live.** The Community Guidelines are published at
 `/community-guidelines`, server-rendered from `docs/community-guidelines.md`
@@ -210,13 +241,15 @@ Vercel changes nothing until a new deployment is built.**
 to the hosted project; set Site URL and the redirect allow-list in the Supabase
 dashboard (Authentication → URL Configuration).
 
-**Shipped "dark" (noindex) on purpose.** Registration is open but there is no
-moderation action path yet (the `reports` table has no UPDATE route for any
-role — that is Phase 2B), so the site must be reachable by a direct link but not
-search-discoverable. Three layers — the `X-Robots-Tag: noindex, nofollow`
+**Shipped "dark" (noindex) on purpose.** Registration is open, and the
+moderation console (Phase 2B) now exists in code — but it is live only once
+migration `20261010000001` is applied to the hosted project (`npm run
+provision`). Keep the site dark until that apply has happened and the console
+has been exercised once. Three layers — the `X-Robots-Tag: noindex, nofollow`
 response header, a disallow-all `/robots.txt`, and the per-page `robots` meta
 tag — are all driven by one flag, `SITE_INDEXABLE` (see `src/lib/seo.ts`).
-Default/unset = noindex (fail-safe).
+Default/unset = noindex (fail-safe). The owner flips it after her own visual
+polish; moderation shipping does not auto-flip it.
 
 ### How to go public (flip when moderation tooling ships)
 
@@ -383,9 +416,10 @@ Default/unset = noindex (fail-safe).
 
 ## Not started
 
-- [ ] Phase 2B: Discover + age gate + minimal moderation/ban tooling
-- [ ] Phase 3: media pipeline and moderation backbone (includes the ban
-      actions that feed `banned_identifiers`)
+- [ ] Phase 2B remainder: Discover feed + the Discoverability settings toggle
+      (the age gate and the moderation console are done — see below)
+- [ ] Phase 3: media pipeline and moderation backbone (CSAM scanning; the ban
+      actions that feed `banned_identifiers` shipped with the console)
 - [ ] Phase 4: direct messages with photos
 - [ ] Phase 5: discovery ranking and the For You feed
 - [ ] Phase 6: launch hardening
@@ -410,9 +444,23 @@ export to S3 Object Lock.
       never cleared either)
 - [ ] NCMEC CyberTipline registration, required **before** any image upload ships
 - [ ] PhotoDNA application, free, roughly a week's lead time
-- [ ] Name the external contact who receives reports about the Owner account
+- [ ] Apply migration `20261010000001` to the live project (`npm run provision`)
+      — the moderation console's data layer; code is deployed and degrades
+      gracefully until the apply happens
+- [ ] Add `RESEND_API_KEY` (a Resend API key, same account as the SMTP sender)
+      to the Vercel env so the per-report email copies to
+      safety@unitedfeminist.com actually send; until then every copy queues
+      durably in `safety_email_outbox` and sends on the first load after the
+      key exists
 - [ ] Choose the founding cohort (the first 10-50 people she asks to join)
 - [ ] Decide on point-in-time database recovery (~$100/mo) at launch
+
+**Resolved 2026-10-05 (owner decision; was "name the external contact who
+receives reports about the Owner account"):** there is NO external contact.
+Reports naming the Owner go to the normal admin report panel, visible to her,
+and every report emails a traceable copy to safety@unitedfeminist.com. Built
+in migration `20261010000001`; the design doc's §7 is corrected. Do not
+re-raise.
 
 ## Decisions worth not relitigating
 

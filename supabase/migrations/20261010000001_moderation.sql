@@ -658,13 +658,13 @@ begin
     insert into banned_identifiers (kind, value_hash, source_user_id, reason)
     values ('email_hash', p_email_hash, p_target, p_rule::text)
     on conflict (kind, value_hash) do nothing;
-    v_kinds := v_kinds || 'email_hash';
+    v_kinds := array_append(v_kinds, 'email_hash');
   end if;
   if p_phone_hash is not null then
     insert into banned_identifiers (kind, value_hash, source_user_id, reason)
     values ('phone_hash', p_phone_hash, p_target, p_rule::text)
     on conflict (kind, value_hash) do nothing;
-    v_kinds := v_kinds || 'phone_hash';
+    v_kinds := array_append(v_kinds, 'phone_hash');
   end if;
   if p_ban_device then
     select device_fingerprint_hash into v_device
@@ -673,7 +673,7 @@ begin
       insert into banned_identifiers (kind, value_hash, source_user_id, reason)
       values ('device_hash', v_device, p_target, p_rule::text)
       on conflict (kind, value_hash) do nothing;
-      v_kinds := v_kinds || 'device_hash';
+      v_kinds := array_append(v_kinds, 'device_hash');
     end if;
   end if;
 
@@ -1030,7 +1030,7 @@ begin
          a.created_at, a.expires_at
   from moderation_actions a
   where a.target_user_id = p_target
-  order by a.created_at desc
+  order by a.created_at desc, a.id desc
   limit 100;
 end $$;
 
@@ -1056,7 +1056,7 @@ language sql stable security definer set search_path = public, extensions, pg_te
     from moderation_actions ma
     where ma.target_user_id = pr.user_id
       and ma.action in ('warn', 'remove_content', 'restrict', 'suspend', 'ban')
-    order by ma.created_at desc
+    order by ma.created_at desc, ma.id desc
     limit 1
   ) a on true
   where pr.user_id = auth.uid()
