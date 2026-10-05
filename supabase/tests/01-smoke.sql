@@ -63,8 +63,9 @@ do $$ begin
   exception when insufficient_privilege then null;
   end;
   begin
-    insert into user_private (user_id, legal_name, dob, email)
-    values ('00000000-0000-0000-0000-000000000002', 'X Y', '1990-01-01', 'x@test');
+    -- (dob no longer exists — dropped by 0017, data minimisation)
+    insert into user_private (user_id, legal_name, email)
+    values ('00000000-0000-0000-0000-000000000002', 'X Y', 'x@test');
     raise exception 'FAIL: service_role inserted into user_private';
   exception when insufficient_privilege then null;
   end;
