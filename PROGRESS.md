@@ -17,9 +17,11 @@ Migration `20261014000001` (admin dashboard) **is applied to the live
 project** (Grove, 2026-10-09; three idempotent runs, verified in the live
 schema): `/owner/members` and `/owner/insights` are live.
 
-All migrations through `20261016000001` are applied to the live project.
-Next, in order: **enable R2 and configure the media zone + env for avatars**
-(see "Where things stand") → **Grove-Test**
+All migrations through `20261016000001` are applied to the live project, and
+the avatar storage layer is configured and live.
+Next, in order: **build Phase 2F — hashtags, @-mentions and reposts**
+(designed in `docs/design-phase2f-hashtags-mentions-reposts.md`; takes
+migration `20261017000001`) → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
 the Owner's MFA enrolment → counsel sign-off, then flip `published: true`
 in `src/lib/legal.ts` (one line per document).
@@ -138,16 +140,39 @@ SECURITY DEFINER functions. The migration also revoked the migration-0009
 column grant that had let members write `profiles.avatar_media_key` directly
 through PostgREST, bypassing the ingest pipeline and the evidence trail —
 verified: `authenticated` now holds no UPDATE privilege on that column.
-⚠️ The feature still renders letter placeholders everywhere until the R2
-storage prerequisites below are met. That is storage, not schema.
 
-⚠️ **Avatars need infrastructure before the feature is live** (the code
-degrades to letter placeholders until then): two R2 buckets (staging +
-media), an R2 API token, the `media.hersciety.com` zone mapped to the media
-bucket with the Cloudflare CSAM Scanning Tool enabled on it (the owner has
-enabled the tool at the zone level already), and the env vars documented in
-`.env.example` (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
-`R2_STAGING_BUCKET`, `R2_MEDIA_BUCKET`, `NEXT_PUBLIC_MEDIA_URL`).
+✅ **THE AVATAR STORAGE LAYER IS LIVE (Grove, 2026-10-10).** Profile pictures
+work end to end in production. What was provisioned:
+
+- **R2 enabled on the Cloudflare account by the Owner.** Before that, every
+  R2 API call returned `10042 "Please enable R2 through the Cloudflare
+  Dashboard"` — a product activation, not a permissions problem.
+- **Two buckets created** (location hint `enam`): `hersciety-avatars-staging`
+  (raw uploads, never publicly served) and `hersciety-media` (re-encoded,
+  metadata-free output, publicly served).
+- **`media.hersciety.com` mapped to `hersciety-media`** as an R2 custom
+  domain: SSL active, ownership active. It returns 404 at the root, which is
+  correct — there are no objects yet.
+- **A bucket-scoped R2 API token** holding only Bucket Item Read + Write on
+  those two buckets. It cannot reach any other bucket on the account. The S3
+  credential pair is the token id plus the SHA-256 of the token value.
+- **All six env vars set on Production**, `R2_SECRET_ACCESS_KEY` as an
+  encrypted variable. No other variable was touched — in particular none of
+  the Supabase decoy variables that caused the 2026-10-07 outage.
+- **Deployment `dpl_EUr1HbFArL7Gb7mJ6kLp9FYbjSjo` is READY** (Vercel
+  snapshots env vars per deployment, so a redeploy was required).
+- **Verified after deploy:** `/` `/login` `/signup` 200; `/home` `/settings`
+  `/owner` 307 to /login; `media.hersciety.com` serving with a valid
+  certificate; and a leak check across ten client bundles plus the page HTML
+  searching for the secret's *actual value* found **no occurrence** — the
+  credential is server-side only.
+- The R2 path was smoke-tested with a real signed request before wiring:
+  PUT 200, DELETE 204, GET-after-delete 404, no test object left behind.
+
+🔁 **If the R2 credential is ever lost, do not hunt for it.** Cloudflare shows
+a token value once. Delete the token, mint a new bucket-scoped one, update
+`R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, redeploy. The whole rotation
+takes minutes and nothing is damaged.
 
 **The Owner's admin dashboard is built (Phase 2D, 2026-10-10).** The
 Owner-tools cluster is now a hub at `/owner` with two new rooms alongside
@@ -748,6 +773,19 @@ revised for open registration on 2026-10-07.
 
 ## Not started
 
+- [ ] **Phase 2F: hashtags, @-mentions and reposts — DESIGNED, NOT BUILT.**
+      Spec: `docs/design-phase2f-hashtags-mentions-reposts.md` (`067ec88`).
+      Takes migration **`20261017000001`** (unused). Two Owner decisions are
+      already made and must be honoured by the build:
+      **(1) BOTH plain reposts AND quote-posts ship** — the design recommended
+      deferring quote-posts as a "quote-dunk vector" and the Owner overruled
+      that reasoning explicitly: *"people love to add their own words to
+      things and that cannot be treated as inherently bad."* Add no friction,
+      warnings, interstitials or discouraging copy to quote-posts.
+      **(2) "Who can mention you" defaults to Everyone.**
+      A build was dispatched 2026-10-10 and died before its first milestone
+      when the API credit balance ran out — it pushed nothing, left no branch
+      and no partial migration. The brief is simply re-runnable.
 - [x] ~~Phase 2B remainder: Discover feed + the Discoverability settings
       toggle~~ — DONE 2026-10-09, migration `20261013000001` **applied to
       live and verified by Grove** (see "Where things stand")
