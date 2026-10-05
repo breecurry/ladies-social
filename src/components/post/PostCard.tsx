@@ -151,7 +151,7 @@ export function PostCard({
         </p>
       ) : null}
       <div className="flex items-start gap-3">
-        <Avatar handle={post.author_handle} size={avatarSize} />
+        <Avatar handle={post.author_handle} size={avatarSize} userId={post.author_id} />
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <Link
             href={`/u/${post.author_handle}`}

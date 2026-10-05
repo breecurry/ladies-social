@@ -36,6 +36,7 @@ export function ReportDialog({
   subjectUserId,
   postId,
   canBlock,
+  subjectHasPhoto,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +44,9 @@ export function ReportDialog({
   subjectUserId: string;
   postId?: number;
   canBlock?: boolean;
+  /** Account reports only: the profile has a photo, so the report
+   *  freezes it as evidence (spec P2E section 9) — say so in scope. */
+  subjectHasPhoto?: boolean;
 }) {
   const router = useRouter();
   const viewer = useViewer();
@@ -116,6 +120,12 @@ export function ReportDialog({
           <>
             <h2 className="text-heading">Report {postId !== undefined ? "this post" : `@${subjectHandle}`}</h2>
             <p className="text-body text-text-secondary">What is happening?</p>
+            {postId === undefined && subjectHasPhoto ? (
+              <p className="text-caption text-text-tertiary">
+                Reporting @{subjectHandle}. If this is about their profile photo, we will include
+                it.
+              </p>
+            ) : null}
             <div role="radiogroup" aria-label="Reason" className="flex flex-col">
               {REASONS.map((item) => (
                 <button

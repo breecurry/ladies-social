@@ -24,7 +24,7 @@ export function PersonRow({ person }: { person: PersonRowData }) {
   const isSelf = person.user_id === viewer.id;
   return (
     <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
-      <Avatar handle={person.handle} size={40} />
+      <Avatar handle={person.handle} size={40} userId={person.user_id} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <Link

@@ -29,12 +29,15 @@ export function OverflowMenu({
   postId,
   isOwn,
   onHidden,
+  targetHasPhoto,
 }: {
   targetUserId: string;
   targetHandle: string;
   /** When present the menu belongs to a post card; Copy link and Report target the post. */
   postId?: number;
   isOwn: boolean;
+  /** Profile surface only: the member has a photo (report-scope line). */
+  targetHasPhoto?: boolean;
   /** Feed callback for the in-place "show me less" confirmation panel (spec §4.8). */
   onHidden?: (undo: () => Promise<void>) => void;
 }) {
@@ -280,6 +283,7 @@ export function OverflowMenu({
         subjectUserId={targetUserId}
         postId={postId}
         canBlock
+        subjectHasPhoto={targetHasPhoto}
       />
     </div>
   );

@@ -18,6 +18,9 @@ import {
 } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useCompose } from "@/components/shell/ComposeProvider";
+import { useViewer } from "@/components/shell/Providers";
+import { useAvatarMedia } from "@/components/avatar/useAvatarMedia";
+import { avatarUrl, blurhashAverageColor } from "@/lib/media/avatar";
 import { BrandWordmark } from "@/components/BrandWordmark";
 
 /** Shown in the account menu for staff roles only (design doc §1, §2.4). */
@@ -183,14 +186,12 @@ export function AppShell({
           aria-current={profileActive ? "page" : undefined}
           className="flex h-14 min-w-11 items-center justify-center"
         >
-          <span
-            className={`flex size-7 items-center justify-center rounded-full bg-accent-subtle text-caption font-semibold text-accent ${
-              profileActive ? "ring-2 ring-accent" : ""
-            }`}
-            aria-hidden
-          >
-            {handle.charAt(0).toUpperCase()}
-          </span>
+          <NavFace
+            letter={handle.charAt(0).toUpperCase()}
+            active={profileActive}
+            sizeClass="size-7"
+            textClass="text-caption"
+          />
         </Link>
       </nav>
     </div>
@@ -241,17 +242,60 @@ function RailLink({
           <UnreadBadge count={badge ?? 0} />
         </span>
       ) : (
-        <span
-          aria-hidden
-          className={`flex size-6 items-center justify-center rounded-full bg-accent-subtle text-micro font-semibold text-accent ${
-            active ? "ring-2 ring-accent" : ""
-          }`}
-        >
-          {avatarLetter}
-        </span>
+        <NavFace
+          letter={avatarLetter ?? ""}
+          active={active}
+          sizeClass="size-6"
+          textClass="text-micro"
+        />
       )}
       {label}
     </Link>
+  );
+}
+
+/**
+ * The nav identity circle (P2E section 4): the member's own avatar IS
+ * the Profile destination. Photo when one is set (resolved through the
+ * block-aware resolver like everywhere else), letter otherwise; the
+ * 2px accent ring stays the active indicator over both.
+ */
+function NavFace({ letter, active, sizeClass, textClass }: {
+  letter: string;
+  active: boolean;
+  sizeClass: string;
+  textClass: string;
+}) {
+  const viewer = useViewer();
+  const media = useAvatarMedia(viewer.id);
+  const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
+  const src = media ? avatarUrl(media.key, 96) : null;
+  if (src && src !== brokenSrc) {
+    return (
+      // Immutable unguessable key on the Cloudflare media zone;
+      // next/image would proxy it through Vercel and defeat the edge cache.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        width={28}
+        height={28}
+        onError={() => setBrokenSrc(src)}
+        className={`rounded-full object-cover ${sizeClass} ${active ? "ring-2 ring-accent" : ""}`}
+        style={{ backgroundColor: blurhashAverageColor(media?.blurhash ?? null) ?? undefined }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className={`flex items-center justify-center rounded-full bg-accent-subtle font-semibold text-accent ${sizeClass} ${textClass} ${
+        active ? "ring-2 ring-accent" : ""
+      }`}
+    >
+      {letter}
+    </span>
   );
 }
 

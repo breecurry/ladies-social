@@ -11,6 +11,7 @@ import { CaseActions } from "@/components/mod/CaseActions";
 import { ReporterReveal } from "@/components/mod/ReporterReveal";
 import { ThreadContext } from "@/components/mod/ThreadContext";
 import { DmEvidence } from "@/components/mod/DmEvidence";
+import { AvatarEvidence } from "@/components/mod/AvatarEvidence";
 
 export const metadata: Metadata = { title: "Case" };
 
@@ -46,6 +47,13 @@ export default async function ModCasePage({ params }: { params: Promise<{ key: s
     parsed.postId === null
       ? await supabase.rpc("mod_dm_evidence", { p_target: parsed.accusedId })
       : { data: null };
+
+  // Frozen reported-avatar evidence (P2E §9-10). Errors — including the
+  // avatar migration not yet being applied — read as "no avatar evidence".
+  // csam-reported images never arrive here: the function excludes them.
+  const { data: avatarEvidence } = await supabase.rpc("mod_avatar_evidence", {
+    p_target: parsed.accusedId,
+  });
 
   const [{ data: thread }, { data: accountPosts }] = await Promise.all([
     parsed.postId !== null
@@ -118,6 +126,13 @@ export default async function ModCasePage({ params }: { params: Promise<{ key: s
       ) : null}
       {dmEvidence && dmEvidence.length > 0 ? (
         <DmEvidence rows={dmEvidence} accusedHandle={account.handle} />
+      ) : null}
+      {avatarEvidence && avatarEvidence.length > 0 ? (
+        <AvatarEvidence
+          rows={avatarEvidence}
+          target={parsed.accusedId}
+          canAct={(tier === "moderator" || tier === "admin" || tier === "owner") && !hasCsam}
+        />
       ) : null}
       {accountPosts && accountPosts.length > 0 ? (
         <section aria-label="Recent posts" className="rounded-lg border border-border bg-surface">

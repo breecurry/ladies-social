@@ -55,7 +55,7 @@ export default async function NotificationsPage() {
               } transition-colors duration-(--duration-fast) hover:bg-surface-raised`}
             >
               {item.actor_handle !== "" ? (
-                <Avatar handle={item.actor_handle} size={32} link={false} />
+                <Avatar handle={item.actor_handle} size={32} link={false} userId={item.actor_id} />
               ) : (
                 <Bell size={24} aria-hidden className="mt-1 text-text-tertiary" />
               )}

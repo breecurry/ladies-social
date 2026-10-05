@@ -108,7 +108,7 @@ function PickerBody({ onClose, viewerHandle }: { onClose: () => void; viewerHand
               }}
               className="flex min-h-14 w-full items-center gap-3 rounded-md px-2 text-left hover:bg-accent-subtle disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
             >
-              <Avatar handle={person.handle} size={40} link={false} />
+              <Avatar handle={person.handle} size={40} link={false} userId={person.user_id} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-label text-text-primary">
                   @{person.handle}

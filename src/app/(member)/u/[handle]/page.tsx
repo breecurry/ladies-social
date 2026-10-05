@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { joinedDate } from "@/lib/format";
 import { HANDLE_REGEX } from "@/lib/validation";
 import { Avatar } from "@/components/Avatar";
+import { OwnProfileAvatar } from "@/components/avatar/OwnProfileAvatar";
 import { FollowControl } from "@/components/follow/FollowControl";
 import { OverflowMenu } from "@/components/post/OverflowMenu";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
@@ -59,6 +60,7 @@ export default async function ProfilePage({
     { data: muteRow },
     { data: blockRow },
     { data: posts },
+    { data: avatarRows },
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -91,18 +93,28 @@ export default async function ProfilePage({
       p_replies: replies,
       p_limit: 20,
     }),
+    // The block-aware, status-aware avatar key resolver — never a raw
+    // profile read. An error (e.g. migration not yet applied) reads as
+    // "no photo": the letter placeholder is always the safe answer.
+    supabase.rpc("avatar_keys", { p_users: [profile.user_id] }),
   ]);
 
   const blockedByViewer = blockRow !== null;
+  const avatarRow = avatarRows?.[0];
+  const avatar = avatarRow ? { key: avatarRow.avatar_key, blurhash: avatarRow.blurhash } : null;
 
   return (
     <div className="flex flex-col lg:mt-6 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
       <header className="flex flex-col gap-3 border-b border-border bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
-          <Avatar handle={profile.handle} size={96} link={false} />
+          {isOwn ? (
+            <OwnProfileAvatar handle={profile.handle} media={avatar} size={96} />
+          ) : (
+            <Avatar handle={profile.handle} size={96} link={false} media={avatar} />
+          )}
           <div className="flex items-center gap-2 pt-2">
             {isOwn ? (
-              <EditProfileDialog initialBio={profile.bio} />
+              <EditProfileDialog initialBio={profile.bio} hasPhoto={avatar !== null} />
             ) : blockedByViewer ? (
               <UnblockButton targetUserId={profile.user_id} targetHandle={profile.handle} />
             ) : (
@@ -118,6 +130,7 @@ export default async function ProfilePage({
                 targetUserId={profile.user_id}
                 targetHandle={profile.handle}
                 isOwn={false}
+                targetHasPhoto={avatar !== null}
               />
             )}
           </div>

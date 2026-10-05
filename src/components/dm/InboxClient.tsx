@@ -153,7 +153,7 @@ export function InboxClient({
                 href={`/messages/${row.conversation_id}`}
                 className="flex min-h-[72px] items-center gap-3 border-b border-border bg-surface px-4 py-3 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
               >
-                <Avatar handle={row.correspondent_handle} size={48} link={false} />
+                <Avatar handle={row.correspondent_handle} size={48} link={false} userId={row.correspondent_id} />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5">
                     {row.unread_count > 0 ? (

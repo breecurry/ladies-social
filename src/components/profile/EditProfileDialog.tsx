@@ -6,13 +6,20 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/shell/ToastProvider";
 import { useViewer } from "@/components/shell/Providers";
+import { ChangePhotoControl, RemovePhotoButton } from "@/components/avatar/AvatarEditor";
 
 /**
- * Edit profile (spec §7.4): bio only in Phase 2A (avatars arrive with
- * media in Phase 3). Name visibility deliberately lives in Settings,
- * Privacy, with its own confirmation and preview.
+ * Edit profile (spec §7.4, P2E §6.1): the profile photo row (change /
+ * remove, both routine) and the bio. Name visibility deliberately
+ * lives in Settings, Privacy, with its own confirmation and preview.
  */
-export function EditProfileDialog({ initialBio }: { initialBio: string | null }) {
+export function EditProfileDialog({
+  initialBio,
+  hasPhoto,
+}: {
+  initialBio: string | null;
+  hasPhoto: boolean;
+}) {
   const router = useRouter();
   const viewer = useViewer();
   const { showToast } = useToast();
@@ -49,6 +56,13 @@ export function EditProfileDialog({ initialBio }: { initialBio: string | null })
       <Dialog open={open} onClose={() => setOpen(false)} label="Edit profile" maxWidth="max-w-md">
         <div className="flex flex-col gap-3 p-4">
           <h2 className="text-heading">Edit profile</h2>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-label text-text-primary">Profile photo</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <ChangePhotoControl variant="row" hasPhoto={hasPhoto} />
+              {hasPhoto ? <RemovePhotoButton /> : null}
+            </div>
+          </div>
           <label className="flex flex-col gap-1.5">
             <span className="text-label text-text-primary">Bio</span>
             <textarea
