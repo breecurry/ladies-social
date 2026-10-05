@@ -47,18 +47,10 @@ export default async function OwnerMemberDetailPage({
   const standing: string[] = [
     `Joined ${absoluteDate(member.joined_at)}`,
     member.activity_bucket,
+    `${member.post_count.toLocaleString("en-US")} post${member.post_count === 1 ? "" : "s"}`,
+    `${member.follower_count.toLocaleString("en-US")} follower${member.follower_count === 1 ? "" : "s"}`,
+    `${member.following_count.toLocaleString("en-US")} following`,
   ];
-  if (member.post_count > 0) {
-    standing.push(`${member.post_count.toLocaleString("en-US")} post${member.post_count === 1 ? "" : "s"}`);
-  }
-  if (member.follower_count > 0) {
-    standing.push(
-      `${member.follower_count.toLocaleString("en-US")} follower${member.follower_count === 1 ? "" : "s"}`,
-    );
-  }
-  if (member.following_count > 0) {
-    standing.push(`${member.following_count.toLocaleString("en-US")} following`);
-  }
 
   return (
     <div className="flex flex-col gap-6">
