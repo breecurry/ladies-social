@@ -981,3 +981,29 @@ overlay). All other directives are strict. Full reasoning in KNOWLEDGE/app.md.
 
 Files changed: `src/proxy.ts` (new), `src/lib/supabase/middleware.ts`,
 `src/app/layout.tsx`, `next.config.ts`.
+
+## Responsive fixes + account menu + 40-char tag cap + Reposts tab (2026-10-05)
+
+**Status: SHIPPED (code); migration `20261018000001` WRITTEN, NOT APPLIED**
+
+Four working increments on main (fc417b7, 9379aba, 78879c4, ccb0d91):
+
+1. **Mobile account menu (blocker).** `AccountMenu` extracted from
+   `AppShell.tsx` into `src/components/shell/AccountMenu.tsx` (single
+   definition, viewer-context-fed) and mounted on the own-profile
+   header below `lg`. Before this, no viewport under 1024px could log
+   out, reach Settings, or open /mod and /owner.
+2. **Overflow fixes.** Tag-page `h1` breaks long tags; tag rows in
+   trending/search/autocomplete truncate; safety-page handles
+   truncate; all owner pages gain `p-4`; audit JSON wraps; the avatar
+   crop viewport is `min(288px, 100vw - 64px)` with measured crop
+   maths.
+3. **Polish.** 44px touch targets (filter pills, mod/insights tabs,
+   camera button hit area); `viewport-fit=cover` so safe-area insets
+   engage; top bar + DM header safe-area-aware; `Card` pads
+   `p-4 sm:p-6` with a `padded={false}` opt-out.
+4. **Muted inert tokens + Reposts tab.** Refused/unresolved mentions
+   and over-40 hashtag tokens render muted (`text-text-tertiary`);
+   hashtag cap 40 on both sides (Owner decision); profile Reposts tab
+   via `profile_posts(p_reposts => true)`. Suites 05/14 updated,
+   suite 15 added; all 15 suites pass on a locally migrated database.

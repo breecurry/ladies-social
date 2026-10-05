@@ -145,11 +145,12 @@ applies it after review.
 
 ## Tests
 
-`supabase/tests/` 01-14 against local Postgres per tests/README.md.
+`supabase/tests/` 01-15 against local Postgres per tests/README.md.
 09-dm-smoke covers the DM invariants; 14-phase2f covers hashtags,
 mention policy and caps, reposts, quotes, trending, and tag
-suppression; `npm run test:dm-crypto` unit-tests the protocol under
-Node. Extend suites; never replace them.
+suppression; 15 covers the profile Reposts tab walls and the
+40-character tag cap; `npm run test:dm-crypto` unit-tests the protocol
+under Node. Extend suites; never replace them.
 
 ## Hashtags, mentions, reposts (Phase 2F, built 2026-10-10)
 
@@ -352,3 +353,39 @@ default-src 'self'; script-src 'self' 'nonce-{NONCE}' https://challenges.cloudfl
 uses `proxy.ts` with `export function proxy`. The old convention's
 `response.headers.set()` calls were silently ignored on response headers.
 Always use `proxy.ts` with `export function proxy` going forward.
+
+## Responsive pass, account menu, 40-char tag cap, Reposts tab (2026-10-05)
+
+Migration `20261018000001` (write-then-review; **Grove applies — NOT
+applied at build time**). The facts an agent must not violate:
+
+- **The account menu is ONE shared component**
+  (`src/components/shell/AccountMenu.tsx`), mounted twice: the desktop
+  rail (variant `rail`, popup opens upward) and the member's OWN
+  profile header below `lg` (variant `profile`, popup opens downward
+  and inward — Owner-approved placement, Threads convention). It reads
+  `handle`/`isOwner`/`mod` from the viewer context (`Providers.tsx`),
+  so adding or moving a mount point is a one-line change. Never
+  duplicate the menu markup; never remove the mobile mount — below
+  1024px it is the ONLY path to Log out, Settings, /mod and /owner.
+- **The hashtag cap is 40 characters (OWNER DECISION 2026-10,
+  replacing the design's 64).** A `#token` over 40 is not a hashtag:
+  not indexed, not linked, rendered as muted `text-text-tertiary` —
+  the SAME inert treatment as a well-shaped mention the server did not
+  resolve (one visual language for "recognised, intentionally not
+  live"). No truncation, no warning, no friction; the post always
+  succeeds. Server (`create_post`) and client (`src/lib/text.ts`
+  `TAG_MAX`, the `inert` segment kind) change together, always.
+- **The profile Reposts tab** filters through the SAME
+  `profile_posts` function via a new `p_reposts` flag (default false)
+  so every visibility wall is one code path. The client sends
+  `p_reposts` ONLY when true: PostgREST matches named arguments, so an
+  unknown argument would break the Posts/Replies tabs on a database
+  that predates the migration.
+- `viewport-fit=cover` is set in `src/app/layout.tsx`; the shell's
+  `env(safe-area-inset-*)` maths (bottom nav, top bar, DM header,
+  toasts, dialogs) is live, not decorative. Keep top-bar height and
+  the DM header offset in sync (`calc(48px + env(safe-area-inset-top))`).
+- `Card` (`src/components/ui.tsx`) pads `p-4 sm:p-6`; padding
+  overrides via `className` are UNRELIABLE (stylesheet order beats
+  class order) — flush cards must use `padded={false}`.
