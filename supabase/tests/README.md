@@ -23,6 +23,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/10-discover.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/11-admin-dashboard.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/12-avatars.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/13-full-analytics.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/14-phase2f.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
