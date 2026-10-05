@@ -13,12 +13,7 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: **apply migration `20261013000001` (Discover) to the live
-project** — the Discover feed code is on main and deploys with it, but the
-feed's functions and the `discoverable` column do not exist on live until the
-migration is applied (until then the Discover tab renders its calm empty
-state and the Privacy toggle cannot save; nothing crashes) → **profile
-pictures / avatars** (designed in `docs/design-phase2e-profile-pictures.md`;
+Next, in order: **profile pictures / avatars** (designed in `docs/design-phase2e-profile-pictures.md`;
 unblocked now that the moderation console is live; PhotoDNA is voluntary and
 NCMEC pre-registration is not required) → **admin dashboard** (designed in
 `docs/design-phase2d-admin-dashboard-and-metrics.md`) → **Grove-Test**
@@ -88,13 +83,18 @@ database layer, while she stays fully reachable by exact @handle search.
 Identity is @handle-only on every Discover surface, and suite
 `10-discover.sql` asserts structurally that neither new function references
 `display_name`, plus the opt-out, block/mute/hide semantics, and
-authenticated-only EXECUTE. ⚠️ **Migration `20261013000001_discover.sql` is
-written, idempotent, and verified locally (fresh apply, re-run, and
-populated-database apply all clean) but has NOT been applied to the live
-project yet — Grove applies it after review.** Until it is applied, the
-deployed Discover tab degrades gracefully (empty feed state, toggle save
-fails with the calm retry toast); after it is applied, everything above is
-live with no further deploy.
+authenticated-only EXECUTE. ✅ **Migration `20261013000001_discover.sql` was
+APPLIED to the live project by Grove on 2026-10-09** via
+`POST /v1/projects/{ref}/database/query` — HTTP 201, then re-run twice more
+clean to prove idempotency against production. Verified in the live schema
+(not the migration file): `profiles.discoverable` is `boolean NOT NULL
+DEFAULT true` with both existing profiles backfilled `true`; both functions
+are SECURITY DEFINER with `search_path` pinned to `public, extensions,
+pg_temp`; `pg_get_functiondef` confirms neither references `display_name`;
+EXECUTE is granted to `authenticated` and the owner only, with zero grants to
+`anon`, `PUBLIC`, or `service_role`; the database still has **0 tables
+without RLS**; and both accounts are intact. Discover is fully live — no
+further deploy needed.
 
 **The brand mark is live (2026-10-08).** The owner's logo — a purple
 "Hersciety" wordmark whose dotted `i` is a speech bubble — is now real
@@ -530,6 +530,19 @@ revised for open registration on 2026-10-07.
 
 ## Known gaps and deliberate skips in Phase 2A (re-flag, do not lose)
 
+### Discover follow-up: the opt-out is not surfaced at signup (2026-10-09)
+
+- **`docs/design-phase2b-moderation-and-discover.md` specifies that the
+  Discoverability opt-out should be prominent at signup. It shipped only in
+  Settings → Privacy.** Discoverability defaults to ON, so a member who never
+  opens Settings is discoverable without having been told so at the moment she
+  joins. On a platform whose members are specifically hiding from specific
+  people, that gap is a safety-posture issue rather than a cosmetic one.
+  This is **not a new decision** — the design already called for it; it is
+  simply unbuilt. Small follow-up: surface the choice (or at minimum a plain
+  statement of the default, with a link) in the signup flow. No migration
+  needed; the column and the write path already exist and are live.
+
 ### Deferred from the 2026-10-06 hardening pass (deliberate, tracked)
 
 - **Content-Security-Policy is not set yet.** The theme-init inline
@@ -573,8 +586,8 @@ revised for open registration on 2026-10-07.
 ## Not started
 
 - [x] ~~Phase 2B remainder: Discover feed + the Discoverability settings
-      toggle~~ — DONE 2026-10-09 (see "Where things stand"; migration
-      `20261013000001` still needs applying to live)
+      toggle~~ — DONE 2026-10-09, migration `20261013000001` **applied to
+      live and verified by Grove** (see "Where things stand")
 - [ ] Phase 3: media pipeline and moderation backbone (CSAM scanning; the ban
       actions that feed `banned_identifiers` shipped with the console)
 - [ ] Phase 4: DM images (text DMs shipped dark in 2C; images stay
