@@ -83,3 +83,43 @@ export function SearchIndexToggle({ initial }: { initial: boolean }) {
     />
   );
 }
+
+/**
+ * Discover opt-out (design doc §13; owner decision 2026-10-07: ON by
+ * default). Off = never surfaced in anyone's Discover feed or
+ * suggested accounts; people who know the @handle can still find her.
+ */
+export function DiscoverToggle({ initial }: { initial: boolean }) {
+  const router = useRouter();
+  const viewer = useViewer();
+  const { showToast } = useToast();
+  const [on, setOn] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  const change = async (next: boolean) => {
+    setOn(next);
+    setBusy(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ discoverable: next })
+      .eq("user_id", viewer.id);
+    setBusy(false);
+    if (error) {
+      setOn(!next);
+      showToast("Could not update the setting. Try again.");
+      return;
+    }
+    router.refresh();
+  };
+
+  return (
+    <ToggleRow
+      label="Suggest my account and posts in Discover"
+      helper="When this is off, your posts and account will not be suggested to people who do not already follow you. People who know your @handle can still find you."
+      checked={on}
+      disabled={busy}
+      onChange={(next) => void change(next)}
+    />
+  );
+}

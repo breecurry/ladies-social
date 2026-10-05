@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { DisplayNameToggle } from "@/components/DisplayNameToggle";
-import { SearchIndexToggle } from "@/components/settings/Toggles";
+import { DiscoverToggle, SearchIndexToggle } from "@/components/settings/Toggles";
 
 export const metadata: Metadata = { title: "Privacy" };
 
@@ -44,6 +44,7 @@ export default async function PrivacySettingsPage() {
 
       <Card className="flex flex-col gap-3">
         <h3 className="text-heading">Search and discoverability</h3>
+        <DiscoverToggle initial={viewer.profile.discoverable} />
         <SearchIndexToggle initial={viewer.profile.search_indexable} />
         <p className="text-caption text-text-tertiary">
           Inside Hersciety, members can always find you by your @handle. Never by your legal
