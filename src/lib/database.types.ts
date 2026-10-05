@@ -172,6 +172,54 @@ export type ReportRow = {
   resolved_at: string | null;
   resolved_by: string | null;
   resolution_note: string | null;
+  reported_avatar_key: string | null;
+};
+
+/** One uploaded avatar object (locked table; functions are the only path). */
+export type AvatarMediaRow = {
+  key: string;
+  owner_id: string;
+  blurhash: string | null;
+  created_at: string;
+  superseded_at: string | null;
+  removed_at: string | null;
+  removed_kind: "self" | "moderation" | null;
+  removed_rule: ReportReason | null;
+  purged_at: string | null;
+  legal_hold: boolean;
+};
+
+/** One avatar upload ticket (locked table; functions are the only path). */
+export type AvatarUploadTicketRow = {
+  id: string;
+  user_id: string;
+  staging_key: string;
+  created_at: string;
+  consumed_at: string | null;
+  redeemed_at: string | null;
+};
+
+/** One resolved avatar from avatar_keys() — the block-aware resolver. */
+export type AvatarKeyRow = {
+  user_id: string;
+  avatar_key: string;
+  blurhash: string | null;
+};
+
+/** The superseded avatar a commit or removal reports back. */
+export type AvatarOldKeyRow = {
+  old_key: string | null;
+  old_purgeable: boolean;
+};
+
+/** One frozen reported image in the console panel, from mod_avatar_evidence(). */
+export type ModAvatarEvidenceRow = {
+  avatar_key: string;
+  blurhash: string | null;
+  reason: ReportReason;
+  reported_at: string;
+  is_current: boolean;
+  removed: boolean;
 };
 
 export type NotificationRow = {
@@ -589,6 +637,8 @@ export type Database = {
       safety_email_outbox: TableDef<SafetyEmailOutboxRow>;
       age_gate_blocks: TableDef<AgeGateBlockRow>;
       dm_settings: TableDef<DmSettingsRow>;
+      avatar_media: TableDef<AvatarMediaRow>;
+      avatar_upload_tickets: TableDef<AvatarUploadTicketRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -862,6 +912,24 @@ export type Database = {
         Returns: string;
       };
       mod_dm_evidence: { Args: { p_target: string }; Returns: ModDmEvidenceRow[] };
+      avatar_ticket_create: { Args: { p_staging_key: string }; Returns: string };
+      avatar_ticket_consume: { Args: { p_ticket: string }; Returns: string };
+      avatar_commit_record: {
+        Args: { p_ticket: string; p_key: string; p_blurhash?: string | null };
+        Returns: AvatarOldKeyRow[];
+      };
+      remove_avatar: { Args: Record<string, never>; Returns: AvatarOldKeyRow[] };
+      avatar_mark_purged: { Args: { p_key: string }; Returns: undefined };
+      avatar_keys: { Args: { p_users: string[] }; Returns: AvatarKeyRow[] };
+      mod_remove_avatar: {
+        Args: { p_target: string; p_rule: ReportReason; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_reinstate_avatar: {
+        Args: { p_target: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      mod_avatar_evidence: { Args: { p_target: string }; Returns: ModAvatarEvidenceRow[] };
     };
     Enums: {
       system_role: SystemRole;
