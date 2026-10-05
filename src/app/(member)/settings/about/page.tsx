@@ -8,7 +8,7 @@ export default function AboutSettingsPage() {
     <div className="flex flex-col gap-4">
       <h2 className="text-title">About and legal</h2>
       <Card className="flex flex-col gap-3">
-        <h3 className="text-heading">United Feminist</h3>
+        <h3 className="text-heading">Herciety</h3>
         <p className="max-w-prose text-body text-text-secondary">
           A social platform built as a safe space for women and their allies. Operated by Curry Co
           LLC. Open to everyone 18 and over; what keeps this space safe is conduct, not identity.

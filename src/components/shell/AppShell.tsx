@@ -64,7 +64,7 @@ export function AppShell({
         className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 py-6 lg:flex"
       >
         <Link href="/home" className="mb-4 px-3 text-heading text-text-primary">
-          United Feminist
+          Herciety
         </Link>
         {navItems.map((item) => (
           <RailLink key={item.href} {...item} />
@@ -93,7 +93,7 @@ export function AppShell({
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 flex h-12 items-center gap-1 bg-surface px-2 shadow-sticky lg:hidden">
           {isHome ? (
-            <span className="px-2 text-heading text-text-primary">United Feminist</span>
+            <span className="px-2 text-heading text-text-primary">Herciety</span>
           ) : (
             <BackButton />
           )}

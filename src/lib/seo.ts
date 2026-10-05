@@ -1,7 +1,7 @@
 /**
  * Single source of truth for search-engine visibility.
  *
- * United Feminist ships "dark": reachable by a direct link but not
+ * Herciety ships "dark": reachable by a direct link but not
  * discoverable by search engines. Registration is open, but there is no
  * moderation action path yet (the reports table has no UPDATE route for any
  * role — moderation tooling is Phase 2B), so the site must not be indexed and

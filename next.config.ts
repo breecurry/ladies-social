@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 /**
  * Security headers (P1-4, 2026-10-06 hardening pass). The threat-model-
  * critical one is Referrer-Policy. We ship `no-referrer`: strict-origin-when-
- * cross-origin still sent the bare origin `https://unitedfeminist.com` on
+ * cross-origin still sent the bare origin `https://herciety.com` on
  * every outbound external click, which broadcasts MEMBERSHIP of this platform
  * to any third-party site a member visits — a real exposure for members hiding
  * from someone. `no-referrer` sends nothing at all. There is no analytics or

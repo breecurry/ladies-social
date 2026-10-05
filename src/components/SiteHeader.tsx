@@ -16,7 +16,7 @@ export async function SiteHeader() {
         className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3"
       >
         <Link href="/" className="text-heading text-text-primary">
-          United Feminist
+          Herciety
         </Link>
         <div className="flex items-center gap-1">
           {viewer ? (

@@ -20,7 +20,7 @@ function describe(item: NotificationItem): string {
     case "mention":
       return "mentioned you";
     case "system":
-      return "United Feminist";
+      return "Herciety";
   }
 }
 

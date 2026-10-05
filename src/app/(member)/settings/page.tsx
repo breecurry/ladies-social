@@ -25,7 +25,7 @@ export default async function AccountSettingsPage() {
           <span className="text-label text-text-primary">Handle</span>
           <p className="text-body text-text-secondary">@{viewer.profile.handle}</p>
           <p className="text-caption text-text-tertiary">
-            Your handle is your public identity everywhere on United Feminist.
+            Your handle is your public identity everywhere on Herciety.
           </p>
         </div>
         <div className="flex flex-col gap-1">
@@ -43,7 +43,7 @@ export default async function AccountSettingsPage() {
         </Link>
       </Card>
       <Card className="flex flex-col gap-2">
-        <h3 className="text-heading">Leaving United Feminist</h3>
+        <h3 className="text-heading">Leaving Herciety</h3>
         <p className="max-w-prose text-body text-text-secondary">
           Account deactivation and deletion controls are coming before launch. Until then, email{" "}
           <a className="text-accent underline" href="mailto:support@unitedfeminist.com">

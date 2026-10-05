@@ -8,7 +8,7 @@
 #     accounts. The Owner account must never have an email-only recovery
 #     path — enforce via MFA enrollment before any role is granted.
 
-project_id = "united-feminist"
+project_id = "herciety"
 
 [api]
 enabled = true
@@ -24,7 +24,9 @@ major_version = 15
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://unitedfeminist.com"]
+# herciety.com is canonical; unitedfeminist.com is the secondary company
+# domain and redirects to it, so both stay on the auth allow-list.
+additional_redirect_urls = ["https://herciety.com", "https://unitedfeminist.com"]
 # Short-lived JWTs (E2E-readiness decision #5 / instant role revocation).
 jwt_expiry = 1800
 enable_refresh_token_rotation = true
