@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
+import { headers } from "next/headers";
 import { SITE_INDEXABLE } from "@/lib/seo";
 import "./globals.css";
 
@@ -50,13 +51,22 @@ export const viewport: Viewport = {
 
 // Applies a saved theme choice before first paint so there is no flash.
 // "system" (the default) sets no attribute and the CSS media query rules.
+// The script content must remain byte-for-byte stable: the CSP nonce in
+// proxy.ts allows it by nonce, not by hash, so any content change only
+// needs a proxy redeploy, not a hash rotation.
 const themeInit = `try{var t=localStorage.getItem("uf-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;}}catch(e){}`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Read the per-request nonce generated in proxy.ts and forwarded via the
+  // x-nonce request header. Falls back to '' when the proxy is not running
+  // (e.g. unit test environments), meaning the inline script will be blocked
+  // by CSP in those contexts — acceptable, since tests do not enforce CSP.
+  const nonce = (await headers()).get("x-nonce") ?? "";
+
   return (
     <html lang="en" className={hanken.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-dvh bg-background font-sans text-text-primary antialiased">
         {children}

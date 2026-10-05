@@ -963,3 +963,21 @@ re-raise.
   Full design: `docs/design-phase2c-direct-messages.md`.
 - **Images are served through Cloudflare** so free CSAM scanning sees them,
   and EXIF is stripped at upload so location data never reaches storage.
+
+## Security — Content-Security-Policy (2026-10-05)
+
+**Status: SHIPPED**
+
+Added a nonce-based CSP header implemented in `src/proxy.ts`
+(Next.js 16 proxy convention). Every response now includes:
+
+```
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-{NONCE}' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.hersciety.com data: blob:; font-src 'self'; connect-src 'self' https://hiphjzhlwiztqgezzipf.supabase.co https://challenges.cloudflare.com https://7f79ff00b7bec4dea299ac9e824cface.r2.cloudflarestorage.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+```
+
+The `unsafe-inline` in style-src is a deliberate, documented tradeoff for
+inline `style={{ }}` attributes in 6 components (blurhash colours, crop
+overlay). All other directives are strict. Full reasoning in KNOWLEDGE/app.md.
+
+Files changed: `src/proxy.ts` (new), `src/lib/supabase/middleware.ts`,
+`src/app/layout.tsx`, `next.config.ts`.

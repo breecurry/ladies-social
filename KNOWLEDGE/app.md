@@ -299,3 +299,56 @@ facts an agent must not violate:
 - Suite `supabase/tests/12-avatars.sql` asserts all of the above
   structurally and behaviourally. Extend it; never weaken the
   both-directions block assertions.
+
+## Content-Security-Policy (CSP) — 2026-10-05
+
+**Implementation**: Nonce-based, per-request, in `src/proxy.ts`
+(Next.js 16 proxy convention — replaces the deprecated `middleware.ts`).
+The nonce is forwarded to server components via the `x-nonce` request
+header; `src/app/layout.tsx` reads it with `headers()` and applies it
+to the theme-init inline `<script>` tag.
+
+**Policy (full)**:
+```
+default-src 'self'; script-src 'self' 'nonce-{NONCE}' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.hersciety.com data: blob:; font-src 'self'; connect-src 'self' https://hiphjzhlwiztqgezzipf.supabase.co https://challenges.cloudflare.com https://7f79ff00b7bec4dea299ac9e824cface.r2.cloudflarestorage.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+```
+
+**Origin allowlist and why each is required**:
+- `'self'` — app's own origin for all resource types
+- `'nonce-{NONCE}'` in script-src — theme-init inline script in layout.tsx
+- `https://challenges.cloudflare.com` in script-src, frame-src, connect-src
+  — Cloudflare Turnstile (login/signup). Script loaded dynamically via
+  `document.createElement('script')` — cannot receive a nonce.
+  Renders its challenge in a cross-origin iframe. Makes validation XHR calls.
+- `https://media.hersciety.com` in img-src — Cloudflare R2 avatar images
+- `data:` in img-src — TOTP QR code returned as data:image/svg+xml by
+  `supabase.auth.mfa.enroll()` (confirmed in @supabase/auth-js source)
+- `blob:` in img-src — AvatarEditor crop preview (URL.createObjectURL)
+- `https://hiphjzhlwiztqgezzipf.supabase.co` in connect-src — all Supabase
+  REST, auth and RPC calls; no WebSocket/realtime in use
+- `https://7f79ff00b7bec4dea299ac9e824cface.r2.cloudflarestorage.com`
+  in connect-src — avatar upload: browser PUTs directly to R2 staging
+  bucket via presigned URL returned from /api/avatar/ticket
+
+**Tradeoffs**:
+- `'unsafe-inline'` in style-src is required because 6 components use
+  `style={{ ... }}` JSX for dynamically computed values: blurhash-derived
+  background colours (Avatar, AppShell, AvatarEvidence) and AvatarEditor
+  layout/overlay dimensions. These cannot be moved to static Tailwind classes
+  because the values are computed at runtime from data. Nonces do not apply
+  to `style=` attributes (only to `<style>` elements), so `'unsafe-inline'`
+  is the only correct allowance. This weakens style injection protection
+  but does not affect script injection prevention.
+
+**Files changed**:
+- `src/proxy.ts` — new file (Next.js 16 proxy; replaces `src/middleware.ts`)
+- `src/lib/supabase/middleware.ts` — updated to accept `requestHeaders`
+  parameter and forward it through both `NextResponse.next` calls
+- `src/app/layout.tsx` — made async, reads nonce from `x-nonce` header,
+  applies `nonce=` attribute to theme-init script
+- `next.config.ts` — comment updated (CSP is no longer "TODO")
+
+**Note**: `middleware.ts` is the deprecated Next.js 15 convention. Next.js 16
+uses `proxy.ts` with `export function proxy`. The old convention's
+`response.headers.set()` calls were silently ignored on response headers.
+Always use `proxy.ts` with `export function proxy` going forward.
