@@ -58,8 +58,38 @@ export type ProfileRow = {
    * @handle search and existing-follower visibility are unaffected.
    */
   discoverable: boolean;
+  /** Departure timestamps (migration 0023): non-null exactly while the
+   * account is in that state. History lives in account_status_events. */
+  deactivated_at: string | null;
+  banned_at: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** One heartbeat-derived session (migration 0023). RLS: own rows only;
+ * written solely by session_heartbeat(). */
+export type MemberSessionRow = {
+  id: string;
+  user_id: string;
+  started_at: string;
+  last_seen_at: string;
+};
+
+/** One status transition in the departures ledger (locked table; the
+ * trigger writes it, owner_metrics() reads it). */
+export type AccountStatusEventRow = {
+  id: number;
+  user_id: string;
+  from_status: AccountStatus;
+  to_status: AccountStatus;
+  occurred_at: string;
+};
+
+/** When a collected series began (locked table; read via owner_metrics()). */
+export type AnalyticsCollectionRow = {
+  series: string;
+  tracked_since: string;
 };
 
 export type UserPrivateRow = {
@@ -639,6 +669,9 @@ export type Database = {
       dm_settings: TableDef<DmSettingsRow>;
       avatar_media: TableDef<AvatarMediaRow>;
       avatar_upload_tickets: TableDef<AvatarUploadTicketRow>;
+      member_sessions: TableDef<MemberSessionRow>;
+      account_status_events: TableDef<AccountStatusEventRow>;
+      analytics_collection: TableDef<AnalyticsCollectionRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -841,6 +874,7 @@ export type Database = {
       };
       owner_directory_export: { Args: DirectoryFilterArgs; Returns: DirectoryExportRow[] };
       owner_metrics: { Args: { p_range?: string }; Returns: Json };
+      session_heartbeat: { Args: Record<string, never>; Returns: undefined };
       my_account_status: { Args: Record<string, never>; Returns: MyAccountStatus[] };
       refresh_my_status: { Args: Record<string, never>; Returns: boolean };
       record_age_gate_block: {

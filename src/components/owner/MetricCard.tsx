@@ -1,13 +1,11 @@
 import { ArrowDown, ArrowUp, Minus } from "@phosphor-icons/react/dist/ssr";
 import type { MetricDescriptor, MetricRange, OwnerMetricsPayload } from "@/lib/metrics";
-import { PERCENT_BASE_THRESHOLD } from "@/lib/metrics";
 
 /**
- * THE metric card (Phase 2D spec §11): one component renders every
- * descriptor, and its states — value, honest zero, not-enough-data,
- * suppressed breakdown — are defined here once so a new metric cannot
- * forget them. No counting-up animations, no gauges: a calm number on
- * calm paper.
+ * THE metric card: one component renders every descriptor. The value
+ * is the literal value — a zero is 0, a one is 1, a real change on a
+ * small base is a real percentage. No counting-up animations, no
+ * gauges: a calm number on calm paper.
  */
 export function MetricCard({
   descriptor,
@@ -26,7 +24,7 @@ export function MetricCard({
       aria-label={descriptor.label}
       className="flex flex-col gap-2 rounded-lg border border-border bg-surface-raised p-5 shadow-e1"
     >
-      <h2 className="text-label text-text-secondary">{descriptor.label}</h2>
+      <h3 className="text-label text-text-secondary">{descriptor.label}</h3>
       <p className="text-display text-text-primary">
         {metric.value.toLocaleString("en-US")}
         {descriptor.unit ? (
@@ -34,46 +32,26 @@ export function MetricCard({
         ) : null}
       </p>
 
-      {metric.value === 0 && metric.zeroNote ? (
-        <p className="text-caption text-text-tertiary">{metric.zeroNote}</p>
-      ) : null}
-
       {metric.subline ? <p className="text-caption text-text-secondary">{metric.subline}</p> : null}
 
-      <Comparison
-        previous={metric.previous}
-        value={metric.value}
-        good={descriptor.goodDirection}
-        range={range}
-      />
+      <Comparison previous={metric.previous} value={metric.value} good={descriptor.goodDirection} range={range} />
 
-      {descriptor.fixedWindowNote ? (
-        <p className="text-caption text-text-tertiary">{descriptor.fixedWindowNote}</p>
+      {descriptor.note ? (
+        <p className="text-caption text-text-tertiary">{descriptor.note}</p>
       ) : null}
 
       {points.length > 0 ? <Sparkline points={points.map((point) => point.v)} /> : null}
 
-      {metric.breakdown && metric.breakdown.length > 0 ? (
+      {metric.rows && metric.rows.length > 0 ? (
         <dl className="mt-1 flex flex-col gap-1 border-t border-border pt-2">
-          {metric.breakdown.map((entry) => {
-            const label = entry.status ?? entry.action ?? "";
-            return (
-              <div key={label} className="flex items-baseline justify-between gap-2">
-                <dt className="text-caption text-text-tertiary capitalize">
-                  {label.replace(/_/g, " ")}
-                </dt>
-                <dd className="text-caption text-text-secondary">
-                  {entry.suppressed ? (
-                    <span className="text-text-tertiary">
-                      Fewer than 5 · hidden to protect individuals
-                    </span>
-                  ) : (
-                    (entry.count ?? 0).toLocaleString("en-US")
-                  )}
-                </dd>
-              </div>
-            );
-          })}
+          {metric.rows.map((row) => (
+            <div key={row.label} className="flex items-baseline justify-between gap-2">
+              <dt className="text-caption text-text-tertiary capitalize">
+                {row.label.replace(/_/g, " ")}
+              </dt>
+              <dd className="text-caption text-text-secondary">{row.detail}</dd>
+            </div>
+          ))}
         </dl>
       ) : null}
     </section>
@@ -81,10 +59,11 @@ export function MetricCard({
 }
 
 /**
- * The comparison line (spec §14): a signed absolute change always; a
- * percentage only above the base threshold, so the dashboard never
- * tells a dramatic percentage story about three people. No prior
- * period means an honest "not enough history", never a fake 0%.
+ * The comparison line: the signed absolute change and the real
+ * percentage, at any base. No prior period (the all-time range) means
+ * no comparison line; a prior period of zero shows the absolute
+ * change alone, because a percentage of zero is undefined, not
+ * withheld.
  */
 function Comparison({
   previous,
@@ -97,12 +76,7 @@ function Comparison({
   good: "up" | "neutral";
   range: MetricRange;
 }) {
-  if (previous === undefined) return null;
-  if (previous === null) {
-    return range === "all" ? null : (
-      <p className="text-caption text-text-tertiary">Not enough history yet to show a trend</p>
-    );
-  }
+  if (previous === undefined || previous === null || range === "all") return null;
   const delta = value - previous;
   const Glyph = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus;
   const tone =
@@ -112,7 +86,7 @@ function Comparison({
         ? "text-success"
         : "text-text-tertiary";
   const percent =
-    previous >= PERCENT_BASE_THRESHOLD ? ` (${delta >= 0 ? "+" : ""}${Math.round((delta / previous) * 100)}%)` : "";
+    previous > 0 ? ` (${delta >= 0 ? "+" : ""}${Math.round((delta / previous) * 100)}%)` : "";
   return (
     <p className={`flex items-center gap-1 text-caption ${tone}`}>
       <Glyph size={12} weight="bold" aria-hidden />
@@ -124,9 +98,9 @@ function Comparison({
 }
 
 /**
- * The single-series sparkline (spec §11.1, §21): drawn in accent with
- * marked data points, no draw-in animation. At tiny N it is dots, not
- * a confident curve — two points never imply a trajectory (spec §13).
+ * The single-series sparkline: drawn in accent with marked data
+ * points, no draw-in animation. Any two or more points draw the real
+ * line through the real values.
  */
 function Sparkline({ points }: { points: number[] }) {
   const width = 160;
@@ -144,7 +118,7 @@ function Sparkline({ points }: { points: number[] }) {
       role="img"
       aria-label={`Trend: ${points.join(", ")}`}
     >
-      {coords.length >= 3 ? (
+      {coords.length >= 2 ? (
         <polyline
           points={coords.map((coord) => `${coord.x},${coord.y}`).join(" ")}
           fill="none"

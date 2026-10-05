@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppShell, type ModMenuInfo } from "@/components/shell/AppShell";
 import { dmFeatureOn } from "@/lib/dm/server";
 import { Providers } from "@/components/shell/Providers";
+import { SessionHeartbeat } from "@/components/shell/SessionHeartbeat";
 import { Card } from "@/components/ui";
 import { modTier, TIER_LABEL, REASON_LABEL } from "@/lib/moderation";
 import type { MyAccountStatus } from "@/lib/database.types";
@@ -102,6 +103,7 @@ export default async function MemberLayout({ children }: { children: React.React
 
   return (
     <Providers viewer={{ id: viewer.user.id, handle: profile.handle }}>
+      <SessionHeartbeat />
       <AppShell
         handle={profile.handle}
         isOwner={viewer.isOwner}

@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth";
 import {
-  FOUNDING_POSTURE_THRESHOLD,
+  GROUP_LABEL,
+  GROUP_ORDER,
   METRIC_REGISTRY,
   parseMetricsPayload,
   parseRange,
@@ -15,12 +16,12 @@ import { MetricCard } from "@/components/owner/MetricCard";
 export const metadata: Metadata = { title: "Insights" };
 
 /**
- * Insights (Phase 2D spec, Part 2): the Owner's read-only metrics
- * dashboard. Aggregates only — there is no path from a number here to
- * a person; reaching a person is the directory's job, with its own
- * gates. The range control is URL state, so a view survives refresh.
- * The refused engagement metrics (spec §15) are absent by design and
- * by the database function's header contract.
+ * Insights: the Owner's read-only full-analytics dashboard. Every
+ * number is the literal number — membership, engagement, growth,
+ * content, per-member leaderboards, and safety operations. Per-member
+ * figures are @handle-keyed; reaching an identity stays the
+ * directory's audited job. The range control is URL state, so a view
+ * survives refresh.
  */
 export default async function OwnerInsightsPage({
   searchParams,
@@ -41,17 +42,10 @@ export default async function OwnerInsightsPage({
       <div className="flex flex-col gap-2">
         <h1 className="text-title">Insights</h1>
         <p className="max-w-prose text-body text-text-secondary">
-          The shape of the community, in aggregate. Numbers, never people: reaching a member is
-          what the directory is for.
+          The whole picture, in exact numbers. Everything starts at zero, goes up by one when it
+          increases by one, and down by one when it decreases by one.
         </p>
       </div>
-
-      {payload && payload.total_members.value < FOUNDING_POSTURE_THRESHOLD ? (
-        <p className="rounded-md bg-accent-subtle px-4 py-3 text-body text-text-primary">
-          Hersciety is new. These numbers are small because the community is young, and that is
-          exactly where you should be.
-        </p>
-      ) : null}
 
       <nav
         aria-label="Time range"
@@ -81,16 +75,25 @@ export default async function OwnerInsightsPage({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {METRIC_REGISTRY.map((descriptor) => (
-            <MetricCard
-              key={descriptor.id}
-              descriptor={descriptor}
-              payload={payload}
-              range={range}
-            />
-          ))}
-        </div>
+        GROUP_ORDER.map((group) => (
+          <section key={group} aria-labelledby={`metrics-${group}`} className="flex flex-col gap-3">
+            <h2 id={`metrics-${group}`} className="text-heading text-text-primary">
+              {GROUP_LABEL[group]}
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {METRIC_REGISTRY.filter((descriptor) => descriptor.group === group).map(
+                (descriptor) => (
+                  <MetricCard
+                    key={descriptor.id}
+                    descriptor={descriptor}
+                    payload={payload}
+                    range={range}
+                  />
+                ),
+              )}
+            </div>
+          </section>
+        ))
       )}
     </div>
   );
