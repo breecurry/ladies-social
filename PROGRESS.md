@@ -1,6 +1,6 @@
 # PROGRESS: Hersciety
 
-Updated: 2026-10-08
+Updated: 2026-10-09
 
 ## 🟢 LIVE STATUS — https://www.hersciety.com is UP (verified 2026-10-07)
 
@@ -13,10 +13,14 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: **Discover feed** (designed in `docs/design-phase2b-moderation
--and-discover.md`) → **profile pictures / avatars** (unblocked now that the
-moderation console is live; PhotoDNA is voluntary and NCMEC pre-registration
-is not required) → **admin dashboard** (designed in
+Next, in order: **apply migration `20261013000001` (Discover) to the live
+project** — the Discover feed code is on main and deploys with it, but the
+feed's functions and the `discoverable` column do not exist on live until the
+migration is applied (until then the Discover tab renders its calm empty
+state and the Privacy toggle cannot save; nothing crashes) → **profile
+pictures / avatars** (designed in `docs/design-phase2e-profile-pictures.md`;
+unblocked now that the moderation console is live; PhotoDNA is voluntary and
+NCMEC pre-registration is not required) → **admin dashboard** (designed in
 `docs/design-phase2d-admin-dashboard-and-metrics.md`) → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
 the Owner's MFA enrolment → counsel sign-off, then flip `published: true` in
@@ -60,6 +64,37 @@ one of them. If the Owner enrolled a passkey before this change, she must
 re-enroll it once. Do not change this value again.
 
 ## Where things stand
+
+**The Discover feed is built (Phase 2B Part 2, 2026-10-09).** Home now has
+its two tabs (spec §4.1/§4.7): Following unchanged, and Discover — recent
+root posts from across Hersciety, lightly ranked by
+`feed_discover()` on **positive signals only**: recency (dominant by
+construction), the viewer's own likes and follows, follow-graph proximity
+(authors and posts favoured by the people she follows), log-damped aggregate
+like counts, and a small time-limited cold-start lift for new authors. The
+refused signals (design doc §11) are refused in code: reply volume,
+controversy/ratio, report/block/mute counts, negative velocity and every
+person-finder signal appear nowhere; blocks and mutes hard-filter, "show me
+less" strongly down-ranks without filtering, suspended authors and removed
+posts never surface. A member with zero follows lands on Discover (then the
+last-chosen tab is remembered), unfollowed authors' cards carry the outlined
+Follow pill, members with few follows get the people-first
+`suggested_accounts()` module, and the empty/sparse states are the warm
+founding-cohort ones from design doc §12 — never fake liveliness.
+**Discoverability is ON by default with the opt-out in Settings → Privacy
+(owner decision 2026-10-07):** `profiles.discoverable = false` removes a
+member from every member's Discover feed AND the suggestions module at the
+database layer, while she stays fully reachable by exact @handle search.
+Identity is @handle-only on every Discover surface, and suite
+`10-discover.sql` asserts structurally that neither new function references
+`display_name`, plus the opt-out, block/mute/hide semantics, and
+authenticated-only EXECUTE. ⚠️ **Migration `20261013000001_discover.sql` is
+written, idempotent, and verified locally (fresh apply, re-run, and
+populated-database apply all clean) but has NOT been applied to the live
+project yet — Grove applies it after review.** Until it is applied, the
+deployed Discover tab degrades gracefully (empty feed state, toggle save
+fails with the calm retry toast); after it is applied, everything above is
+live with no further deploy.
 
 **The brand mark is live (2026-10-08).** The owner's logo — a purple
 "Hersciety" wordmark whose dotted `i` is a speech bubble — is now real
@@ -452,7 +487,12 @@ polish; moderation shipping does not auto-flip it.
       is the moment existing accounts may need a completion flow —
       self-attestation to self-attestation is not that moment.
 
-## Next session, start here
+## Historical next-steps (2026-10-06 session — all three since done)
+
+Kept for the detail they carry; the live list is "Next, in order" at the top.
+Provisioning happened 2026-10-06/07, the moderation console and age gate
+shipped 2026-10-05, Discover shipped 2026-10-09, and the legal documents were
+revised for open registration on 2026-10-07.
 
 1. **Provision the rebuilt live project.** The original Supabase project was
    deleted by accident on 2026-10-06. The live project is now ref
@@ -520,9 +560,10 @@ polish; moderation shipping does not auto-flip it.
 - The desktop right rail (persistent search + getting-started card at
   xl) is not built; search is a primary nav destination, so nothing is
   unreachable.
-- The on-card Follow pill appears in people rows (search, lists); feed
-  cards do not need it (Following-only feed) and thread reply cards do
-  not carry it yet; it becomes load-bearing with Discover in 2B.
+- The on-card Follow pill appears in people rows (search, lists) and,
+  since the Discover build, on Discover feed cards for unfollowed
+  authors; Following feed cards and thread reply cards still do not
+  carry it (you follow everyone in Following; threads are for reading).
 - Notifications fetch the latest 50 with no pager; fine for the
   founding cohort.
 - Report history shows reason/status only (no deep link to the
@@ -531,14 +572,17 @@ polish; moderation shipping does not auto-flip it.
 
 ## Not started
 
-- [ ] Phase 2B remainder: Discover feed + the Discoverability settings toggle
-      (the age gate and the moderation console are done — see below)
+- [x] ~~Phase 2B remainder: Discover feed + the Discoverability settings
+      toggle~~ — DONE 2026-10-09 (see "Where things stand"; migration
+      `20261013000001` still needs applying to live)
 - [ ] Phase 3: media pipeline and moderation backbone (CSAM scanning; the ban
       actions that feed `banned_identifiers` shipped with the console)
 - [ ] Phase 4: DM images (text DMs shipped dark in 2C; images stay
       gated behind the five preconditions in the 2C design §17, chiefly
       NCMEC/PhotoDNA and the attorney-reviewed CSAM posture)
-- [ ] Phase 5: discovery ranking and the For You feed
+- [ ] Phase 5: the heavier model-driven For You feed with per-post "why you
+      are seeing this" (Discover's light positive-signal ranking shipped in
+      2B; the vector-similarity upgrade remains Phase 5)
 - [ ] Phase 6: launch hardening
 
 Deferred, needs the owner's call: phone verification and age verification
