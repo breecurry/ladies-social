@@ -5,14 +5,29 @@ import { requireEnv } from "@/lib/env";
 import { hashIdentifier } from "@/lib/crypto";
 import { padToUniformTime } from "@/lib/timing";
 import { runSignupTriage } from "@/lib/signup/triage";
-import { signupSchema, RESERVED_HANDLES } from "@/lib/validation";
+import { signupSchema, isAtLeast18, RESERVED_HANDLES } from "@/lib/validation";
+import {
+  AGE_GATE_COOKIE,
+  getActiveAgeGateBlock,
+  parseAgeGateCookie,
+  recordAgeGateBlock,
+  setAgeGateCookie,
+  type AgeGateBlock,
+} from "@/lib/age-gate";
 import type { Database } from "@/lib/database.types";
 
 /**
- * POST /api/auth/signup — open registration.
+ * POST /api/auth/signup — open registration behind the age gate.
  *
- * Everyone is welcome; enforcement is conduct-based and happens after
- * the fact. What this endpoint still defends:
+ * Everyone 18+ is welcome; enforcement is conduct-based and happens
+ * after the fact. What this endpoint still defends:
+ *
+ *   THE AGE GATE (spec §17): an under-18 date of birth is REJECTED,
+ *   not recorded — the response routes the client to the rejection
+ *   screen, and the device receives a 14-day soft block (hashed
+ *   fingerprint + cookie). A blocked device meets the blocked screen
+ *   instead of a working form. Nothing about the person is kept: the
+ *   block row is a fingerprint hash, timestamps and a reference code.
  *
  *   BAN EVASION: a signup whose email or device-fingerprint hash
  *   matches a banned account is answered with the EXACT same response
@@ -65,9 +80,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const input = parsed.data;
 
-  const uniform = async (body: Record<string, unknown>, status: number) => {
+  const uniform = async (
+    body: Record<string, unknown>,
+    status: number,
+    block?: AgeGateBlock | null,
+  ) => {
     await padToUniformTime(startedAt);
-    return NextResponse.json(body, { status });
+    const response = NextResponse.json(body, { status });
+    if (block) setAgeGateCookie(response, block);
+    return response;
   };
 
   try {
@@ -98,6 +119,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           429,
         );
       }
+    }
+
+    // --- The age gate (spec §17) ---
+    // A device under an active 14-day block meets the blocked screen,
+    // not a working form: matched by fingerprint hash or by the cookie
+    // the failing visit set, so clearing cookies alone does not help.
+    const cookieCode = parseAgeGateCookie(request.cookies.get(AGE_GATE_COOKIE)?.value);
+    const activeBlock = await getActiveAgeGateBlock(admin, fingerprintHash, cookieCode);
+    if (activeBlock) {
+      return uniform(
+        { ok: false, blocked: true, code: activeBlock.referenceCode },
+        403,
+        activeBlock,
+      );
+    }
+
+    // An under-18 date of birth REJECTS (it is never silently stored)
+    // and soft-blocks the device for 14 days. The response carries no
+    // reference code — the rejection screen shows none (§17.2); the
+    // code appears only if the device returns (§17.3). Deliberately
+    // nothing else about the visitor is recorded, on this branch or
+    // anywhere downstream of it.
+    if (!isAtLeast18(input.dob)) {
+      const block = await recordAgeGateBlock(admin, fingerprintHash);
+      return uniform({ ok: false, underage: true }, 403, block);
     }
 
     // Handle availability. This necessarily reveals whether a HANDLE is

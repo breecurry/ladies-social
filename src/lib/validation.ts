@@ -30,7 +30,49 @@ export const RESERVED_HANDLES = new Set([
   "staff",
 ]);
 
-function isAtLeast18(dob: string): boolean {
+/**
+ * True when the ISO date is a real calendar date (no 2026-02-30) in a
+ * plausible range (1900 onward, not in the future).
+ */
+export function isRealBirthDate(dob: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return false;
+  }
+  return date.getTime() <= Date.now();
+}
+
+/**
+ * Compose Month/Day/Year field values into an ISO date, or null when
+ * they do not form a real birth date. Shared by the three-field date
+ * group on the signup form and anything else that gathers parts.
+ */
+export function composeBirthDate(month: string, day: string, year: string): string | null {
+  const m = month.trim();
+  const d = day.trim();
+  const y = year.trim();
+  if (!/^\d{1,2}$/.test(m) || !/^\d{1,2}$/.test(d) || !/^\d{4}$/.test(y)) return null;
+  const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  return isRealBirthDate(iso) ? iso : null;
+}
+
+/**
+ * The 18+ gate check. Deliberately NOT part of signupSchema: an
+ * under-18 date is a VALID submission that routes to the rejection
+ * screen and records a device block (spec §17.1-17.3) — it is not a
+ * field-level form error.
+ */
+export function isAtLeast18(dob: string): boolean {
   const birth = new Date(`${dob}T00:00:00Z`);
   if (Number.isNaN(birth.getTime())) return false;
   const cutoff = new Date();
@@ -60,8 +102,9 @@ export const signupSchema = z.object({
     ),
   dob: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth.")
-    .refine(isAtLeast18, "You must be 18 or older to join."),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your full date of birth.")
+    .refine(isRealBirthDate, "Enter your full date of birth."),
+  ageAttested: z.literal(true, "Please confirm that you are 18 or older."),
   deviceFingerprint: z.string().trim().max(128).optional().default(""),
 });
 

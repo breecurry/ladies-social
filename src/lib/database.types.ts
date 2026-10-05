@@ -46,7 +46,6 @@ export type ProfileRow = {
 export type UserPrivateRow = {
   user_id: string;
   legal_name: string;
-  dob: string;
   email: string;
   phone_e164: string | null;
   phone_verified_at: string | null;
@@ -170,6 +169,26 @@ export type NotificationPrefsRow = {
   updated_at: string;
 };
 
+/**
+ * One 14-day age-gate device block (spec §17.3). By design this row
+ * holds a hashed fingerprint, timestamps and a reference code — and
+ * NOTHING else. No app role can read or write the table directly; the
+ * age-gate functions below are the only path.
+ */
+export type AgeGateBlockRow = {
+  id: number;
+  fingerprint_hash: string | null;
+  reference_code: string;
+  created_at: string;
+  expires_at: string;
+};
+
+/** Row shape returned by the age-gate block functions. */
+export type AgeGateBlockResult = {
+  reference_code: string;
+  expires_at: string;
+};
+
 /** Row shape returned by feed_following(). Identity is the handle ONLY. */
 export type FeedPost = {
   id: number;
@@ -254,6 +273,7 @@ export type Database = {
       reports: TableDef<ReportRow>;
       notifications: TableDef<NotificationRow>;
       notification_prefs: TableDef<NotificationPrefsRow>;
+      age_gate_blocks: TableDef<AgeGateBlockRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -364,6 +384,19 @@ export type Database = {
         Returns: NotificationItem[];
       };
       notif_mark_all_read: { Args: Record<string, never>; Returns: undefined };
+      record_age_gate_block: {
+        Args: { p_fingerprint_hash: string | null };
+        Returns: AgeGateBlockResult[];
+      };
+      get_age_gate_block: {
+        Args: { p_fingerprint_hash: string | null; p_code: string | null };
+        Returns: AgeGateBlockResult[];
+      };
+      lookup_age_gate_block: {
+        Args: { p_code: string };
+        Returns: { reference_code: string; created_at: string; expires_at: string }[];
+      };
+      clear_age_gate_block: { Args: { p_code: string }; Returns: boolean };
     };
     Enums: {
       system_role: SystemRole;
