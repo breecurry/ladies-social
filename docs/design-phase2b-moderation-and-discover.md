@@ -448,7 +448,7 @@ Every other pairing this document relies on is already measured and is reused ve
 |---|---|---|---|---|
 | `accent` on `accent-subtle` | console identity strip label, In-review chip | 6.03 | 5.55 | P2 2.3 |
 | `text-secondary` on `accent-subtle` | identity strip role caption | 6.52 | 6.90 | P2 2.3 |
-| `text-primary` on `accent-subtle` | sealed-case and setup-task card body | 14.35 | 13.20 | P2 2.3 |
+| ~~`text-primary` on `accent-subtle`~~ | ~~sealed-case and setup-task card body~~ | ~~14.35~~ | ~~13.20~~ | Removed — the sealed owner-conflict lane and the independent-contact setup task no longer exist; see section 7. |
 | white on `danger-fill` | Critical chip, destructive buttons' fill | 5.62 | 4.83 | P2 2.3 |
 | `danger` on `surface-raised` | destructive action rail items on the popover | 5.62 | 5.49 | P2 2.3 |
 | `text-tertiary` on `surface` | counts, times, locked duration chips | 4.88 | 5.11 | P2 2.3 |
