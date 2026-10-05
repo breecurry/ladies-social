@@ -19,6 +19,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/06-age-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/07-moderation.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/08-tos-consent.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/09-dm-smoke.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/10-discover.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -305,3 +306,32 @@ messages, text-only, 1:1):
   `one_time_prekeys` directly; another member's `user_devices` and
   `dm_settings` rows are invisible; a non-participant cannot fetch a
   conversation through the functions either.
+
+## What the Discover suite (10) proves
+
+Covers migration 0021 (Phase 2B Part 2 — the Discover feed):
+
+- **the Discoverability opt-out holds at the database**: a member who
+  turns `profiles.discoverable` off (it defaults ON — owner decision
+  2026-10-07) never surfaces in anyone's `feed_discover()` and is never
+  returned by `suggested_accounts()`, while remaining fully reachable
+  by exact `@handle` through `search_people()` and keeping her own
+  Discover view intact; RLS confines the toggle to the member's own
+  row;
+- **no Discover function returns or even references `display_name`**
+  (checked structurally against `pg_proc`): the widest surface in the
+  product is @handle-only below the app layer, like every other read
+  path;
+- EXECUTE on both functions is authenticated-only (anon and
+  service_role are refused);
+- ranking is positive-signal-only in behaviour: a cold-start member
+  with zero follows and zero likes still gets a populated feed (never
+  containing her own posts), offset pagination is deterministic, and
+  following an author flips `viewer_follows` (the card's Follow-pill
+  signal) while retiring her from suggestions;
+- the safety filters match every other read path: mutual blocks remove
+  both directions from feed and suggestions, mutes remove the author
+  entirely, hide ("show me less") **suppresses without hard-filtering**
+  the feed (P2 spec §4.8) while keeping the account out of
+  suggestions, and a suspended author's posts and moderation-removed
+  posts never surface.
