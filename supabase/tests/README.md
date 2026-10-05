@@ -21,6 +21,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/08-tos-consent.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/09-dm-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/10-discover.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/11-admin-dashboard.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/12-avatars.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -376,3 +377,38 @@ Covers migration 0021 (Phase 2B Part 2 — the Discover feed):
   the metrics headline — and the system account appears nowhere;
 - search is exact-and-prefix `@handle` only (substrings do not match),
   and keyset pagination pages without overlap.
+
+## What the avatar smoke test proves (12-avatars)
+
+- the **avatar key resolver is mutual-hard on blocks**: a block in
+  EITHER direction returns no key to either party (`blocked_either`,
+  the posts semantics — never the one-way `profiles_read` semantics),
+  while a mute changes nothing (mute is a feed tool, not an identity
+  tool);
+- a context with **no member resolves nothing**, `anon` holds no
+  EXECUTE on any avatar function, and a suspended viewer resolves
+  nothing either;
+- **suspended / banned owners resolve to nothing** (letter placeholder
+  everywhere) and come back when standing is restored;
+- `avatar_media` and `avatar_upload_tickets` carry **RLS with zero
+  policies and zero direct privileges** — the SECURITY DEFINER
+  functions are the only path — and **no table in `public` is without
+  RLS**;
+- members **cannot write `profiles.avatar_media_key` directly** (the
+  0009 column grant is revoked; the pipeline functions are the only
+  writers), and **no filename-shaped column exists** anywhere in the
+  feature;
+- **a report freezes the accused's current avatar key** as evidence;
+  a frozen object is never purgeable and `avatar_mark_purged` refuses
+  it, even after the member swaps or removes the photo;
+- **moderation removal preserves**: the profile reverts to the
+  placeholder, the object row is marked (never deleted, never
+  purgeable), the enforcement history and a member-facing notification
+  naming the rule are written, and **reinstatement restores** the
+  photo end to end;
+- a **csam-reason report never reaches the console evidence panel**
+  and pins a `legal_hold` on the frozen object;
+- upload tickets are refused for suspended and restricted members,
+  capped per hour, single-consume and single-redeem; malformed keys
+  are rejected; and **no avatar function returns or references
+  `display_name`** (checked structurally against `pg_proc`).
