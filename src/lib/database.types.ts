@@ -52,6 +52,12 @@ export type ProfileRow = {
   status: AccountStatus;
   status_expires_at: string | null;
   search_indexable: boolean;
+  /**
+   * Discover opt-out (owner decision 2026-10-07: ON by default).
+   * false = never surfaced in anyone's Discover feed or suggestions;
+   * @handle search and existing-follower visibility are unaffected.
+   */
+  discoverable: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -256,6 +262,13 @@ export type FeedPost = {
   viewer_liked: boolean;
   created_at: string;
 };
+
+/**
+ * Row shape returned by feed_discover(). FeedPost plus the one signal
+ * Discover needs that Following never does: whether the viewer already
+ * follows the author (the card shows the Follow pill when she does not).
+ */
+export type DiscoverPost = FeedPost & { viewer_follows: boolean };
 
 /** Row shape returned by get_thread(). Tombstones have unavailable=true. */
 export type ThreadPost = {
@@ -583,6 +596,11 @@ export type Database = {
         Args: { p_before?: string | null; p_limit?: number; p_before_id?: number | null };
         Returns: FeedPost[];
       };
+      feed_discover: {
+        Args: { p_limit?: number; p_offset?: number };
+        Returns: DiscoverPost[];
+      };
+      suggested_accounts: { Args: { p_limit?: number }; Returns: PersonRow[] };
       get_thread: { Args: { p_post: number }; Returns: ThreadPost[] };
       profile_posts: {
         Args: {

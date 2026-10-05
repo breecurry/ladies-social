@@ -8,6 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { ReplyControl } from "@/lib/database.types";
 import { relativeTime, fullTimestamp } from "@/lib/format";
 import { Avatar, type AvatarSize } from "@/components/Avatar";
+import { FollowControl } from "@/components/follow/FollowControl";
 import { PostBody } from "@/components/post/PostBody";
 import { OverflowMenu } from "@/components/post/OverflowMenu";
 import { useToast } from "@/components/shell/ToastProvider";
@@ -38,6 +39,7 @@ export function PostCard({
   variant = "feed",
   avatarSize = 48,
   parentContext,
+  followPill = false,
 }: {
   post: PostCardData;
   /** feed = clickable card; root = thread hero with full timestamp. */
@@ -45,6 +47,13 @@ export function PostCard({
   avatarSize?: AvatarSize;
   /** One-line parent context for profile Replies rows (spec §7.3). */
   parentContext?: { handle: string; excerpt: string } | null;
+  /**
+   * Discover cards only (spec §4.2, §4.7): show the compact Follow
+   * pill after the identity block for an author the viewer does not
+   * yet follow. The pill's presence IS the "you do not follow this
+   * person" signal, so Following cards never pass this.
+   */
+  followPill?: boolean;
 }) {
   const router = useRouter();
   const viewer = useViewer();
@@ -158,6 +167,14 @@ export function PostCard({
             <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-micro text-accent">
               Founding
             </span>
+          ) : null}
+          {followPill && post.author_id && !isOwn ? (
+            <FollowControl
+              targetUserId={post.author_id}
+              targetHandle={post.author_handle}
+              initialFollowing={false}
+              variant="pill"
+            />
           ) : null}
         </div>
         {post.author_id ? (
