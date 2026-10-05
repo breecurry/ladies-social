@@ -67,7 +67,7 @@ export default async function OwnerHubPage() {
         </p>
       </div>
 
-      <Card className="flex flex-col divide-y divide-border p-0">
+      <Card padded={false} className="flex flex-col divide-y divide-border">
         {TOOLS.map(({ href, icon: Icon, label, description }) => (
           <Link
             key={href}

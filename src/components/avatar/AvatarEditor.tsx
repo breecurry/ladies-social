@@ -63,7 +63,7 @@ export function ChangePhotoControl({
           type="button"
           aria-label="Change profile photo"
           onClick={() => inputRef.current?.click()}
-          className="absolute -bottom-1 -right-1 flex size-8 items-center justify-center rounded-full border border-border bg-surface-raised text-text-primary shadow-e1 hover:bg-accent-subtle"
+          className="absolute -bottom-1 -right-1 flex size-8 items-center justify-center rounded-full border border-border bg-surface-raised text-text-primary shadow-e1 after:absolute after:-inset-1.5 after:content-[''] hover:bg-accent-subtle"
         >
           <Camera size={18} aria-hidden />
         </button>

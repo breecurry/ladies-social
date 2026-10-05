@@ -63,7 +63,7 @@ export default async function ModQueuePage({
               key={item.value}
               href={`/mod?state=${item.value}`}
               aria-current={state === item.value ? "page" : undefined}
-              className={`flex min-h-9 flex-1 items-center justify-center rounded-sm px-2 text-label transition-colors duration-(--duration-fast) ${
+              className={`flex min-h-11 flex-1 items-center justify-center rounded-sm px-2 text-label transition-colors duration-(--duration-fast) ${
                 state === item.value
                   ? "border-b-2 border-accent bg-accent-subtle text-accent"
                   : "text-text-secondary hover:bg-surface-raised"

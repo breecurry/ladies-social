@@ -43,6 +43,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // cover makes env(safe-area-inset-*) real values on notched phones;
+  // without it every safe-area rule in the shell and dialogs is inert.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f0ea" },
     { media: "(prefers-color-scheme: dark)", color: "#16130f" },

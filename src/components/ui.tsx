@@ -90,9 +90,24 @@ export function Field({
   );
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = "",
+  padded = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Opt out of the default padding; same-property utility overrides
+   *  in className are unreliable (stylesheet order wins, not class
+   *  order), so flush cards say so here instead. */
+  padded?: boolean;
+}) {
   return (
-    <section className={`rounded-lg border border-border bg-surface p-6 shadow-e1 ${className}`}>
+    <section
+      className={`rounded-lg border border-border bg-surface shadow-e1 ${
+        padded ? "p-4 sm:p-6" : ""
+      } ${className}`}
+    >
       {children}
     </section>
   );

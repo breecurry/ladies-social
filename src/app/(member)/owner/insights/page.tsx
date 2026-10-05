@@ -56,7 +56,7 @@ export default async function OwnerInsightsPage({
             key={option.value}
             href={`/owner/insights?range=${option.value}`}
             aria-current={range === option.value ? "page" : undefined}
-            className={`flex min-h-9 flex-1 items-center justify-center rounded-sm px-2 text-label transition-colors duration-(--duration-fast) ${
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-sm px-2 text-label transition-colors duration-(--duration-fast) ${
               range === option.value
                 ? "bg-accent-subtle text-accent"
                 : "text-text-secondary hover:bg-surface-raised"

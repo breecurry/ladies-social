@@ -161,7 +161,7 @@ function FilterPill({
       type="button"
       aria-pressed={pressed}
       onClick={onToggle}
-      className={`inline-flex min-h-9 items-center rounded-full border px-3 text-caption transition-colors duration-(--duration-fast) ${
+      className={`inline-flex min-h-11 items-center rounded-full border px-3 text-caption transition-colors duration-(--duration-fast) ${
         pressed
           ? "border-accent bg-accent-subtle text-accent"
           : "border-border bg-surface text-text-secondary hover:bg-surface-raised"

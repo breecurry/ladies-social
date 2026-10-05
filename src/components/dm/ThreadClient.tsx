@@ -268,7 +268,7 @@ export function ThreadClient(props: {
   return (
     <div className="flex min-h-[calc(100dvh-120px)] flex-col lg:mt-6 lg:min-h-0 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
       {/* Header: @handle only, never a legal name (design §0.1). */}
-      <header className="sticky top-12 z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2 lg:top-0">
+      <header className="sticky top-[calc(48px+env(safe-area-inset-top))] z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2 lg:top-0">
         <Avatar handle={thread.peerHandle} size={32} userId={thread.peerId} />
         <Link
           href={`/u/${thread.peerHandle}`}

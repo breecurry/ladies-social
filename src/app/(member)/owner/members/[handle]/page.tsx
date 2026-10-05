@@ -81,7 +81,7 @@ export default async function OwnerMemberDetailPage({
         </div>
       </header>
 
-      <Card className="flex flex-col gap-1 py-4">
+      <Card padded={false} className="flex flex-col gap-1 px-4 py-4 sm:px-6">
         <h2 className="sr-only">Standing</h2>
         <p className="text-body text-text-secondary">{standing.join(" · ")}</p>
       </Card>

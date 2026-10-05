@@ -105,7 +105,7 @@ export function AppShell({
       {/* Centre column */}
       <div className="flex w-full max-w-[600px] flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-20 flex h-12 items-center gap-1 bg-surface px-2 shadow-sticky lg:hidden">
+        <header className="sticky top-0 z-20 flex h-[calc(48px+env(safe-area-inset-top))] items-center gap-1 bg-surface px-2 pt-[env(safe-area-inset-top)] shadow-sticky lg:hidden">
           {isHome ? (
             <span className="flex px-2">
               <BrandWordmark height={20} />
