@@ -7,6 +7,7 @@ import { joinedDate } from "@/lib/format";
 import { HANDLE_REGEX } from "@/lib/validation";
 import { Avatar } from "@/components/Avatar";
 import { OwnProfileAvatar } from "@/components/avatar/OwnProfileAvatar";
+import { AccountMenu } from "@/components/shell/AccountMenu";
 import { FollowControl } from "@/components/follow/FollowControl";
 import { OverflowMenu } from "@/components/post/OverflowMenu";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
@@ -125,7 +126,13 @@ export default async function ProfilePage({
                 variant="profile"
               />
             )}
-            {isOwn ? null : (
+            {isOwn ? (
+              // Mobile account entry (logout, settings, staff tools):
+              // the desktop rail already carries this menu at lg and up.
+              <div className="lg:hidden">
+                <AccountMenu variant="profile" />
+              </div>
+            ) : (
               <OverflowMenu
                 targetUserId={profile.user_id}
                 targetHandle={profile.handle}

@@ -4,9 +4,20 @@ import { createContext, useContext, type ReactNode } from "react";
 import { ToastProvider } from "@/components/shell/ToastProvider";
 import { ComposeProvider } from "@/components/shell/ComposeProvider";
 
+/** Shown in the account menu for staff roles only (design doc §1, §2.4). */
+export interface ModMenuInfo {
+  label: string;
+  openCount: number;
+  criticalCount: number;
+}
+
 export interface ViewerInfo {
   id: string;
   handle: string;
+  /** Whether the viewer holds the owner role (gates the Owner tools entry). */
+  isOwner: boolean;
+  /** Moderation-queue summary when the viewer is staff; null otherwise. */
+  mod: ModMenuInfo | null;
 }
 
 const ViewerContext = createContext<ViewerInfo | null>(null);

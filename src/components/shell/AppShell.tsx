@@ -10,25 +10,13 @@ import {
   ChatCircle,
   PencilSimple,
   CaretLeft,
-  CaretUp,
-  GearSix,
-  SignOut,
-  ShieldCheck,
-  ShieldStar,
 } from "@phosphor-icons/react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useCompose } from "@/components/shell/ComposeProvider";
 import { useViewer } from "@/components/shell/Providers";
+import { AccountMenu } from "@/components/shell/AccountMenu";
 import { useAvatarMedia } from "@/components/avatar/useAvatarMedia";
 import { avatarUrl, blurhashAverageColor } from "@/lib/media/avatar";
 import { BrandWordmark } from "@/components/BrandWordmark";
-
-/** Shown in the account menu for staff roles only (design doc §1, §2.4). */
-export interface ModMenuInfo {
-  label: string;
-  openCount: number;
-  criticalCount: number;
-}
 
 /**
  * The application shell (spec §1): desktop left rail (>=lg) with a
@@ -37,16 +25,12 @@ export interface ModMenuInfo {
  */
 export function AppShell({
   handle,
-  isOwner,
-  mod,
   initialUnread,
   dmEnabled = false,
   dmUnread = 0,
   children,
 }: {
   handle: string;
-  isOwner: boolean;
-  mod: ModMenuInfo | null;
   initialUnread: number;
   /** The DM feature flag (design 2C §8); when false, no Messages entry exists anywhere. */
   dmEnabled?: boolean;
@@ -114,7 +98,7 @@ export function AppShell({
           Compose
         </button>
         <div className="mt-auto">
-          <AccountMenu handle={handle} isOwner={isOwner} mod={mod} />
+          <AccountMenu />
         </div>
       </nav>
 
@@ -340,110 +324,5 @@ function BackButton() {
     >
       <CaretLeft size={22} aria-hidden />
     </button>
-  );
-}
-
-function AccountMenu({
-  handle,
-  isOwner,
-  mod,
-}: {
-  handle: string;
-  isOwner: boolean;
-  mod: ModMenuInfo | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const router = useRouter();
-
-  const logOut = async () => {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  };
-
-  return (
-    <div className="relative px-1">
-      {open ? (
-        <div
-          role="menu"
-          aria-label="Account"
-          className="absolute bottom-full left-1 mb-1 w-56 rounded-md bg-surface-raised py-2 shadow-e2"
-        >
-          {mod ? (
-            // The queue count is information, not alarm (§2.4): plain
-            // secondary text, "Clear" in success when empty, and the
-            // one red dot reserved for open CRITICAL cases, where a
-            // delay is itself a harm.
-            <Link
-              role="menuitem"
-              href="/mod"
-              onClick={() => setOpen(false)}
-              className="flex min-h-11 items-center gap-3 px-4 text-body text-text-primary hover:bg-accent-subtle"
-            >
-              <span className="relative">
-                <ShieldCheck size={20} aria-hidden />
-                {mod.criticalCount > 0 ? (
-                  <span
-                    aria-label={`${mod.criticalCount} critical case${mod.criticalCount === 1 ? "" : "s"}`}
-                    className="absolute -right-1 -top-0.5 size-2 rounded-full bg-danger-fill"
-                  />
-                ) : null}
-              </span>
-              Moderation
-              {mod.openCount > 0 ? (
-                <span className="ml-auto text-caption text-text-secondary">
-                  {mod.openCount} open
-                </span>
-              ) : (
-                <span className="ml-auto text-caption text-success">Clear</span>
-              )}
-            </Link>
-          ) : null}
-          <Link
-            role="menuitem"
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="flex min-h-11 items-center gap-3 px-4 text-body text-text-primary hover:bg-accent-subtle"
-          >
-            <GearSix size={20} aria-hidden /> Settings
-          </Link>
-          {isOwner ? (
-            <Link
-              role="menuitem"
-              href="/owner"
-              onClick={() => setOpen(false)}
-              className="flex min-h-11 items-center gap-3 px-4 text-body text-text-primary hover:bg-accent-subtle"
-            >
-              <ShieldStar size={20} aria-hidden /> Owner tools
-            </Link>
-          ) : null}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void logOut()}
-            className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-body text-text-primary hover:bg-accent-subtle"
-          >
-            <SignOut size={20} aria-hidden /> Log out
-          </button>
-        </div>
-      ) : null}
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-label text-text-primary hover:bg-surface-raised"
-      >
-        <span
-          aria-hidden
-          className="flex size-8 items-center justify-center rounded-full bg-accent-subtle text-caption font-semibold text-accent"
-        >
-          {handle.charAt(0).toUpperCase()}
-        </span>
-        @{handle}
-        <CaretUp size={14} aria-hidden className="ml-auto" />
-      </button>
-    </div>
   );
 }
