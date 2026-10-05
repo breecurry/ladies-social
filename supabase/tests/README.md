@@ -22,6 +22,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/09-dm-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/10-discover.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/11-admin-dashboard.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/12-avatars.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/13-full-analytics.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -365,13 +366,14 @@ Covers migration 0021 (Phase 2B Part 2 — the Discover feed):
 - the **export** is identity-free (glance columns only) and lands in
   the audit log as `directory.export` with the filter set and row
   count;
-- **metrics are honest and suppression holds**: top-line totals are
-  exact while every segmented breakdown below the floor (k = 5) is
-  suppressed to `null` server-side; zeros read as real `0`s; the
-  all-time range fabricates no previous-period comparison; active
-  members is the fixed 30-day window; and the refused engagement
-  metrics (DAU/MAU, stickiness, time-on-site, streaks, leaderboards,
-  presence, virality) are structurally absent from the payload;
+- **metrics are literal**: top-line totals and every segmented
+  breakdown carry the exact count at any N (1 reads as 1 — the former
+  k=5 suppression is gone, asserted); zeros read as real `0`s; the
+  all-time range fabricates no previous-period comparison (there is no
+  prior all-time period); and the full-analytics sections
+  (engagement, sessions, presence, leaderboards, streaks, virality,
+  retention — behaviour covered by suite 12) are present in the
+  payload;
 - **deleted members are gone from every surface** — directory (even
   when asked for by explicit status filter), detail, member count, and
   the metrics headline — and the system account appears nowhere;
@@ -412,3 +414,37 @@ Covers migration 0021 (Phase 2B Part 2 — the Discover feed):
   capped per hour, single-consume and single-redeem; malformed keys
   are rejected; and **no avatar function returns or references
   `display_name`** (checked structurally against `pg_proc`).
+
+## What the full-analytics suite (13) proves
+
+Covers migration 0023 (full analytics — the owner's decision that
+every number is the literal number, plus the collection it needs):
+
+- **every number is literal**: breakdowns, leaderboards, stickiness,
+  and retention rates carry exact values at any N — a count of 1 reads
+  as 1 and a 1-of-2 cohort reads as a real 50.0;
+- **the heartbeat works and is bounded**: a member's first heartbeat
+  opens a session, repeats within the 30-minute gap extend the same
+  session, one after the gap opens a new one; direct writes to
+  `member_sessions` are refused for every app role, and RLS confines a
+  member's reads to her own sessions;
+- **departures are real recorded events**: a status change stamps
+  `deactivated_at` / `banned_at` / `deleted_at` and appends to the
+  `account_status_events` ledger; a reinstatement clears the stamp and
+  appends the return; net change is real arithmetic (joined − departed
+  + returned) and the series carries its honest tracked-since label —
+  no history is fabricated;
+- **engagement, sessions, presence**: DAU/WAU/MAU count real activity
+  over the standard fixed windows, stickiness is the real DAU/MAU
+  ratio, session durations are the real derived minutes, and presence
+  names who is online right now with a precise per-member last-seen;
+- **leaderboards, streaks, virality, retention** compute exact values
+  (most posts, likes given and received, sessions, follower growth,
+  consecutive-day streaks, likes per post, cohort shares at 1/7/30
+  days) — and every per-member entry is `@handle`-keyed, structurally
+  carrying nothing but handle and value;
+- **the privacy posture holds**: no new function references
+  `display_name`; `owner_metrics()` still raises for a non-Owner (the
+  internal active-count helper is callable by no app role); the three
+  new tables all have RLS enabled, and the ledger and tracked-since
+  tables are not even directly readable.

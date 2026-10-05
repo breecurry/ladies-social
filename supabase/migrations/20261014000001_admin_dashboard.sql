@@ -33,27 +33,12 @@
 -- precise value appears solely inside the AAL2-gated, audited
 -- identity reveal, nowhere else.
 --
--- 🚨 REFUSED METRICS — PERMANENT (spec §15, confirmed by the owner).
--- The following are deliberately NOT collected, NOT computed, and NOT
--- displayed, and must never be added to this file or its successors:
---   • time on site / session length / time in app
---   • DAU, MAU, DAU/MAU "stickiness" — any daily-engagement dial
---   • streaks, daily-return mechanics, any "come back" metric
---   • per-member engagement rankings, "power users", "most active",
---     "top posters", most-followed leaderboards
---   • "who is online now", precise per-member last-seen, presence
---   • virality / K-factor / referral coefficients
--- These dials bend a safety product toward compulsion and
--- surveillance. The product measures the community in aggregate and
--- asks "how fast do we protect people", never "how long can we hold
--- them". Do not add an engagement-maximising or per-person-ranking
--- metric here, ever.
---
--- 🚨 SMALL-N SUPPRESSION (spec §16, k = 5, enforced server-side):
--- any segmented or broken-down aggregate between 1 and k-1 leaves
--- this function as NULL with suppressed = true, never as the exact
--- number. Top-line, non-segmented totals are exempt. The floor lives
--- in one place (owner_metrics) so tuning k is a config change.
+-- NOTE (2026-10): this migration originally carried a "refused
+-- metrics" prohibition and a k=5 small-N suppression rule. Neither was
+-- ever the owner's decision — she asked for full, literal analytics —
+-- and both are removed. Migration 20261016000001 supersedes
+-- owner_metrics() below with the full-analytics version; the function
+-- body here is kept byte-identical because this file is applied.
 -- ============================================================
 set search_path = public, extensions;
 

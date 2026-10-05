@@ -282,9 +282,9 @@ do $$ declare n int; begin
 end $$;
 
 -- ============================================================
--- 6. Metrics: honest totals, segmented breakdowns suppressed below
---    the floor (k=5) while top-line totals are exempt, and the
---    refused engagement metrics are structurally absent.
+-- 6. Metrics: literal numbers everywhere (owner decision: full
+--    analytics — every count is the exact count, at any N), and the
+--    full-analytics sections are present in the payload.
 -- ============================================================
 do $$ declare m jsonb; e jsonb; begin
   m := owner_metrics('30d');
@@ -292,40 +292,39 @@ do $$ declare m jsonb; e jsonb; begin
   if (m -> 'total_members' ->> 'value')::int <> 4 then
     raise exception 'FAIL: total members should be 4, got %', m -> 'total_members' ->> 'value';
   end if;
-  -- Segmented breakdown: active = 4 members < 5 → suppressed.
+  -- Segmented breakdown: active = 4, shown as the literal 4. Small
+  -- counts are never suppressed, nulled, or floored.
   select x into e from jsonb_array_elements(m -> 'total_members' -> 'breakdown') x
-   where x ->> 'status' = 'active';
-  if (e ->> 'suppressed')::boolean is distinct from true or e -> 'count' <> 'null'::jsonb then
-    raise exception 'FAIL: a sub-floor breakdown was not suppressed: %', e;
+   where x ->> 'label' = 'active';
+  if (e ->> 'count')::int <> 4 then
+    raise exception 'FAIL: breakdown must carry the exact count, got %', e;
   end if;
-  if (m ->> 'suppression_floor')::int <> 5 then
-    raise exception 'FAIL: suppression floor is not 5';
+  if m ? 'suppression_floor' then
+    raise exception 'FAIL: the suppression floor must be gone from the payload';
   end if;
   -- Signups in the window = all 4 (everyone just joined).
   if (m -> 'signups' ->> 'value')::int <> 4 then
     raise exception 'FAIL: signups in range';
   end if;
-  -- Active members (fixed 30d window): ada logged in; others have
-  -- no qualifying action except bea (45d ago, outside the window).
+  -- Active members (30d window): ada logged in; others have no
+  -- qualifying action except bea (45d ago, outside the window).
   if (m -> 'active_members' ->> 'value')::int <> 1 then
     raise exception 'FAIL: active members should be 1, got %', m -> 'active_members' ->> 'value';
-  end if;
-  if (m -> 'active_members' ->> 'window_days')::int <> 30 then
-    raise exception 'FAIL: active members must be the fixed 30-day window';
   end if;
   -- Zero states are real values, not absences.
   if (m -> 'reports_filed' ->> 'value')::int <> 0
      or (m -> 'enforcement_actions' ->> 'value')::int <> 0 then
     raise exception 'FAIL: zero metrics must read as 0';
   end if;
-  -- The REFUSED metrics are absent by name, now and forever.
-  if m ? 'dau' or m ? 'mau' or m ? 'stickiness' or m ? 'time_on_site'
-     or m ? 'session_length' or m ? 'streaks' or m ? 'top_posters'
-     or m ? 'most_active' or m ? 'online_now' or m ? 'presence'
-     or m ? 'k_factor' or m ? 'virality' then
-    raise exception 'FAIL: a refused engagement metric has appeared';
+  -- The full-analytics sections are PRESENT (suite 13 exercises their
+  -- behaviour; this asserts the payload shape).
+  if not (m ? 'engagement' and m ? 'sessions' and m ? 'presence'
+          and m ? 'leaderboards' and m ? 'streaks' and m ? 'virality'
+          and m ? 'retention') then
+    raise exception 'FAIL: a full-analytics section is missing from the payload';
   end if;
-  -- 'all' range carries no previous-period comparison.
+  -- 'all' range carries no previous-period comparison (there is no
+  -- prior all-time period; that is arithmetic, not a withheld number).
   m := owner_metrics('all');
   if (m -> 'signups' -> 'previous') <> 'null'::jsonb then
     raise exception 'FAIL: all-time must not fabricate a comparison';
