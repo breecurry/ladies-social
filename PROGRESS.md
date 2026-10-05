@@ -17,11 +17,9 @@ Migration `20261014000001` (admin dashboard) **is applied to the live
 project** (Grove, 2026-10-09; three idempotent runs, verified in the live
 schema): `/owner/members` and `/owner/insights` are live.
 
-Next, in order: **apply migrations `20261015000001` (avatars) and
-`20261016000001` (full analytics) to the live project** — both are written,
-tested, and on main, and neither exists in production until Grove applies
-them (write-then-review protocol, same as every migration) → **R2 buckets +
-media-zone env for avatars** (see "Where things stand") → **Grove-Test**
+All migrations through `20261016000001` are applied to the live project.
+Next, in order: **enable R2 and configure the media zone + env for avatars**
+(see "Where things stand") → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
 the Owner's MFA enrolment → counsel sign-off, then flip `published: true`
 in `src/lib/legal.ts` (one line per document).
@@ -128,13 +126,20 @@ the safety model as the spine:
   any filename column, and the structural absence of `display_name` from
   every avatar function. `tests/13` and all earlier suites still pass.
 
-⚠️ **Migration `20261015000001_avatars.sql` is written, tested (fresh
-apply + re-run clean three times, including a re-run after the later
-`20261016000001` was applied), and NOT yet applied to the live project.**
-Until Grove applies it, every avatar RPC errors and every surface renders
-the letter placeholder; nothing crashes. New tables `avatar_media` and
-`avatar_upload_tickets` carry RLS with zero policies; the
-0-tables-without-RLS invariant holds.
+✅ **Migration `20261015000001_avatars.sql` was APPLIED to the live project
+by Grove on 2026-10-09** — HTTP 201, re-run twice more clean to prove
+idempotency against production. Verified in the live schema (not the
+migration file): `avatar_media` and `avatar_upload_tickets` both exist with
+RLS enabled and zero policies (functions-only lockdown); `avatar_keys()`
+uses the bidirectional `blocked_either` and does NOT use `blocked_by`, so a
+block hides the photo in both directions; zero avatar functions reference
+`display_name`; the database still has 0 tables without RLS and 0 unpinned
+SECURITY DEFINER functions. The migration also revoked the migration-0009
+column grant that had let members write `profiles.avatar_media_key` directly
+through PostgREST, bypassing the ingest pipeline and the evidence trail —
+verified: `authenticated` now holds no UPDATE privilege on that column.
+⚠️ The feature still renders letter placeholders everywhere until the R2
+storage prerequisites below are met. That is storage, not schema.
 
 ⚠️ **Avatars need infrastructure before the feature is live** (the code
 degrades to letter placeholders until then): two R2 buckets (staging +
@@ -197,9 +202,17 @@ Roles, Audit log, and Age gate:
   erasure.
 
 Migration `20261014000001_admin_dashboard.sql` **is applied to the live
-project** (2026-10-09). ⚠️ **Migration `20261016000001_full_analytics.sql`
-is written, tested (fresh apply over all 24 migrations + repeated re-run
-clean, suites 01-13 green), and NOT yet applied to the live project.** It
+project** (2026-10-09). ✅ **Migration `20261016000001_full_analytics.sql` was APPLIED to the live
+project by Grove on 2026-10-09** — HTTP 201, re-run twice more clean to prove
+idempotency against production. Verified in the live schema: `owner_metrics()`
+contains no suppression logic of any kind and is still Owner-gated via
+`is_owner()`; `member_sessions`, `account_status_events` and
+`analytics_collection` all exist with RLS enabled; `profiles` carries the
+`deactivated_at`, `banned_at` and `deleted_at` departure stamps, so net change
+can genuinely go down by one; `analytics_collection` is seeded with
+tracked-since rows for `sessions` and `departures`; zero new functions
+reference `display_name`; the database still has 0 tables without RLS and 0
+unpinned SECURITY DEFINER functions. It
 supersedes `owner_metrics()`, adds the collection the new metrics need —
 `member_sessions` (client heartbeat via `session_heartbeat()`, RLS
 own-rows-read, function-only writes), `account_status_events` plus
