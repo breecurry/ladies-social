@@ -11,7 +11,7 @@ export type AccountStatus =
   "active" | "restricted" | "suspended" | "banned" | "deactivated" | "deleted";
 export type ReplyControl = "everyone" | "followed" | "mentioned";
 export type PostVisibility = "visible" | "pending_scan" | "removed_moderation" | "removed_author";
-export type ReportSubject = "post" | "user";
+export type ReportSubject = "post" | "user" | "message";
 export type ReportReason =
   | "harassment"
   | "hate"
@@ -25,7 +25,9 @@ export type ReportReason =
   | "other";
 export type ReportStatus = "open" | "in_review" | "actioned" | "dismissed" | "escalated";
 export type ReportRouting = "standard" | "admin_only" | "owner_conflict";
-export type NotifType = "follow" | "like" | "reply" | "mention" | "system";
+export type NotifType = "follow" | "like" | "reply" | "mention" | "system" | "message";
+export type DmConversationState = "request" | "accepted";
+export type DmRequestPolicy = "everyone" | "followed" | "no_one";
 export type ModAction =
   | "dismiss"
   | "warn"
@@ -397,6 +399,87 @@ export type MyAccountStatus = {
   last_action_at: string | null;
 };
 
+// ---------------------------------------------------------------
+// Direct messages (Phase 2C). The server stores ciphertext only;
+// bytea travels as "\x"-prefixed hex over PostgREST.
+// ---------------------------------------------------------------
+
+/** Messages settings row (absent row = these defaults). */
+export type DmSettingsRow = {
+  user_id: string;
+  requests_from: DmRequestPolicy;
+  dms_enabled: boolean;
+  read_receipts: boolean;
+  updated_at: string;
+};
+
+/** The member's own active device, from dm_my_device(). */
+export type DmMyDevice = {
+  device_id: string;
+  identity_key: string;
+  created_at: string;
+  prekeys_remaining: number;
+};
+
+/** A prekey bundle for session setup, from dm_prekey_bundle(). */
+export type DmPrekeyBundle = {
+  device_id: string;
+  identity_key: string;
+  signed_prekey: string;
+  signed_prekey_sig: string;
+  prekey_id: number | null;
+  prekey: string | null;
+};
+
+/** One inbox row, from dm_list_conversations(). @handle only, ever. */
+export type DmConversationRow = {
+  conversation_id: string;
+  correspondent_id: string;
+  correspondent_handle: string;
+  state: DmConversationState;
+  is_initiator: boolean;
+  muted: boolean;
+  cleared_before: string | null;
+  last_message_at: string;
+  unread_count: number;
+  my_last_read_at: string | null;
+  peer_read_at: string | null;
+};
+
+/** The result row of dm_send_message(). */
+export type DmSendResult = {
+  message_id: number;
+  conversation_id: string;
+  conversation_state: DmConversationState;
+  sent_at: string;
+};
+
+/** One ciphertext row, from dm_fetch_messages(). */
+export type DmWireMessage = {
+  id: number;
+  sender_id: string;
+  sender_handle: string;
+  sender_device_id: string;
+  recipient_device_id: string;
+  header: Json;
+  ciphertext: string;
+  frank_hash: string;
+  sent_at: string;
+};
+
+/** One evidence row in the console transcript, from mod_dm_evidence(). */
+export type ModDmEvidenceRow = {
+  report_id: string;
+  reason: ReportReason;
+  report_status: ReportStatus;
+  reported_at: string;
+  message_id: number;
+  sender_handle: string;
+  plaintext: string;
+  verified: boolean;
+  sent_at: string;
+};
+
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -424,6 +507,7 @@ export type Database = {
       moderation_actions: TableDef<ModerationActionRow>;
       safety_email_outbox: TableDef<SafetyEmailOutboxRow>;
       age_gate_blocks: TableDef<AgeGateBlockRow>;
+      dm_settings: TableDef<DmSettingsRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -623,6 +707,58 @@ export type Database = {
         Args: { p_user_id: string; p_version: string };
         Returns: boolean;
       };
+      dm_feature_enabled: { Args: Record<string, never>; Returns: boolean };
+      dm_register_device: {
+        Args: {
+          p_device_name: string;
+          p_identity_key: string;
+          p_signed_prekey: string;
+          p_signed_prekey_sig: string;
+          p_prekeys: string[];
+        };
+        Returns: string;
+      };
+      dm_add_prekeys: { Args: { p_prekeys: string[] }; Returns: number };
+      dm_my_device: { Args: Record<string, never>; Returns: DmMyDevice[] };
+      dm_can_message: { Args: { p_user: string }; Returns: string };
+      dm_prekey_bundle: { Args: { p_user: string }; Returns: DmPrekeyBundle[] };
+      dm_send_message: {
+        Args: {
+          p_recipient: string;
+          p_recipient_device: string;
+          p_header: Json;
+          p_ciphertext: string;
+          p_frank_hash: string;
+        };
+        Returns: DmSendResult[];
+      };
+      dm_accept_request: { Args: { p_conversation: string }; Returns: undefined };
+      dm_decline_request: { Args: { p_conversation: string }; Returns: undefined };
+      dm_delete_conversation: { Args: { p_conversation: string }; Returns: undefined };
+      dm_set_muted: {
+        Args: { p_conversation: string; p_muted: boolean };
+        Returns: undefined;
+      };
+      dm_mark_read: { Args: { p_conversation: string }; Returns: undefined };
+      dm_list_conversations: {
+        Args: { p_requests?: boolean };
+        Returns: DmConversationRow[];
+      };
+      dm_unread_total: { Args: Record<string, never>; Returns: number };
+      dm_fetch_messages: {
+        Args: { p_conversation: string; p_after_id?: number | null; p_limit?: number };
+        Returns: DmWireMessage[];
+      };
+      file_dm_report: {
+        Args: {
+          p_conversation: string;
+          p_reason: ReportReason;
+          p_details?: string | null;
+          p_evidence: Json;
+        };
+        Returns: string;
+      };
+      mod_dm_evidence: { Args: { p_target: string }; Returns: ModDmEvidenceRow[] };
     };
     Enums: {
       system_role: SystemRole;
@@ -636,6 +772,8 @@ export type Database = {
       report_routing: ReportRouting;
       notif_type: NotifType;
       mod_action: ModAction;
+      dm_conversation_state: DmConversationState;
+      dm_request_policy: DmRequestPolicy;
     };
     CompositeTypes: Record<string, never>;
   };

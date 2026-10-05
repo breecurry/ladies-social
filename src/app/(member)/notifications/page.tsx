@@ -19,6 +19,8 @@ function describe(item: NotificationItem): string {
       return "replied to your post";
     case "mention":
       return "mentioned you";
+    case "message":
+      return "sent you a message";
     case "system":
       return "Hersciety";
   }
@@ -79,7 +81,11 @@ export default async function NotificationsPage() {
               </div>
             </div>
           );
-          return item.post_id !== null ? (
+          return item.type === "message" ? (
+            <Link key={item.id} href="/messages">
+              {row}
+            </Link>
+          ) : item.post_id !== null ? (
             <Link key={item.id} href={`/post/${item.post_id}`}>
               {row}
             </Link>
