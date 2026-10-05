@@ -25,7 +25,18 @@ export type ReportReason =
   | "other";
 export type ReportStatus = "open" | "in_review" | "actioned" | "dismissed" | "escalated";
 export type ReportRouting = "standard" | "admin_only" | "owner_conflict";
-export type NotifType = "follow" | "like" | "reply" | "mention" | "system" | "message";
+export type NotifType =
+  | "follow"
+  | "like"
+  | "reply"
+  | "mention"
+  | "system"
+  | "message"
+  | "reshare"
+  | "quote";
+export type TagStatus = "active" | "detrended" | "blocked";
+/** "Who can mention you" (Phase 2F §12). Default: everyone (owner decision). */
+export type MentionPolicy = "everyone" | "followed" | "no_one";
 export type DmConversationState = "request" | "accepted";
 export type DmRequestPolicy = "everyone" | "followed" | "no_one";
 export type ModAction =
@@ -58,6 +69,9 @@ export type ProfileRow = {
    * @handle search and existing-follower visibility are unaffected.
    */
   discoverable: boolean;
+  /** "Who can mention you" (Phase 2F §12). Gates both the mention
+   * notification and mentioned-participant status at post time. */
+  mention_policy: MentionPolicy;
   /** Departure timestamps (migration 0023): non-null exactly while the
    * account is in that state. History lives in account_status_events. */
   deactivated_at: string | null;
@@ -175,10 +189,20 @@ export type PostRow = {
   reply_control: ReplyControl;
   like_count: number;
   reply_count: number;
+  reshare_count: number;
+  quoted_post_id: number | null;
   visibility: PostVisibility;
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
+};
+
+/** One plain repost (Phase 2F). Own-row RLS; the trigger maintains
+ * posts.reshare_count and the 'reshare' notification. */
+export type ReshareRow = {
+  user_id: string;
+  post_id: number;
+  created_at: string;
 };
 
 export type LikeRow = {
@@ -327,7 +351,32 @@ export type AgeGateBlockResult = {
   expires_at: string;
 };
 
-/** Row shape returned by feed_following(). Identity is the handle ONLY. */
+/** One resolved mention returned with a post (Phase 2F §10): the
+ * stored member id plus her CURRENT handle, filtered server-side to
+ * reachable, unblocked accounts. The client links exactly these
+ * tokens and renders every other @-shaped string as plain text. */
+export type ResolvedMention = { user_id: string; handle: string };
+
+/** The embedded card of a quote-post. The unavailable stub carries
+ * nothing — not the author, not the reason. */
+export type QuotedCard =
+  | { unavailable: true }
+  | {
+      unavailable: false;
+      id: number;
+      author_id: string;
+      handle: string;
+      founding: boolean;
+      body: string;
+      created_at: string;
+    };
+
+/**
+ * Row shape returned by feed_following(). Identity is the handle ONLY.
+ * The Phase 2F fields are optional so the client degrades gracefully
+ * while the deployed code is ahead of the un-applied migration (the
+ * standing deploy-before-migrate rule in KNOWLEDGE/app.md).
+ */
 export type FeedPost = {
   id: number;
   author_id: string;
@@ -339,6 +388,17 @@ export type FeedPost = {
   reply_count: number;
   viewer_liked: boolean;
   created_at: string;
+  reshare_count?: number;
+  viewer_reshared?: boolean;
+  viewer_follows?: boolean;
+  /** The feed cursor: the repost time when the row surfaced via a
+   * repost, otherwise the post time. */
+  sort_at?: string;
+  /** Handles of the followed members whose reposts surfaced this row,
+   * newest first; empty when the row is the author's own appearance. */
+  reshared_by?: string[] | null;
+  mentions?: ResolvedMention[] | null;
+  quoted?: QuotedCard | null;
 };
 
 /**
@@ -363,12 +423,40 @@ export type ThreadPost = {
   viewer_liked: boolean;
   unavailable: boolean;
   created_at: string;
+  reshare_count?: number;
+  viewer_reshared?: boolean;
+  mentions?: ResolvedMention[] | null;
+  quoted?: QuotedCard | null;
 };
 
 /** Row shape returned by profile_posts(). */
 export type ProfilePost = FeedPost & {
+  /** True when this row is the member's repost of someone else's post. */
+  is_reshare?: boolean;
   parent_author_handle: string | null;
   parent_excerpt: string | null;
+};
+
+/** One tag row from search_tags() or the trending read. */
+export type TagSearchRow = { tag: string; post_count: number };
+
+/** The tag-page header from get_tag(). */
+export type TagHeaderRow = { tag: string; status: TagStatus; post_count: number };
+
+/** One trending row from get_trending_tags(): a real distinct-person
+ * count, shown literally however small (owner rule: 1 is 1). */
+export type TrendingTagRow = { tag: string; distinct_people: number };
+
+/** One staff row from mod_tag_lookup(). new_account_share is the
+ * brigade signal: the share of the 48-hour window's participants
+ * whose accounts are under seven days old — information for a human,
+ * never an automatic action. */
+export type ModTagRow = {
+  tag: string;
+  status: TagStatus;
+  post_count: number;
+  people_48h: number;
+  new_account_share: number;
 };
 
 /** Row shape returned by search_people() and the follow lists. */
@@ -660,6 +748,7 @@ export type Database = {
       hidden_accounts: TableDef<HiddenAccountRow>;
       posts: TableDef<PostRow>;
       likes: TableDef<LikeRow>;
+      reshares: TableDef<ReshareRow>;
       reports: TableDef<ReportRow>;
       notifications: TableDef<NotificationRow>;
       notification_prefs: TableDef<NotificationPrefsRow>;
@@ -729,7 +818,12 @@ export type Database = {
       revoke_role: { Args: { p_target: string; p_role: SystemRole }; Returns: undefined };
       set_display_name_visibility: { Args: { p_show: boolean }; Returns: undefined };
       create_post: {
-        Args: { p_body: string; p_parent?: number | null; p_reply_control?: ReplyControl };
+        Args: {
+          p_body: string;
+          p_parent?: number | null;
+          p_reply_control?: ReplyControl;
+          p_quote?: number | null;
+        };
         Returns: number;
       };
       delete_post: { Args: { p_post: number }; Returns: undefined };
@@ -752,6 +846,25 @@ export type Database = {
         Returns: DiscoverPost[];
       };
       suggested_accounts: { Args: { p_limit?: number }; Returns: PersonRow[] };
+      get_tag: { Args: { p_tag: string }; Returns: TagHeaderRow[] };
+      feed_hashtag: {
+        Args: {
+          p_tag: string;
+          p_before?: string | null;
+          p_limit?: number;
+          p_before_id?: number | null;
+        };
+        Returns: FeedPost[];
+      };
+      search_tags: { Args: { p_query: string; p_limit?: number }; Returns: TagSearchRow[] };
+      get_trending_tags: { Args: { p_limit?: number }; Returns: TrendingTagRow[] };
+      mod_tag_lookup: {
+        Args: { p_query?: string | null; p_limit?: number };
+        Returns: ModTagRow[];
+      };
+      mod_detrend_tag: { Args: { p_tag: string; p_note?: string | null }; Returns: undefined };
+      mod_block_tag: { Args: { p_tag: string; p_note?: string | null }; Returns: undefined };
+      mod_reinstate_tag: { Args: { p_tag: string; p_note?: string | null }; Returns: undefined };
       get_thread: { Args: { p_post: number }; Returns: ThreadPost[] };
       profile_posts: {
         Args: {
@@ -977,6 +1090,8 @@ export type Database = {
       report_routing: ReportRouting;
       notif_type: NotifType;
       mod_action: ModAction;
+      tag_status: TagStatus;
+      mention_policy: MentionPolicy;
       dm_conversation_state: DmConversationState;
       dm_request_policy: DmRequestPolicy;
     };

@@ -45,7 +45,12 @@ export default async function ModQueuePage({
   return (
     <div className="flex flex-col">
       <header className="flex flex-col gap-3 border-b border-border bg-surface px-4 py-4">
-        <h1 className="text-title text-text-primary">Reports</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-title text-text-primary">Reports</h1>
+          <Link href="/mod/tags" className="text-label text-accent hover:underline">
+            Topics
+          </Link>
+        </div>
         {counts ? (
           <p className="text-body text-text-secondary">
             {counts.open_count} open, {counts.critical_count} critical, {counts.in_review_count} in

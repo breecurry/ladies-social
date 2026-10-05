@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChatCircle, Heart } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { ReplyControl } from "@/lib/database.types";
+import type { ReplyControl, ResolvedMention, QuotedCard } from "@/lib/database.types";
 import { relativeTime, fullTimestamp } from "@/lib/format";
 import { Avatar, type AvatarSize } from "@/components/Avatar";
 import { FollowControl } from "@/components/follow/FollowControl";
@@ -26,6 +26,11 @@ export interface PostCardData {
   reply_count: number;
   viewer_liked: boolean;
   created_at: string;
+  /** Phase 2F fields; optional so pre-migration rows degrade gracefully. */
+  reshare_count?: number;
+  viewer_reshared?: boolean;
+  mentions?: ResolvedMention[] | null;
+  quoted?: QuotedCard | null;
 }
 
 /**
@@ -188,7 +193,7 @@ export function PostCard({
         ) : null}
       </div>
 
-      <PostBody body={post.body} />
+      <PostBody body={post.body} mentions={post.mentions ?? null} />
 
       {variant === "root" ? (
         <p className="text-caption text-text-tertiary">{fullTimestamp(post.created_at)}</p>

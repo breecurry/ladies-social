@@ -19,6 +19,10 @@ function describe(item: NotificationItem): string {
       return "replied to your post";
     case "mention":
       return "mentioned you";
+    case "reshare":
+      return "reposted your post";
+    case "quote":
+      return "quoted your post";
     case "message":
       return "sent you a message";
     case "system":
