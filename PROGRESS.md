@@ -1,6 +1,28 @@
-# PROGRESS: United Feminist
+# PROGRESS: Herciety
 
 Updated: 2026-10-06
+
+## Naming (decided 2026-10-06; do not re-litigate)
+
+Three layers, each with its own name. Confusing them breaks things:
+
+- **Herciety is the product brand and the canonical domain.** Everything a
+  user reads says Herciety, and the app lives at **herciety.com**.
+- **United Feminist is the company.** unitedfeminist.com is the secondary
+  domain and redirects to herciety.com, but it **still owns all email**: the
+  four live contact aliases (safety@ / appeals@ / support@ / legal@
+  unitedfeminist.com) and the transactional sender address stay put, because
+  they are routed, working, named by address in the legal documents, and the
+  email provider's DKIM is verified for unitedfeminist.com only.
+- **Curry Co LLC (Tennessee) is the legal entity.** Legal documents read
+  "Herciety, a service operated by Curry Co LLC."
+
+**WEBAUTHN_RP_ID changed to `herciety.com` in the same pass (2026-10-06).**
+This was safe only because the database was rebuilt the same day, has exactly
+two accounts, and has never been deployed: a relying-party ID is effectively
+permanent once members hold passkeys, because changing it invalidates every
+one of them. If the Owner enrolled a passkey before this change, she must
+re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
@@ -84,7 +106,7 @@ groundwork), the age gate screens (spec §17), reshares/quotes (schema
 arrives additively with the feature), image upload of any kind (hard-
 gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
 
-## Deployment (going live on unitedfeminist.com)
+## Deployment (going live on herciety.com)
 
 **Host: Vercel** (first-party Next.js 16; `src/middleware.ts` auth gate runs
 natively on every protected prefix). **DNS: Cloudflare in DNS-only / grey-cloud
@@ -92,8 +114,9 @@ mode** for the app records — Vercel issues and renews the Let's Encrypt
 certificate and does the HTTP→HTTPS redirect itself. Do **not** turn on
 Cloudflare's orange-cloud proxy in front of Vercel at launch: it interferes with
 certificate issuance and blinds Vercel's firewall. Canonical hostname is the
-apex `unitedfeminist.com` (matches the provisioned Supabase `site_url`); `www`
-301/308-redirects to it via Vercel domain settings.
+apex `herciety.com` (set the Supabase `site_url` to match); `www`
+301/308-redirects to it via Vercel domain settings, and the secondary
+`unitedfeminist.com` redirects to `herciety.com` as well.
 
 Runtime env vars on the host (server-only unless `NEXT_PUBLIC_`):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
@@ -237,7 +260,8 @@ export to S3 Object Lock.
 
 - [ ] Attorney review of the Terms and Guidelines (after the open-registration
       revision)
-- [ ] Trademark search on "United Feminist"
+- [ ] Trademark search on "Herciety" (the earlier "United Feminist" name was
+      never cleared either)
 - [ ] NCMEC CyberTipline registration, required **before** any image upload ships
 - [ ] PhotoDNA application, free, roughly a week's lead time
 - [ ] Name the external contact who receives reports about the Owner account

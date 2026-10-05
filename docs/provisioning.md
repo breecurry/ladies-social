@@ -1,4 +1,4 @@
-# Provisioning a Supabase project for United Feminist
+# Provisioning a Supabase project for Herciety
 
 Nothing in this product runs until a Supabase project exists. This document
 describes the **one-command** path to a fully configured project, and — honestly
@@ -57,11 +57,11 @@ Set these in your shell before running. **Values are never committed or printed.
 | `OWNER_DOB` | **yes** | Owner date of birth, `YYYY-MM-DD` (18+). |
 | `OWNER_PHONE` | no | Owner phone in E.164 (`+1…`), optional. |
 | `SUPABASE_ORG_SLUG` | no | Which organization to create the project in. Auto-detected if you belong to exactly one; required if you belong to several. Find it in the dashboard org URL `…/org/<slug>`. |
-| `SUPABASE_PROJECT_NAME` | no | Defaults to `United Feminist`. |
+| `SUPABASE_PROJECT_NAME` | no | Defaults to `United Feminist` — the hosted project's actual name. The script reuses an existing project by exact name, so changing this creates a duplicate project. |
 | `SUPABASE_REGION` | no | Defaults to `us-east-1` (US launch). |
 | `SUPABASE_INSTANCE_SIZE` | no | Defaults to `micro` (the compute the Pro plan includes). Needs a Pro org. |
-| `SITE_URL` | no | Defaults to `https://unitedfeminist.com`. Sets the auth Site URL and redirect allow-list. |
-| `WEBAUTHN_RP_ID` | no | Defaults to `unitedfeminist.com`. The WebAuthn Relying-Party ID — **permanent once set**. |
+| `SITE_URL` | no | Defaults to `https://herciety.com` (the canonical domain). Sets the auth Site URL and redirect allow-list. |
+| `WEBAUTHN_RP_ID` | no | Defaults to `herciety.com`. The WebAuthn Relying-Party ID — **permanent once members hold passkeys** (changing it then invalidates all of them). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_ADMIN_EMAIL`, `SMTP_SENDER_NAME` | strongly recommended | Custom SMTP (Resend). Without these, email confirmation stays **on** (as required) but the built-in mailer only sends to org-team addresses at ~2/hour — fine for your own first login, useless for public signups. Create a Resend SMTP credential in the Resend dashboard. |
 
 Run it:

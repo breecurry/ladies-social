@@ -1,8 +1,14 @@
-# United Feminist — Technical Architecture, Data Model & Phased Delivery Plan
+# Herciety — Technical Architecture, Data Model & Phased Delivery Plan
 
 **Status:** Living blueprint. Phase 1 (identity, open signup, roles, audit) is built and migrated; everything from §2's social schema onward is planned, not built. Where this document and `supabase/migrations/` disagree, the migrations are authoritative.
-**Date:** 2026-10-01 (membership model updated 2026-10-02)
-**Scope:** unitedfeminist.com, a social platform built as a safe space for women and their allies (Threads-class feature set). **Open registration: everyone is welcome, no invite, no vouch, no approval queue, no gender screening of any kind.** Enforcement is conduct-based and after the fact: bullying and harassment are banable offenses, and the Owner can ban any account including new accounts a banned person creates (ban-evasion detection is load-bearing). 18+, real name collected but displayed only by opt-in / @handle in feed, DMs with photo upload in V1, mobile-first responsive web, native apps later off the same API.
+**Date:** 2026-10-01 (membership model updated 2026-10-02; rebranded to Herciety 2026-10-06)
+**Naming model (owner decision 2026-10-06 — three layers, do not merge or "fix" them):**
+
+- **Herciety is the product brand AND the canonical domain.** Everything a user reads says Herciety, and the app's canonical origin is **herciety.com**. `WEBAUTHN_RP_ID` is `herciety.com` (changed 2026-10-06 while the database held only two accounts and nothing was deployed; it is permanent from the moment members hold passkeys).
+- **United Feminist is the company.** unitedfeminist.com is the secondary domain and redirects to herciety.com, but it **still owns all email**: safety@ / appeals@ / support@ / legal@ unitedfeminist.com are live and routed, the legal documents name them by address, and the email provider's DKIM is verified for unitedfeminist.com only. Do not move email to herciety.com without re-verifying DKIM and revising the legal documents.
+- **Curry Co LLC (Tennessee) is the legal entity.** Legal documents read "Herciety, a service operated by Curry Co LLC."
+
+**Scope:** herciety.com, a social platform built as a safe space for women and their allies (Threads-class feature set). **Open registration: everyone is welcome, no invite, no vouch, no approval queue, no gender screening of any kind.** Enforcement is conduct-based and after the fact: bullying and harassment are banable offenses, and the Owner can ban any account including new accounts a banned person creates (ban-evasion detection is load-bearing). 18+, real name collected but displayed only by opt-in / @handle in feed, DMs with photo upload in V1, mobile-first responsive web, native apps later off the same API.
 
 This document builds on, and does not contradict, the locked decisions in the project memory files (`ladiessocial-project.md`, `ladiessocial-security-architecture.md`, `ladiessocial-e2e-and-roles.md`, `ladiessocial-design-system.md`). The design system is complete and is built-to, not redesigned.
 
@@ -64,8 +70,8 @@ Cloudflare caches static assets and public media; Next.js caches rendered output
 **Hosting: Vercel Pro ($20/mo) — over Netlify and Cloudflare Pages.**
 Next.js is Vercel's own framework; the sharp-based image processing in route handlers, cron invocation, and preview deployments all work with zero configuration. Netlify ($19/mo) is an acceptable substitute; Cloudflare Pages/Workers is cheapest but its runtime cannot run `sharp` (native binary) which the EXIF-strip pipeline needs. Critical cost rule enforced by architecture: **no media bytes ever flow through Vercel** (no Next/Image optimizer, no proxying) — HTML/JSON only, which keeps Vercel comfortably inside its included 1TB transfer at every scale modeled here. Set Vercel spend management alerts + pause threshold on day one (it is not on by default).
 
-**CDN: Cloudflare (Free plan to start), proxying `unitedfeminist.com` and `media.unitedfeminist.com`.**
-Mandatory, already decided, and the domain is already registered with Cloudflare. The free plan includes the CSAM scanning tool (all plans), DDoS mitigation, and WAF basics. Cloudflare Pro ($25/mo) is an optional later upgrade (better WAF rules, image polish) — not required for launch.
+**CDN: Cloudflare (Free plan to start), proxying `herciety.com` and `media.herciety.com`.**
+Mandatory, already decided, and both domains are already registered with Cloudflare. The free plan includes the CSAM scanning tool (all plans), DDoS mitigation, and WAF basics. Cloudflare Pro ($25/mo) is an optional later upgrade (better WAF rules, image polish) — not required for launch.
 
 **Email (transactional — verification, security alerts, digest): Resend.** Free to 3k emails/mo (covers launch), $20/mo at 50k emails. Any equivalent (Postmark, SES) is fine; Resend has the least setup friction.
 
@@ -210,7 +216,7 @@ create table profiles (
   -- 'established' is a later trust tier (e.g. media-scan sampling).
   trust_level    trust_level not null default 'member',
   founding_member boolean not null default false,   -- badge only, zero privileges
-  is_system      boolean not null default false,    -- the "United Feminist" account
+  is_system      boolean not null default false,    -- the "Herciety" account
   status         account_status not null default 'active',
   status_expires_at timestamptz,              -- for timed restrictions/suspensions
   search_indexable boolean not null default false,  -- opt-IN to search engines
@@ -916,12 +922,12 @@ Cloudflare ──► Vercel (Next.js)
                  ├─ Supabase Auth (signup, phone OTP, MFA/AAL2, refresh rotation)
                  └─ Supabase Realtime (Broadcast; private channels authorized via RLS)
 
-media.unitedfeminist.com ──► Cloudflare (cache + CSAM scan + Worker auth for DM media) ──► R2
+media.herciety.com ──► Cloudflare (cache + CSAM scan + Worker auth for DM media) ──► R2
 ```
 
 Signup flow (open registration): email + password + legal name + date of birth + @handle → per-IP rate limit and handle availability → **ban-evasion check**: email and device-fingerprint hashes matched against `banned_identifiers`; a match is silently refused with a success-shaped, uniformly-timed response → bot pre-filter (disposable email domains, subnet velocity, profile-coherence heuristics) **auto-flags** the account but never blocks it → account created at `trust_level = 'member'`, active immediately → Supabase sends the confirmation email; the account cannot sign in until the address is confirmed. Device fingerprint hash + signup IP recorded. There is no admission step, no review queue, and no appearance or gender screening of any kind, by locked decision. Removal is conduct-based and after the fact.
 
-**Security response headers** (shipped 2026-10-06, tightened at deploy 2026-10-05, `next.config.ts`): `Referrer-Policy: no-referrer` — threat-model-critical, because a member clicking an external link planted in a post or bio must not broadcast anything to the link's owner; `strict-origin-when-cross-origin` still leaked the bare origin `https://unitedfeminist.com` (i.e. *that she is a member*) on every outbound click, so it was tightened to `no-referrer`, which sends nothing — plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a restrictive `Permissions-Policy` (camera, microphone, geolocation, payment, usb all denied). The site also ships **`X-Robots-Tag: noindex, nofollow`** plus a disallow-all `/robots.txt` and a `noindex` meta tag, all gated by the single `SITE_INDEXABLE` env flag (default off), so the platform is reachable by a direct link but not search-discoverable until moderation tooling (Phase 2B) can action a report. **CSP is a tracked follow-up**: the theme-init inline script in `layout.tsx` needs a nonce or hash first (see PROGRESS.md).
+**Security response headers** (shipped 2026-10-06, tightened at deploy 2026-10-05, `next.config.ts`): `Referrer-Policy: no-referrer` — threat-model-critical, because a member clicking an external link planted in a post or bio must not broadcast anything to the link's owner; `strict-origin-when-cross-origin` still leaked the bare origin (i.e. *that she is a member*) on every outbound click, so it was tightened to `no-referrer`, which sends nothing — plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a restrictive `Permissions-Policy` (camera, microphone, geolocation, payment, usb all denied). The site also ships **`X-Robots-Tag: noindex, nofollow`** plus a disallow-all `/robots.txt` and a `noindex` meta tag, all gated by the single `SITE_INDEXABLE` env flag (default off), so the platform is reachable by a direct link but not search-discoverable until moderation tooling (Phase 2B) can action a report. **CSP is a tracked follow-up**: the theme-init inline script in `layout.tsx` needs a nonce or hash first (see PROGRESS.md).
 
 **Hosting & edge** (deploy 2026-10-05): the app runs on **Vercel** (first-party Next.js; `src/middleware.ts` is the coarse auth gate and runs natively on every protected prefix). DNS stays on **Cloudflare in DNS-only (grey-cloud) mode** for the app records — Vercel manages the Let's Encrypt certificate and the HTTP→HTTPS redirect directly; proxying Cloudflare (orange cloud) in front of Vercel interferes with certificate issuance and is deliberately not used at launch. Media (Phase 3+) still goes R2 → Cloudflare, never through Vercel, per §1.4.
 
@@ -943,7 +949,7 @@ Signup flow (open registration): email + password + legal name + date of birth +
      e. Hive visual moderation per sampling policy (100% for new/low-trust accounts,
         sampled for established, always on report)
      f. write variants to R2 MEDIA bucket; delete staging object; scan_status='clear'
-5. Serving: media.unitedfeminist.com (Cloudflare-proxied zone)
+5. Serving: media.herciety.com (Cloudflare-proxied zone)
      • public post media: cached at edge, long Cache-Control, immutable keys
      • DM media: Cloudflare Worker validates short-lived signed token (issued only to
        conversation members) before reading R2
@@ -1116,7 +1122,7 @@ All endpoints HTTPS JSON under `/api`. Auth legend: **P** = public, **A** = auth
 | GET | /api/owner/audit-log | O ⚿ | Chained log + chain-verification status |
 | GET | /api/owner/users/{id}/contact | O ⚿ | Email/phone (each access itself audit-logged) |
 | GET | /api/owner/csam · POST /api/owner/csam/{id}/ncmec | O ⚿ | CSAM event log; record CyberTipline filing |
-| POST | /api/owner/system-notice | O ⚿ | Publish as the unblockable "United Feminist" system account |
+| POST | /api/owner/system-notice | O ⚿ | Publish as the unblockable "Herciety" system account |
 
 **Internal**
 | POST | /api/internal/jobs/drain | cron secret | pg_cron-triggered worker |
@@ -1133,7 +1139,7 @@ Owner approves this blueprint and answers the decision list (§7). Accounts prov
 *Owner + Grove orchestrating; Grove-Deploy for provisioning; Grove-Security owns the NCMEC/PhotoDNA checklist.*
 
 **Phase 1: Identity and the security skeleton** *(depends: 0)* **(BUILT, with the 2026-10-02 membership update applied)**
-Shipped: identity/roles/audit schema migrations; Supabase Auth config (30-min JWTs, refresh rotation, required email confirmation); **open signup** (no inviter field, no admission step) with ban-evasion refusal and bot-signal auto-flagging; profiles; trust levels (`member` from signup); roles tables + DB-layer enforcement + `grant_role` path; audit log with hash chaining; Owner account hardening (TOTP MFA to AAL2; WebAuthn pending Supabase support); the "United Feminist" system account; app shell with design tokens applied. The original vouch/admission gate shipped in this phase and was then removed by migrations 0011/0012 when the owner opened registration.
+Shipped: identity/roles/audit schema migrations; Supabase Auth config (30-min JWTs, refresh rotation, required email confirmation); **open signup** (no inviter field, no admission step) with ban-evasion refusal and bot-signal auto-flagging; profiles; trust levels (`member` from signup); roles tables + DB-layer enforcement + `grant_role` path; audit log with hash chaining; Owner account hardening (TOTP MFA to AAL2; WebAuthn pending Supabase support); the "Herciety" system account (bootstrapped as "United Feminist" and renamed by migration 0015); app shell with design tokens applied. The original vouch/admission gate shipped in this phase and was then removed by migrations 0011/0012 when the owner opened registration.
 Demonstrable: anyone can sign up and immediately see member surfaces; the Owner grants a moderator role from her account and the attempt from any other account fails *at the database*.
 *Grove-Code builds; Grove-Security reviews gate + roles enforcement before merge; Grove-Design supplies shell polish; Grove-Deploy CI/CD + environments.*
 
@@ -1183,7 +1189,7 @@ Demonstrable: launch-ready build; founding cohort (10–50 personally-known firs
 | 11 | **Coordinated false-report brigading** (threat model #2, amplified by the explicitly political name) | Trans members especially targeted; queue weaponized | Velocity anomaly job treats spikes as attack signal; reporter-pattern weighting; mod queue shows reporter history; Owner alerted on spikes |
 | 12 | **Open registration invites bots, spam, and ban evasion** (the gate that used to absorb this is gone, by owner decision) | Moderation load scales with abuse, not just with members; a banned harasser can try again with a fresh account | Ban-evasion blocklist checked at signup (email/device hashes, silently refused); per-IP rate limits; subnet-velocity and disposable-email auto-flagging; device fingerprinting raises the cost of return. Honest limit: fingerprinting loses to determined actors with clean devices; it raises cost, it does not make evasion impossible |
 | 13 | **Vercel/Supabase usage billing without hard caps** | Surprise invoice during a traffic spike or attack | Spend alerts + Vercel pause threshold on day one; Supabase spend cap decision made consciously at launch (cap = throttling risk, no cap = billing risk; recommend cap ON until launch, OFF with alerts after) |
-| 14 | **Trademark on "United Feminist" never cleared** (flagged in memory, still open) | Rebrand after launch is expensive and demoralizing | Owner decision #6 — search before money goes into branding |
+| 14 | **Trademark on "Herciety" never cleared** (the earlier "United Feminist" name was never cleared either; flagged in memory, still open) | Rebrand after launch is expensive and demoralizing | Owner decision #6 — search before money goes into branding |
 
 ---
 
@@ -1193,7 +1199,7 @@ Demonstrable: launch-ready build; founding cohort (10–50 personally-known firs
 
 2. **RESOLVED 2026-10-02.** Nobody is ever judged by photo, appearance, or gender to get in, because there is no admission screening at all anymore. The owner removed the gate entirely: registration is open and removal is conduct-based. The earlier warning about appearance review (the Giggle/Tickle fact pattern) stands permanently: appearance screening must never be reintroduced in any form.
 
-3. **Approve the lawyer touchpoints before launch:** (a) review of the already-drafted Terms of Service and the privacy policy, (b) sign-off on the child-safety-reporting posture before photo uploads go live, (c) a quick trademark search on "United Feminist" before money goes into branding. These are three contained engagements, not a retainer.
+3. **Approve the lawyer touchpoints before launch:** (a) review of the already-drafted Terms of Service and the privacy policy, (b) sign-off on the child-safety-reporting posture before photo uploads go live, (c) a quick trademark search on "Herciety" before money goes into branding. These are three contained engagements, not a retainer.
 
 4. **Name the outside person who receives complaints made about *you*.** If a member ever reports the Owner's own account, that report should go to someone who isn't you — typically your attorney or a trusted third party — with a tamper-proof copy kept automatically. Who is that person?
 

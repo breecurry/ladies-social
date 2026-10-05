@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# provision.sh — one-command Supabase provisioning for United Feminist.
+# provision.sh — one-command Supabase provisioning for Herciety.
 #
 # Given a Supabase personal access token (PAT) and a handful of values, this
 # creates the project, applies the migrations, turns on every security setting
@@ -120,11 +120,15 @@ info "tooling: curl, node $(node -v), supabase $(supabase --version 2>/dev/null 
 : "${OWNER_DOB:?set OWNER_DOB (YYYY-MM-DD)}"
 
 # Optional inputs with sensible, product-correct defaults.
+# PROJECT_NAME deliberately stays "United Feminist": the script finds an
+# EXISTING hosted project by exact name (step 2), and the live project is
+# named that. Changing this default would make a re-provision create a
+# duplicate project instead of reusing the real one.
 PROJECT_NAME="${SUPABASE_PROJECT_NAME:-United Feminist}"
 REGION="${SUPABASE_REGION:-us-east-1}"               # US-only launch
 INSTANCE_SIZE="${SUPABASE_INSTANCE_SIZE:-micro}"     # Pro includes one Micro
-SITE_URL="${SITE_URL:-https://unitedfeminist.com}"
-WEBAUTHN_RP_ID="${WEBAUTHN_RP_ID:-unitedfeminist.com}"
+SITE_URL="${SITE_URL:-https://herciety.com}"
+WEBAUTHN_RP_ID="${WEBAUTHN_RP_ID:-herciety.com}"
 OWNER_PHONE="${OWNER_PHONE:-}"
 
 [[ ${#SUPABASE_DB_PASSWORD} -ge 12 ]] || die "SUPABASE_DB_PASSWORD must be at least 12 characters."
@@ -284,7 +288,7 @@ if(process.env.SB_SMTP==="yes"){
   b.smtp_user=process.env.SMTP_USER;
   b.smtp_pass=process.env.SMTP_PASS;
   b.smtp_admin_email=process.env.SMTP_ADMIN_EMAIL||"no-reply@unitedfeminist.com";
-  b.smtp_sender_name=process.env.SMTP_SENDER_NAME||"United Feminist";
+  b.smtp_sender_name=process.env.SMTP_SENDER_NAME||"Herciety";
 }
 fs.writeFileSync(process.argv[1],JSON.stringify(b),{mode:0o600});
 ' "$BODY"

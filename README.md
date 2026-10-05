@@ -1,9 +1,14 @@
-# United Feminist
+# Herciety
 
 A social platform built as a safe space for women and their allies.
 Threads-like in function, its own thing in identity.
 
-> `ladies-social` is the original repo name. The product is **United Feminist**.
+> `ladies-social` is the original repo name. The product is **Herciety**.
+> Three naming layers, deliberately distinct: **Herciety** is the brand and
+> the canonical domain (herciety.com); **United Feminist** is the company,
+> whose unitedfeminist.com is the secondary domain (it redirects to
+> herciety.com) and still owns all email addresses; **Curry Co LLC** is the
+> legal entity. Do not "fix" one layer into another.
 
 ## What this is
 
@@ -80,7 +85,7 @@ npm run provision
 `pg_cron`, sets the required auth posture (30-minute JWTs, refresh-token
 rotation, mandatory email confirmation, TOTP + WebAuthn MFA), writes the app
 keys into `.env.local`, and runs `npm run bootstrap` to create the Owner and the
-"United Feminist" system account. It is idempotent and never prints a secret.
+"Herciety" system account. It is idempotent and never prints a secret.
 The env vars it needs, and the few steps that are irreducibly manual (upgrading
 the org to Pro, minting the access token), are documented in
 [`docs/provisioning.md`](docs/provisioning.md).
