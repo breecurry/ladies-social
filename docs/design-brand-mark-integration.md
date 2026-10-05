@@ -187,10 +187,12 @@ Every file to produce, with exact name, pixel dimensions, format, destination, a
 
 | File | Dimensions | Format | Fill | Background | Weight target |
 | --- | --- | --- | --- | --- | --- |
-| `public/wordmark-light.png` | 1024 x 374 | PNG, 8-bit alpha | `#6901E2` | transparent | 40 KB or less |
-| `public/wordmark-dark.png` | 1024 x 374 | PNG, 8-bit alpha | `#a78bfa` | transparent | 40 KB or less |
+| `public/wordmark-light.png` | 1024 x 265 | PNG, 8-bit alpha | `#6901E2` | transparent | 40 KB or less |
+| `public/wordmark-dark.png` | 1024 x 265 | PNG, 8-bit alpha | `#a78bfa` | transparent | 40 KB or less |
 
-Both are the full wordmark, trimmed tightly to the glyph bounds (no baked padding; clear-space is handled in layout, section 5.7), at the native 2.74:1 ratio. The 1024 px width is a generous master: the largest on-screen render is the landing hero at about 197 px, so 1024 px over-samples it comfortably and stays sharp at every placement. The dark asset is the light asset's alpha channel filled with `#a78bfa` (section 3).
+Both are the full wordmark, trimmed tightly to the glyph bounds (no baked padding; clear-space is handled in layout, section 5.7), at the native trimmed ratio (see the build-time correction below). The 1024 px width is a generous master: the largest on-screen render is the landing hero at about 278 px, so 1024 px over-samples it comfortably and stays sharp at every placement. The dark asset is the light asset's alpha channel filled with `#a78bfa` (section 3).
+
+**Build-time correction (code pass, 2026-10-05).** This manifest originally specified 1024 x 374, derived from the source canvas ratio of 2.74:1. Measurement at build time showed that ratio belongs to the padded canvas, not the glyphs: the source PNG carries a ghost halo of alpha 1-8 pixels (an export glow remnant, invisible to the eye) extending roughly 66 px above and 90 px below the visible wordmark, which poisons a naive alpha bounding box. The true tight-trimmed glyph ratio, measured at alpha greater than 8, is 1952 x 505 = 3.865:1, so the tight-trim rule above wins and the assets are 1024 x 265. The halo was zeroed in the master before resampling, so no ghost pixels are baked into the delivered assets. Rendered widths follow the true ratio: width equals about 3.86 times height (22 px tall is about 85 px wide; the hero at 72 px tall is about 278 px wide). All placements and clear-space rules in section 5 hold at these widths.
 
 **Icon set (standalone speech-bubble mark):**
 

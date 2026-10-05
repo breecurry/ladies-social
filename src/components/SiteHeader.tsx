@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/auth";
+import { BrandWordmark } from "@/components/BrandWordmark";
 
 /**
  * Public (signed-out) marketing header. Signed-in members are
@@ -15,8 +16,8 @@ export async function SiteHeader() {
         aria-label="Primary"
         className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3"
       >
-        <Link href="/" className="text-heading text-text-primary">
-          Hersciety
+        <Link href="/" className="flex items-center">
+          <BrandWordmark height={22} />
         </Link>
         <div className="flex items-center gap-1">
           {viewer ? (

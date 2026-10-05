@@ -230,6 +230,31 @@
 }
 
 @layer components {
+  /* Brand wordmark theme swap (brand-mark spec §3): which of the two
+     baked wordmark images shows. Display rules, not colour tokens; the
+     selectors mirror the token theme logic above exactly so a manual
+     [data-theme] override is honoured. */
+  .brand-wordmark .is-dark {
+    display: none;
+  }
+  .brand-wordmark .is-light {
+    display: inline-block;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .brand-wordmark .is-light {
+      display: none;
+    }
+    :root:not([data-theme="light"]) .brand-wordmark .is-dark {
+      display: inline-block;
+    }
+  }
+  [data-theme="dark"] .brand-wordmark .is-light {
+    display: none;
+  }
+  [data-theme="dark"] .brand-wordmark .is-dark {
+    display: inline-block;
+  }
+
   /* Loading placeholder (spec §11.1): skeletons for content surfaces. */
   .skeleton {
     position: relative;

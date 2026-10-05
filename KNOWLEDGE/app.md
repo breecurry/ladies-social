@@ -148,3 +148,37 @@ applies it after review.
 `supabase/tests/` 01-09 against local Postgres per tests/README.md.
 09-dm-smoke covers the DM invariants; `npm run test:dm-crypto` unit-
 tests the protocol under Node. Extend suites; never replace them.
+
+## Brand mark (integrated 2026-10-05, spec: docs/design-brand-mark-integration.md)
+
+The owner's wordmark logo is live. The authoritative design spec is
+`docs/design-brand-mark-integration.md` (measured WCAG numbers; do not
+re-derive). The facts an agent must not violate:
+
+- **Light theme wordmark fill is `#6901E2`; dark theme is `#a78bfa`**
+  (the existing dark `--accent`). Raw `#6901E2` measures 2.38:1 on the
+  dark background — never render it on dark surfaces.
+- **Logo fill ≠ UI token.** `--accent` stays `#6d28d9` (light). Do not
+  reconcile them; the whole contrast table depends on the token.
+- Assets: `public/wordmark-light.png` / `public/wordmark-dark.png`
+  (1024×265 — the spec manifest said 1024×374 by assuming the source
+  canvas ratio 2.74:1 was the glyph ratio; the true tight-trimmed glyph
+  ratio is 3.86:1, and tight trim per the spec's own "no baked padding"
+  rule won); `src/app/icon.png` (512), `apple-icon.png` (180, no
+  alpha), `favicon.ico` (48/32/16; the 16px frame has a deliberately
+  thickened tail), `opengraph-image.png` (1200×630) + its `.alt.txt`.
+  Icons are the white speech bubble (the dot over the "i") on a filled
+  `#6901E2` tile, no pre-baked corner rounding.
+- `src/components/BrandWordmark.tsx` renders the mark; the light/dark
+  swap is the `.brand-wordmark` display rules in `globals.css`, which
+  mirror the token theme selectors so manual `[data-theme]` overrides
+  are honoured. It is an `<img>`, not a CSS mask, on purpose
+  (forced-colors safety). `alt="Hersciety"` everywhere; on the landing
+  hero the image IS the `h1` text.
+- Icon/OG files are wired by Next.js **file convention** — never add an
+  `icons` or `openGraph.images` block to `layout.tsx` metadata.
+- The old root-level extensionless `hersciety` PNG was deleted when
+  these assets replaced it. Source master, if ever needed again, is in
+  git history at commit `c5554c2`.
+- Vector (SVG) source still unknown — if the owner produces one, the
+  two wordmark PNGs collapse to a single `currentColor` SVG (spec §8).

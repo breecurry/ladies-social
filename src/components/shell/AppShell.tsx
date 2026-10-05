@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useCompose } from "@/components/shell/ComposeProvider";
+import { BrandWordmark } from "@/components/BrandWordmark";
 
 /** Shown in the account menu for staff roles only (design doc §1, §2.4). */
 export interface ModMenuInfo {
@@ -80,8 +81,8 @@ export function AppShell({
         aria-label="Primary"
         className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 py-6 lg:flex"
       >
-        <Link href="/home" className="mb-4 px-3 text-heading text-text-primary">
-          Hersciety
+        <Link href="/home" className="mb-4 flex px-3">
+          <BrandWordmark height={22} />
         </Link>
         {navItems.map((item) => (
           <RailLink key={item.href} {...item} />
@@ -119,7 +120,9 @@ export function AppShell({
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 flex h-12 items-center gap-1 bg-surface px-2 shadow-sticky lg:hidden">
           {isHome ? (
-            <span className="px-2 text-heading text-text-primary">Hersciety</span>
+            <span className="flex px-2">
+              <BrandWordmark height={20} />
+            </span>
           ) : (
             <BackButton />
           )}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
+import { BrandWordmark } from "@/components/BrandWordmark";
 
 export default async function LandingPage() {
   const viewer = await getViewer();
@@ -9,7 +10,11 @@ export default async function LandingPage() {
   return (
     <div className="flex flex-col gap-8 py-12">
       <div className="flex flex-col gap-4">
-        <h1 className="text-display text-text-primary">Hersciety</h1>
+        {/* The wordmark is the page's one h1; its alt is the heading text
+            (brand-mark spec §5.4, §9.1). */}
+        <h1>
+          <BrandWordmark hero />
+        </h1>
         <p className="max-w-prose text-body-lg text-text-secondary">
           A social platform built as a safe space for women and their allies. Simple on the surface,
           genuinely sophisticated underneath. Safety is architecture here, not a settings page.

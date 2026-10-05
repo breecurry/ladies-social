@@ -10,12 +10,31 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.hersciety.com"),
   title: {
     default: "Hersciety",
     template: "%s · Hersciety",
   },
   description:
     "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
+  // The icon and Open Graph image files (src/app/icon.png, apple-icon.png,
+  // favicon.ico, opengraph-image.png) are wired automatically by the Next.js
+  // file conventions; do not add `icons` or `openGraph.images` here.
+  openGraph: {
+    type: "website",
+    siteName: "Hersciety",
+    title: "Hersciety",
+    description:
+      "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
+    url: "https://www.hersciety.com",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Hersciety",
+    description:
+      "A social platform built as a safe space for women and their allies. Open to everyone 18 and over; bullying and harassment are never tolerated.",
+  },
   // Search visibility is controlled by the single SITE_INDEXABLE flag
   // (src/lib/seo.ts), which also drives the X-Robots-Tag header and
   // /robots.txt. Default is noindex until moderation tooling ships.
