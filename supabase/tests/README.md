@@ -15,6 +15,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/02-social-smoke.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/03-adversarial-regressions.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/04-known-vulnerabilities.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/05-hardening-regressions.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/06-age-gate.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -156,3 +157,28 @@ exactly where findings 1-3 lived. 04 and 05 now exercise that calling
 pattern explicitly; keep doing so for any future SECURITY DEFINER
 helper that is (or must be) executable by `authenticated`.
 
+
+## What the age-gate suite (06) proves
+
+Covers migration 0017 (spec §17 — the account-creation age gate):
+
+- **a block can never take in a person, structurally**: `age_gate_blocks`
+  has exactly five columns (id, hashed fingerprint, reference code,
+  created_at, expires_at), and the test fails the moment a future
+  migration adds one — no email, name, DOB, or IP can ever live there;
+- `user_private.dob` is gone (the raw birth date is validated but not
+  retained) while `age_attested_at` — the derived 18+ record — remains;
+- no app role (anon/authenticated/service_role) holds any direct
+  privilege on the table; RLS is enabled with zero policies; the
+  SECURITY DEFINER functions are the only path;
+- recording is service_role-only and idempotent per device: the same
+  fingerprint keeps its code AND its expiry (re-failing does not restart
+  the 14-day clock), and every block/unblock is audit-logged by code
+  alone;
+- lookups match by fingerprint hash or by reference code, case- and
+  whitespace-insensitively; expired blocks neither match nor linger;
+- the support unlock is Owner-only (a signed-in member is refused),
+  clears exactly the quoted block, returns false on a second clear, and
+  leaves the audit chain verifying end to end;
+- `create_member()` still refuses an under-18 date at the database, no
+  matter what reaches it.

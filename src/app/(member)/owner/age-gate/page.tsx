@@ -25,10 +25,10 @@ export default async function OwnerAgeGatePage() {
         <h1 className="text-title">Age gate</h1>
         <p className="max-w-prose text-body text-text-secondary">
           A device that enters an under-18 date of birth is blocked from the signup form for 14
-          days. If someone entered the wrong date, she emails support and quotes the reference
-          code from her screen; look it up here and clear it. A block stores no name, no email,
-          and no date — only a hashed device signal, timestamps and the code — so there is
-          nothing to identify anyone by except the code she quotes.
+          days. If someone entered the wrong date, she emails support and quotes the reference code
+          from her screen; look it up here and clear it. A block stores no name, no email, and no
+          date — only a hashed device signal, timestamps and the code — so there is nothing to
+          identify anyone by except the code she quotes.
         </p>
       </div>
 

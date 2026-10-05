@@ -119,8 +119,8 @@ export function AgeGateSupport() {
 
       {searched && !block && !notice && !error ? (
         <p className="text-body text-text-secondary">
-          No block found for {searched}. It may have expired (blocks clear themselves after 14
-          days) or already been cleared.
+          No block found for {searched}. It may have expired (blocks clear themselves after 14 days)
+          or already been cleared.
         </p>
       ) : null}
 

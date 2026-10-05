@@ -72,10 +72,7 @@ export async function recordAgeGateBlock(
 
 /** Attach the block cookie to a response, expiring with the block. */
 export function setAgeGateCookie(response: NextResponse, block: AgeGateBlock): void {
-  const maxAge = Math.max(
-    0,
-    Math.floor((new Date(block.expiresAt).getTime() - Date.now()) / 1000),
-  );
+  const maxAge = Math.max(0, Math.floor((new Date(block.expiresAt).getTime() - Date.now()) / 1000));
   response.cookies.set(AGE_GATE_COOKIE, block.referenceCode, {
     httpOnly: true,
     sameSite: "lax",

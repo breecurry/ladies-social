@@ -230,7 +230,9 @@ create index idx_profiles_name_trgm   on profiles using gin (display_name gin_tr
 create table user_private (
   user_id        uuid primary key references profiles(user_id) on delete cascade,
   legal_name     text not null,
-  dob            date not null,
+  -- No dob column: the date of birth is VALIDATED at signup (18+) and
+  -- never retained (migration 0017, data minimisation). age_attested_at
+  -- below is the derived record that the gate was passed.
   email          citext not null,             -- triage copy; auth.users is authoritative
   phone_e164     text,                        -- reserved for phone verification (under evaluation)
   phone_verified_at timestamptz,
@@ -926,7 +928,7 @@ Cloudflare ──► Vercel (Next.js)
 media.hersciety.com ──► Cloudflare (cache + CSAM scan + Worker auth for DM media) ──► R2
 ```
 
-Signup flow (open registration): email + password + legal name + date of birth + @handle → per-IP rate limit and handle availability → **ban-evasion check**: email and device-fingerprint hashes matched against `banned_identifiers`; a match is silently refused with a success-shaped, uniformly-timed response → bot pre-filter (disposable email domains, subnet velocity, profile-coherence heuristics) **auto-flags** the account but never blocks it → account created at `trust_level = 'member'`, active immediately → Supabase sends the confirmation email; the account cannot sign in until the address is confirmed. Device fingerprint hash + signup IP recorded. There is no admission step, no review queue, and no appearance or gender screening of any kind, by locked decision. Removal is conduct-based and after the fact.
+Signup flow (open registration): email + password + legal name + date of birth + 18+ attestation + @handle → **age gate** (spec §17): a device under an active 14-day block meets the blocked screen, not the form; an under-18 date of birth is rejected to the §17.2 screen and soft-blocks the device (a block row is a hashed fingerprint, timestamps and a reference code — nothing identifying; the date of birth itself is validated and then discarded, never stored) → per-IP rate limit and handle availability → **ban-evasion check**: email and device-fingerprint hashes matched against `banned_identifiers`; a match is silently refused with a success-shaped, uniformly-timed response → bot pre-filter (disposable email domains, subnet velocity, profile-coherence heuristics) **auto-flags** the account but never blocks it → account created at `trust_level = 'member'`, active immediately → Supabase sends the confirmation email; the account cannot sign in until the address is confirmed. Device fingerprint hash + signup IP recorded. There is no admission step, no review queue, and no appearance or gender screening of any kind, by locked decision. Removal is conduct-based and after the fact.
 
 **Security response headers** (shipped 2026-10-06, tightened at deploy 2026-10-05, `next.config.ts`): `Referrer-Policy: no-referrer` — threat-model-critical, because a member clicking an external link planted in a post or bio must not broadcast anything to the link's owner; `strict-origin-when-cross-origin` still leaked the bare origin (i.e. *that she is a member*) on every outbound click, so it was tightened to `no-referrer`, which sends nothing — plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a restrictive `Permissions-Policy` (camera, microphone, geolocation, payment, usb all denied). The site also ships **`X-Robots-Tag: noindex, nofollow`** plus a disallow-all `/robots.txt` and a `noindex` meta tag, all gated by the single `SITE_INDEXABLE` env flag (default off), so the platform is reachable by a direct link but not search-discoverable until moderation tooling (Phase 2B) can action a report. **CSP is a tracked follow-up**: the theme-init inline script in `layout.tsx` needs a nonce or hash first (see PROGRESS.md).
 

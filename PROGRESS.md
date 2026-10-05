@@ -237,6 +237,25 @@ Default/unset = noindex (fail-safe).
       fixed in migration 0014 + app layer (see "Where things stand").
       `04-known-vulnerabilities.sql` now hard-fails on regression; new
       `05-hardening-regressions.sql` gates the fixes.
+- [x] **Phase 2B, age gate (spec §17).** Migration 0017
+      (`20261009000001_age_gate.sql`): `age_gate_blocks` — a block row is
+      a hashed device fingerprint, timestamps and a short reference code,
+      and STRUCTURALLY nothing else (no email, no name, no DOB, no IP;
+      `06-age-gate.sql` breaks if a column is ever added) — plus the
+      record/get/lookup/clear SECURITY DEFINER functions. **Data
+      minimisation: `user_private.dob` is dropped**; the 18+ check still
+      runs in the form, the signup route, and `create_member()`/
+      `bootstrap_owner()` (which keep `p_dob` for validation), but the
+      raw birth date is no longer retained anywhere — `age_attested_at`
+      is the derived record. Signup form now uses the §17.1 three-field
+      blank date-of-birth group + 18+ attestation checkbox; an under-18
+      date routes to the §17.2 rejection screen (which collects nothing)
+      and soft-blocks the device for 14 days (fingerprint hash + cookie);
+      a returning device meets the §17.3 blocked screen with its copyable
+      reference code and the support mailto. Owner support unlock at
+      `/owner/age-gate` (look up a quoted code, clear that one block);
+      authority re-checked in the database. New smoke suite
+      `06-age-gate.sql`.
 
 ## Next session, start here
 
@@ -252,10 +271,14 @@ Default/unset = noindex (fail-safe).
    now refuses to create a new project unless `SUPABASE_ALLOW_CREATE=yes` is
    passed explicitly, so a name or ref mismatch stops loudly instead of
    silently spawning a duplicate.
-2. **Phase 2B**: Discover feed (chronological, with the hide signal
-   suppressing hidden accounts) + the age gate screens (spec §17) + the
-   minimal report-review/ban tooling committed to before strangers can
-   find each other (nothing writes `banned_identifiers` yet).
+2. **Phase 2B remainder**: Discover feed (chronological, with the hide signal
+   suppressing hidden accounts) + the minimal report-review/ban tooling
+   committed to before strangers can find each other (nothing writes
+   `banned_identifiers` yet). The age gate (spec §17) is DONE — but
+   migration 0017 is **not yet applied to the live project**; the next
+   `npm run provision` (or `supabase db push`) applies it. ⚠️ 0017 drops
+   `user_private.dob` (data minimisation, see Done) — deliberate and
+   flagged; the owner's own stored DOB is removed by it too.
 3. **Legal documents need revision for open registration** (separate task):
    ToS §1.2 (references the admission process), all of §3 "Admission and the
    Vouching System" (§§3.1-3.7), §2.5 (invitation-system wording), §9.4

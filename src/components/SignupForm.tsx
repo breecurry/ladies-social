@@ -45,10 +45,7 @@ interface AgeGateResponse {
   code?: string;
 }
 
-type GateState =
-  | { kind: "form" }
-  | { kind: "rejected" }
-  | { kind: "blocked"; code: string };
+type GateState = { kind: "form" } | { kind: "rejected" } | { kind: "blocked"; code: string };
 
 export function SignupForm() {
   const [submitting, setSubmitting] = useState(false);
@@ -190,74 +187,74 @@ export function SignupForm() {
       </div>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-      {error && !field ? <Alert tone="danger">{error}</Alert> : null}
+        {error && !field ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Field
-        label="Legal name"
-        htmlFor="legalName"
-        hint="Required, but never shown publicly unless you choose to show it. Members see your @handle."
-        error={field === "legalName" ? error : null}
-      >
-        <Input id="legalName" name="legalName" autoComplete="name" required maxLength={100} />
-      </Field>
+        <Field
+          label="Legal name"
+          htmlFor="legalName"
+          hint="Required, but never shown publicly unless you choose to show it. Members see your @handle."
+          error={field === "legalName" ? error : null}
+        >
+          <Input id="legalName" name="legalName" autoComplete="name" required maxLength={100} />
+        </Field>
 
-      <Field label="Email" htmlFor="email" error={field === "email" ? error : null}>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
-      </Field>
+        <Field label="Email" htmlFor="email" error={field === "email" ? error : null}>
+          <Input id="email" name="email" type="email" autoComplete="email" required />
+        </Field>
 
-      <DateOfBirthFields value={dob} onChange={setDob} error={dobError} disabled={submitting} />
+        <DateOfBirthFields value={dob} onChange={setDob} error={dobError} disabled={submitting} />
 
-      <Field
-        label="Handle"
-        htmlFor="handle"
-        hint="3-30 characters: lowercase letters, numbers, underscores. This is what members see."
-        error={field === "handle" ? error : null}
-      >
-        <Input id="handle" name="handle" autoComplete="off" required maxLength={30} />
-      </Field>
+        <Field
+          label="Handle"
+          htmlFor="handle"
+          hint="3-30 characters: lowercase letters, numbers, underscores. This is what members see."
+          error={field === "handle" ? error : null}
+        >
+          <Input id="handle" name="handle" autoComplete="off" required maxLength={30} />
+        </Field>
 
-      <Field
-        label="Password"
-        htmlFor="password"
-        hint="At least 10 characters."
-        error={field === "password" ? error : null}
-      >
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={10}
-        />
-      </Field>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="flex min-h-11 cursor-pointer items-center gap-3">
-          <input
-            type="checkbox"
-            name="ageAttested"
-            checked={ageAttested}
-            onChange={(e) => setAgeAttested(e.target.checked)}
-            className="size-5 shrink-0 accent-(--accent) focus-visible:outline-2 focus-visible:outline-focus-ring"
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint="At least 10 characters."
+          error={field === "password" ? error : null}
+        >
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={10}
           />
-          <span className="text-body text-text-primary">I confirm that I am 18 or older.</span>
-        </label>
-        {field === "ageAttested" && error ? (
-          <p role="alert" className="text-caption text-danger">
-            {error}
-          </p>
-        ) : null}
-      </div>
+        </Field>
 
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Creating your account…" : "Join"}
-      </Button>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              name="ageAttested"
+              checked={ageAttested}
+              onChange={(e) => setAgeAttested(e.target.checked)}
+              className="size-5 shrink-0 accent-(--accent) focus-visible:outline-2 focus-visible:outline-focus-ring"
+            />
+            <span className="text-body text-text-primary">I confirm that I am 18 or older.</span>
+          </label>
+          {field === "ageAttested" && error ? (
+            <p role="alert" className="text-caption text-danger">
+              {error}
+            </p>
+          ) : null}
+        </div>
 
-      <p className="text-caption text-text-tertiary">
-        Everyone is welcome here. What keeps this space safe is conduct: bullying and harassment
-        are not tolerated and lead to removal.
-      </p>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Creating your account…" : "Join"}
+        </Button>
+
+        <p className="text-caption text-text-tertiary">
+          Everyone is welcome here. What keeps this space safe is conduct: bullying and harassment
+          are not tolerated and lead to removal.
+        </p>
       </form>
     </div>
   );
