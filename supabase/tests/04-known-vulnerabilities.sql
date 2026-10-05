@@ -23,7 +23,7 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000008', 'eve@test');
 
 select bootstrap_owner('00000000-0000-0000-0000-000000000001', 'bree', 'Bree Curry', '1990-01-01', 'owner@test', null);
-select create_system_account('00000000-0000-0000-0000-000000000007', 'unitedfeminist');
+select create_system_account('00000000-0000-0000-0000-000000000007', 'herciety');
 select create_member('00000000-0000-0000-0000-000000000003', 'ada@test', 'Ada Lovelace', '1995-05-05', 'ada', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000004', 'bea@test', 'Bea Arthur',   '1995-05-05', 'bea', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000005', 'cat@test', 'Cat Stevens',  '1995-05-05', 'cat', null, null, null, '{}'::jsonb, false);

@@ -5,6 +5,9 @@
 -- (P2-2), the maximum reply depth (P2-4), parent-excerpt visibility
 -- (P2-6) — plus structural EXECUTE-privilege guards (P1-3, P2-8) so a
 -- future migration cannot quietly reopen the holes.
+-- Also covers migration 0015 (rebrand): the system account is
+-- @herciety / "Herciety", and reserved handles are enforced in the
+-- database, not only in the signup route.
 \set ON_ERROR_STOP on
 set search_path = public, extensions;
 begin;
@@ -18,7 +21,7 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000008', 'eve@test');
 
 select bootstrap_owner('00000000-0000-0000-0000-000000000001', 'bree', 'Bree Curry', '1990-01-01', 'owner@test', null);
-select create_system_account('00000000-0000-0000-0000-000000000007', 'unitedfeminist');
+select create_system_account('00000000-0000-0000-0000-000000000007', 'herciety');
 select create_member('00000000-0000-0000-0000-000000000003', 'ada@test', 'Ada Lovelace', '1995-05-05', 'ada', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000004', 'bea@test', 'Bea Arthur',   '1995-05-05', 'bea', null, null, null, '{}'::jsonb, false);
 select create_member('00000000-0000-0000-0000-000000000005', 'cat@test', 'Cat Stevens',  '1995-05-05', 'cat', null, null, null, '{}'::jsonb, false);
@@ -288,7 +291,8 @@ do $$ declare f text; begin
     'public.forbid_blocking_protected()',
     'public.set_post_thread_fields()',
     'public.on_like_change()',
-    'public.on_follow_insert()'] loop
+    'public.on_follow_insert()',
+    'public.enforce_reserved_handles()'] loop
     if has_function_privilege('authenticated', f, 'execute')
        or has_function_privilege('anon', f, 'execute')
        or has_function_privilege('service_role', f, 'execute') then
@@ -309,6 +313,89 @@ do $$ declare f text; begin
       raise exception 'FAIL: % is executable by anon or service_role', f;
     end if;
   end loop;
+end $$;
+
+rollback;
+
+-- ============================================================
+-- 0015: the rebranded system account and reserved-handle enforcement.
+-- Run in its own transaction so a trigger-raised exception above
+-- cannot mask these.
+-- ============================================================
+begin;
+
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-000000000007', 'system@test'),
+  ('00000000-0000-0000-0000-000000000009', 'mallory@test');
+select create_system_account('00000000-0000-0000-0000-000000000007', 'herciety');
+
+-- The system account carries the brand name and handle.
+do $$ declare v record; begin
+  select handle, display_name into v from profiles where is_system;
+  if v.handle is distinct from 'herciety' or v.display_name is distinct from 'Herciety' then
+    raise exception 'FAIL (0015): system account is @% / %, expected @herciety / Herciety',
+      v.handle, v.display_name;
+  end if;
+end $$;
+
+-- create_member() refuses reserved handles: the freed @unitedfeminist
+-- must never be claimable by a member (impersonation guard), and the
+-- check lives in the database, beneath the signup route.
+do $$
+declare h text;
+begin
+  foreach h in array array['unitedfeminist', 'united_feminist', 'official'] loop
+    begin
+      perform create_member('00000000-0000-0000-0000-000000000009', 'mallory@test',
+                            'Mallory Mal', '1990-01-01', h::citext,
+                            null, null, null, '{}'::jsonb, false);
+      raise exception 'FAIL (0015): a member claimed the reserved handle %', h;
+    exception when others then
+      if sqlerrm <> 'handle_reserved' then raise; end if;
+    end;
+  end loop;
+end $$;
+
+-- Even a direct INSERT in a superuser session cannot take a reserved
+-- handle for a non-system profile.
+do $$ begin
+  begin
+    insert into profiles (user_id, handle, trust_level)
+    values ('00000000-0000-0000-0000-000000000009', 'herciety', 'member');
+    raise exception 'FAIL (0015): direct INSERT claimed the brand handle';
+  exception when others then
+    if sqlerrm <> 'handle_reserved' then raise; end if;
+  end;
+end $$;
+
+-- A handle UPDATE cannot move an existing member onto a reserved handle.
+do $$ begin
+  perform create_member('00000000-0000-0000-0000-000000000009', 'mallory@test',
+                        'Mallory Mal', '1990-01-01', 'mallory',
+                        null, null, null, '{}'::jsonb, false);
+  begin
+    update profiles set handle = 'unitedfeminist'
+     where user_id = '00000000-0000-0000-0000-000000000009';
+    raise exception 'FAIL (0015): a member UPDATEd her way onto a reserved handle';
+  exception when others then
+    if sqlerrm <> 'handle_reserved' then raise; end if;
+  end;
+end $$;
+
+-- reserved_handles itself: RLS enabled, zero app-role access.
+do $$ begin
+  if not (select relrowsecurity from pg_class
+           where relname = 'reserved_handles'
+             and relnamespace = 'public'::regnamespace) then
+    raise exception 'FAIL (0015): reserved_handles has RLS disabled';
+  end if;
+  if has_table_privilege('authenticated', 'public.reserved_handles', 'select')
+     or has_table_privilege('anon', 'public.reserved_handles', 'select')
+     or has_table_privilege('service_role', 'public.reserved_handles', 'select')
+     or has_table_privilege('authenticated', 'public.reserved_handles', 'insert, update, delete')
+     or has_table_privilege('service_role', 'public.reserved_handles', 'insert, update, delete') then
+    raise exception 'FAIL (0015): reserved_handles is accessible to an app role';
+  end if;
 end $$;
 
 rollback;
