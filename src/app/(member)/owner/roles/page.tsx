@@ -39,6 +39,16 @@ export default async function OwnerRolesPage() {
           Only you can grant or revoke roles, enforced in the database itself, not just in this
           interface. The owner role is never grantable.
         </p>
+        <p className="text-caption text-text-tertiary">
+          Other owner tools:{" "}
+          <Link className="text-accent underline-offset-4 hover:underline" href="/owner/audit">
+            Audit log
+          </Link>{" "}
+          ·{" "}
+          <Link className="text-accent underline-offset-4 hover:underline" href="/owner/age-gate">
+            Age gate
+          </Link>
+        </p>
       </div>
 
       {needsStepUp ? (

@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { AgeGateRejection } from "@/components/age-gate/AgeGateRejection";
+import { AgeGateBlocked } from "@/components/age-gate/AgeGateBlocked";
+import { DateOfBirthFields, type DobParts } from "@/components/age-gate/DateOfBirthFields";
+import { composeBirthDate, isAtLeast18 } from "@/lib/validation";
 
 /**
  * Lightweight, non-invasive device signal: stable browser properties
  * hashed client-side. Server HMACs it with a pepper before storage and
- * only ever compares it against banned-account hashes.
+ * only ever compares it against banned-account and age-gate-block
+ * hashes.
  */
 async function computeDeviceFingerprint(): Promise<string> {
   const parts = [
@@ -29,28 +34,110 @@ interface SignupResponse {
   message?: string;
   error?: string;
   field?: string | null;
+  blocked?: boolean;
+  underage?: boolean;
+  code?: string;
 }
+
+interface AgeGateResponse {
+  ok: boolean;
+  blocked?: boolean;
+  code?: string;
+}
+
+type GateState =
+  | { kind: "form" }
+  | { kind: "rejected" }
+  | { kind: "blocked"; code: string };
 
 export function SignupForm() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [field, setField] = useState<string | null>(null);
+  const [gate, setGate] = useState<GateState>({ kind: "form" });
+  const [dob, setDob] = useState<DobParts>({ month: "", day: "", year: "" });
+  const [dobError, setDobError] = useState<string | null>(null);
+  const [ageAttested, setAgeAttested] = useState(false);
+
+  // A device whose cookie was cleared but whose fingerprint is under an
+  // active block still meets the blocked screen (spec §17.3). The form
+  // renders immediately; this check swaps it out if the device is known.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const deviceFingerprint = await computeDeviceFingerprint().catch(() => "");
+      if (!deviceFingerprint) return;
+      try {
+        const response = await fetch("/api/auth/age-gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check", deviceFingerprint }),
+        });
+        const body = (await response.json()) as AgeGateResponse;
+        if (!cancelled && body.ok && body.blocked && body.code) {
+          setGate({ kind: "blocked", code: body.code });
+        }
+      } catch {
+        // Network trouble on a best-effort check: the form stays; the
+        // server re-checks on submit regardless.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitting(true);
     setError(null);
     setField(null);
+    setDobError(null);
 
     const form = new FormData(event.currentTarget);
+
+    const birthDate = composeBirthDate(dob.month, dob.day, dob.year);
+    if (!birthDate) {
+      setDobError("Enter your full date of birth.");
+      return;
+    }
+    if (!ageAttested) {
+      setError("Please confirm that you are 18 or older.");
+      setField("ageAttested");
+      return;
+    }
+
+    setSubmitting(true);
+    const deviceFingerprint = await computeDeviceFingerprint().catch(() => "");
+
+    // Under 18: route to the rejection screen (§17.2) and record the
+    // 14-day device block. The ONLY thing sent is the fingerprint —
+    // the date of birth, email, and name never leave this browser on
+    // this path. The gate takes in a date and gives back a no; it
+    // never takes in a person (§17.4).
+    if (!isAtLeast18(birthDate)) {
+      try {
+        await fetch("/api/auth/age-gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "block", deviceFingerprint }),
+        });
+      } catch {
+        // Even if recording fails, the answer is still no.
+      }
+      setGate({ kind: "rejected" });
+      setSubmitting(false);
+      return;
+    }
+
     const payload = {
       legalName: String(form.get("legalName") ?? ""),
       email: String(form.get("email") ?? ""),
-      dob: String(form.get("dob") ?? ""),
+      dob: birthDate,
+      ageAttested,
       handle: String(form.get("handle") ?? ""),
       password: String(form.get("password") ?? ""),
-      deviceFingerprint: await computeDeviceFingerprint().catch(() => ""),
+      deviceFingerprint,
     };
 
     try {
@@ -62,6 +149,10 @@ export function SignupForm() {
       const body = (await response.json()) as SignupResponse;
       if (body.ok) {
         setSuccess(body.message ?? "Account created.");
+      } else if (body.blocked && body.code) {
+        setGate({ kind: "blocked", code: body.code });
+      } else if (body.underage) {
+        setGate({ kind: "rejected" });
       } else {
         setError(body.error ?? "Something went wrong. Please try again.");
         setField(body.field ?? null);
@@ -72,6 +163,9 @@ export function SignupForm() {
       setSubmitting(false);
     }
   };
+
+  if (gate.kind === "rejected") return <AgeGateRejection />;
+  if (gate.kind === "blocked") return <AgeGateBlocked code={gate.code} />;
 
   if (success) {
     return (
@@ -86,8 +180,17 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-title">Create your account</h1>
+        <p className="text-body text-text-secondary">
+          Joining takes an email address, a handle and your legal name. Your legal name stays
+          private unless you choose to show it.
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+      {error && !field ? <Alert tone="danger">{error}</Alert> : null}
 
       <Field
         label="Legal name"
@@ -102,14 +205,7 @@ export function SignupForm() {
         <Input id="email" name="email" type="email" autoComplete="email" required />
       </Field>
 
-      <Field
-        label="Date of birth"
-        htmlFor="dob"
-        hint="You must be 18 or older."
-        error={field === "dob" ? error : null}
-      >
-        <Input id="dob" name="dob" type="date" autoComplete="bday" required />
-      </Field>
+      <DateOfBirthFields value={dob} onChange={setDob} error={dobError} disabled={submitting} />
 
       <Field
         label="Handle"
@@ -136,6 +232,24 @@ export function SignupForm() {
         />
       </Field>
 
+      <div className="flex flex-col gap-1.5">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            name="ageAttested"
+            checked={ageAttested}
+            onChange={(e) => setAgeAttested(e.target.checked)}
+            className="size-5 shrink-0 accent-(--accent) focus-visible:outline-2 focus-visible:outline-focus-ring"
+          />
+          <span className="text-body text-text-primary">I confirm that I am 18 or older.</span>
+        </label>
+        {field === "ageAttested" && error ? (
+          <p role="alert" className="text-caption text-danger">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
       <Button type="submit" disabled={submitting}>
         {submitting ? "Creating your account…" : "Join"}
       </Button>
@@ -144,6 +258,7 @@ export function SignupForm() {
         Everyone is welcome here. What keeps this space safe is conduct: bullying and harassment
         are not tolerated and lead to removal.
       </p>
-    </form>
+      </form>
+    </div>
   );
 }
