@@ -1,4 +1,4 @@
-# Herciety — Privacy Policy
+# Hersciety — Privacy Policy
 
 ---
 
@@ -6,7 +6,7 @@
 
 **This is a comprehensive draft, not legal advice, and not a substitute for qualified legal counsel.**
 
-Herciety operates an open-membership social platform for adults that handles user-generated content including images, operates a direct-messaging system with photo upload, conducts automated image scanning for child sexual abuse material, collects and verifies real legal names while protecting their public display, and uses technical signals including device fingerprints and IP addresses for safety and fraud prevention. Before this Privacy Policy is published, the owner must have it reviewed by a lawyer who is:
+Hersciety operates an open-membership social platform for adults that handles user-generated content including images, operates a direct-messaging system with photo upload, conducts automated image scanning for child sexual abuse material, collects and verifies real legal names while protecting their public display, and uses technical signals including device fingerprints and IP addresses for safety and fraud prevention. Before this Privacy Policy is published, the owner must have it reviewed by a lawyer who is:
 
 - Licensed to practice in Tennessee and familiar with applicable state, federal, and (when EU/UK launch occurs) international law
 - Knowledgeable about data protection law including the California Consumer Privacy Act and its amendments (CCPA/CPRA), applicable state privacy statutes, and the FTC Act Section 5 unfair and deceptive acts standard
@@ -30,7 +30,7 @@ Do not publish this Privacy Policy without counsel review.
 *Effective date: October 1, 2026*
 *Last updated: October 1, 2026*
 
-This Privacy Policy describes how Curry Co LLC ("Company," "we," "us," or "our") collects, uses, stores, and shares personal information when you use Herciety, the social platform available at herciety.com (the "Platform"). It also describes your rights and how to exercise them.
+This Privacy Policy describes how Curry Co LLC ("Company," "we," "us," or "our") collects, uses, stores, and shares personal information when you use Hersciety, the social platform available at hersciety.com (the "Platform"). It also describes your rights and how to exercise them.
 
 By creating an account or using the Platform, you agree to this Privacy Policy. If you do not agree, do not use the Platform.
 
@@ -60,9 +60,9 @@ This policy is incorporated into and made part of our Terms of Service.
 
 ## 1. About This Policy
 
-**1.1 Who we are.** Herciety is operated by Curry Co LLC, a Tennessee limited liability company. Our mailing address is 466 E Broadway Blvd, Jefferson City, TN 37760. Privacy questions and requests can be sent to legal@unitedfeminist.com.
+**1.1 Who we are.** Hersciety is operated by Curry Co LLC, a Tennessee limited liability company. Our mailing address is 466 E Broadway Blvd, Jefferson City, TN 37760. Privacy questions and requests can be sent to legal@unitedfeminist.com.
 
-**1.2 What this platform does.** Herciety is a text-first social platform designed as a safe space for women and their allies. Members post publicly, reply in threads, follow each other, and send direct messages including photos. Membership is fully open -- anyone who agrees to our Terms of Service and is 18 or older can create an account. Because both the platform's safety mission and our legal obligations require it, we collect and verify the real identity of every member while giving members control over what the public sees.
+**1.2 What this platform does.** Hersciety is a text-first social platform designed as a safe space for women and their allies. Members post publicly, reply in threads, follow each other, and send direct messages including photos. Membership is fully open -- anyone who agrees to our Terms of Service and is 18 or older can create an account. Because both the platform's safety mission and our legal obligations require it, we collect and verify the real identity of every member while giving members control over what the public sees.
 
 **1.3 Geographic scope.** The Platform currently serves members in the United States only. This policy is written for that context. If we expand to the European Union, the United Kingdom, or other jurisdictions, this policy will be updated and reviewed before that expansion occurs. Nothing in this policy creates rights under the GDPR or UK GDPR.
 
@@ -182,7 +182,7 @@ Your legal name is accessible to platform administrators for the purposes descri
 
 **Direct messages are not end-to-end encrypted.**
 
-End-to-end encryption would mean that only you and the recipient could read a message, and the platform would have no technical ability to see its content. Herciety does not provide that. Your direct messages -- text and images -- are stored on our servers in a form that the platform can access.
+End-to-end encryption would mean that only you and the recipient could read a message, and the platform would have no technical ability to see its content. Hersciety does not provide that. Your direct messages -- text and images -- are stored on our servers in a form that the platform can access.
 
 **What this means in practice:**
 
@@ -195,7 +195,7 @@ End-to-end encryption would mean that only you and the recipient could read a me
 
 **This architecture is a deliberate safety choice.** A platform built for survivors of harassment and stalking needs the ability to investigate when a member reports that someone is threatening them in their inbox. End-to-end encryption eliminates that ability. We chose the design that can respond to reports over the design that cannot. We are telling you clearly so you can make an informed choice about what you put in a direct message.
 
-If you share highly sensitive information in direct messages, understand that the platform can access it under the circumstances described above. For communications that require stronger confidentiality, use a dedicated end-to-end encrypted messaging service outside of Herciety.
+If you share highly sensitive information in direct messages, understand that the platform can access it under the circumstances described above. For communications that require stronger confidentiality, use a dedicated end-to-end encrypted messaging service outside of Hersciety.
 
 ---
 
@@ -394,7 +394,7 @@ If you are a California resident, the California Consumer Privacy Act (CCPA) as 
 
 ## 13. Minors
 
-**13.1 Minimum age.** Herciety is intended for and restricted to adults 18 and older. We do not knowingly collect personal information from anyone under 18. By creating an account, you represent that you are at least 18 years old.
+**13.1 Minimum age.** Hersciety is intended for and restricted to adults 18 and older. We do not knowingly collect personal information from anyone under 18. By creating an account, you represent that you are at least 18 years old.
 
 **13.2 Children under 13.** We do not knowingly collect personal information from children under 13. This is consistent with our obligations under the Children's Online Privacy Protection Act (COPPA). If we learn that we have collected information from a child under 13, we will delete that information immediately.
 
@@ -408,7 +408,7 @@ If you are a California resident, the California Consumer Privacy Act (CCPA) as 
 
 We may update this Privacy Policy from time to time. When we make material changes, we will:
 
-- Post the updated policy at herciety.com/privacy-policy with a new "Last Updated" date
+- Post the updated policy at hersciety.com/privacy-policy with a new "Last Updated" date
 - Send an in-app notification
 - For changes that significantly affect your rights or how we use your data, send an email to the address on your account at least 30 days before the changes take effect
 
@@ -434,7 +434,7 @@ We aim to respond to all inquiries within 45 days.
 
 ---
 
-*Herciety*
+*Hersciety*
 *Operated by: Curry Co LLC*
 *466 E Broadway Blvd, Jefferson City, TN 37760*
 *legal@unitedfeminist.com*
