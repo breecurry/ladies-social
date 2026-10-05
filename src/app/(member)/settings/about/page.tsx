@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 
 export const metadata: Metadata = { title: "About and legal" };
@@ -17,9 +18,16 @@ export default function AboutSettingsPage() {
       </Card>
       <Card className="flex flex-col gap-3">
         <h3 className="text-heading">Documents</h3>
+        <ul className="flex flex-col gap-1 text-body text-text-secondary">
+          <li>
+            <Link className="text-accent underline" href="/community-guidelines">
+              Community Guidelines
+            </Link>
+          </li>
+        </ul>
         <p className="max-w-prose text-body text-text-secondary">
-          The Community Guidelines, Terms of Service, and Privacy Policy are being finalised with
-          counsel and will be published here before launch.
+          The Terms of Service and Privacy Policy are being finalised with counsel and will be
+          published before launch.
         </p>
       </Card>
       <Card className="flex flex-col gap-3">

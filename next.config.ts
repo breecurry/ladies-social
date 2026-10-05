@@ -37,8 +37,29 @@ const nextConfig: NextConfig = {
   // docs/architecture.md §1.4). Disabling the image optimizer enforces it.
   images: { unoptimized: true },
   poweredByHeader: false,
+  // The legal pages read docs/*.md from disk at request time; make sure
+  // the markdown ships inside the serverless bundle on the host.
+  outputFileTracingIncludes: {
+    "/terms-of-service": ["./docs/terms-of-service.md"],
+    "/privacy-policy": ["./docs/privacy-policy.md"],
+    "/community-guidelines": ["./docs/community-guidelines.md"],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: responseHeaders }];
+  },
+  async redirects() {
+    return [
+      // Aliases so no reasonable guess at a legal URL 404s. Canonical
+      // routes match the paths the Terms of Service itself cites
+      // (hersciety.com/terms-of-service, /privacy-policy,
+      // /community-guidelines).
+      { source: "/terms", destination: "/terms-of-service", permanent: true },
+      { source: "/tos", destination: "/terms-of-service", permanent: true },
+      { source: "/privacy", destination: "/privacy-policy", permanent: true },
+      { source: "/guidelines", destination: "/community-guidelines", permanent: true },
+      // Not permanent: /legal may become a legal index page later.
+      { source: "/legal", destination: "/terms-of-service", permanent: false },
+    ];
   },
 };
 

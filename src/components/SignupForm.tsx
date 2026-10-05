@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
 import { AgeGateRejection } from "@/components/age-gate/AgeGateRejection";
@@ -230,6 +231,19 @@ export function SignupForm() {
         </Field>
 
         <div className="flex flex-col gap-1.5">
+          <p className="text-body text-text-secondary">
+            By creating an account you agree to follow the{" "}
+            <Link
+              href="/community-guidelines"
+              target="_blank"
+              rel="noopener"
+              className="text-accent underline underline-offset-2"
+            >
+              Community Guidelines
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>
+            .
+          </p>
           <label className="flex min-h-11 cursor-pointer items-center gap-3">
             <input
               type="checkbox"

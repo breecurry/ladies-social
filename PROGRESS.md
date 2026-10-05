@@ -51,6 +51,23 @@ re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
+**Legal pages are live.** The Community Guidelines are published at
+`/community-guidelines`, server-rendered from `docs/community-guidelines.md`
+(the markdown stays the single source of truth; react-markdown with no
+raw-HTML pass-through, so no XSS surface). `/terms-of-service` and
+`/privacy-policy` are public 200 pages but show an interim
+"being finalised with counsel" notice instead of draft text: both drafts
+still contain unresolved owner decisions (ToS §7.7 `[OWNER DECISION
+REQUIRED]` on DM-access scope; six `[RETENTION PERIOD NOT YET DECIDED]`
+brackets in Privacy Policy §8; attorney notes on arbitration/class waiver)
+and describe features that do not exist yet (DMs, image upload and CSAM
+scanning, phone verification). **When a document gets sign-off, flip its
+`published` flag in `src/lib/legal.ts` — one line per document — and the
+real text goes live at the same URL.** Aliases `/terms` `/tos` `/privacy`
+`/guidelines` `/legal` redirect to the canonical routes. Signup links the
+Community Guidelines beside the 18+ checkbox; the public footer and
+Settings → About link them too.
+
 **Phase 2A, the text social core, is built and hardened.** Posts (text
 only, 500
 chars), threaded replies (adjacency list with denormalised root/depth,
@@ -371,8 +388,12 @@ export to S3 Object Lock.
 
 ## Needs the owner
 
-- [ ] Attorney review of the Terms and Guidelines (after the open-registration
-      revision)
+- [ ] Attorney review of the Terms of Service and Privacy Policy — their
+      pages ship an interim notice until then (the Guidelines are published;
+      counsel can still review them post-publication). Publication is also
+      blocked on owner decisions: ToS §7.7 (administrator DM-access scope)
+      and the six retention periods in Privacy Policy §8. Once a document is
+      signed off, flip its `published` flag in `src/lib/legal.ts`.
 - [ ] Trademark search on "Hersciety" (the earlier "United Feminist" name was
       never cleared either)
 - [ ] NCMEC CyberTipline registration, required **before** any image upload ships
