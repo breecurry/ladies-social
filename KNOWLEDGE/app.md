@@ -145,9 +145,77 @@ applies it after review.
 
 ## Tests
 
-`supabase/tests/` 01-09 against local Postgres per tests/README.md.
-09-dm-smoke covers the DM invariants; `npm run test:dm-crypto` unit-
-tests the protocol under Node. Extend suites; never replace them.
+`supabase/tests/` 01-14 against local Postgres per tests/README.md.
+09-dm-smoke covers the DM invariants; 14-phase2f covers hashtags,
+mention policy and caps, reposts, quotes, trending, and tag
+suppression; `npm run test:dm-crypto` unit-tests the protocol under
+Node. Extend suites; never replace them.
+
+## Hashtags, mentions, reposts (Phase 2F, built 2026-10-10)
+
+Spec: `docs/design-phase2f-hashtags-mentions-reposts.md`. Migration
+`20261017000001` (write-then-review; Grove applies). The facts an agent
+must not violate:
+
+- **Quote-posts are a first-class feature by OWNER DECISION
+  (2026-10-09), overriding the design's recommendation to defer them.**
+  Never add friction, warnings, interstitials, confirmation dialogs,
+  cooldowns, or discouraging copy to quote-posts, and never frame them
+  in code or docs as a dunk vector or as something to restrict later.
+  The safety posture lives in the ABUSE CONTROLS, not in withholding
+  capability: the block walls, the mention policy, the notification
+  cap, and distinct-person trending. "This could be misused" is a
+  reason to design controls, not to remove features.
+- **"Who can mention you" defaults to Everyone** (owner decision). The
+  enum is `mention_policy` on `profiles` (everyone/followed/no_one),
+  enforced inside `create_post`: it gates BOTH the mention notification
+  AND the `post_mentions` participant row. A block always beats the
+  setting. At most 10 mention notifications fire per post; rows past
+  the cap still render and link.
+- **The client links only resolved mentions.** Every post read shape
+  carries `mentions` (stored member id + CURRENT handle, filtered to
+  reachable, unblocked accounts) and the renderer
+  (`src/components/post/PostBody.tsx` + `src/lib/text.ts`) links
+  exactly those tokens. The tokenizer's rules mirror the server parser
+  character for character — change one, change both. When `mentions`
+  is absent (pre-migration rows) the renderer falls back to
+  link-by-shape; that fallback is the documented skew behavior, not
+  dead code.
+- **Trending counts DISTINCT PEOPLE, never raw posts** (48-hour
+  window, recency-weighted, repost counts the reposter once). There is
+  deliberately NO minimum-participation floor, no k-anonymity
+  suppression, no "not enough data" state: counts are literal (owner
+  rule). `get_trending_tags()` is volatile with a read-through refresh
+  (advisory-locked) so it stays honest without pg_cron; the cron job
+  keeps it warm where the extension exists.
+- **`internal.blocked_pair()` exists because `blocked_either()` is
+  caller-scoped** (0014 P1-1) and raises when the caller is neither
+  party. The repost rules need third-party checks (reposter↔author,
+  quoter↔quoted-author). blocked_pair has NO app-role EXECUTE — it is
+  reachable only through the SECURITY DEFINER read functions, so the
+  block-graph-probing fix stands. Never grant it to app roles.
+- **Repost visibility is derived, never stored**: a repost (and the
+  embedded card of a quote) renders only while the original is
+  visible, its author reachable, and no block exists between the
+  viewer and either party NOR between the reposter/quoter and the
+  original author. A failed wall yields nothing for a repost and the
+  neutral unavailable stub for a quoted card — the quoting member's
+  own words always survive, with no author name and no reason leaked.
+- **`tags`, `post_tags`, `trending_tags` are function-only tables**
+  (RLS on, zero policies, zero direct app-role grants — the
+  avatar_media lockdown). `reshares` follows the likes pattern
+  (own-row RLS, trigger-maintained counter + notification,
+  self-repost refused in the policy). `reply_control` does not
+  restrict reposting or quoting.
+- **Tag suppression is staff-only and two-tier**: de-trend
+  (moderator+, out of trending and suggestions, posts stay) and block
+  (admin+, tag page unavailable too), both reversible, both
+  `append_audit`-ed. Members report conduct in posts, never tags —
+  there is no member-facing report-a-tag flow and none may be added
+  without a design pass.
+- The canonical tag fold is `lower(normalize(tag, NFC))` server-side
+  and `tag.normalize("NFC").toLowerCase()` client-side; `/t/<tag>`
+  redirects any non-canonical casing to the one canonical URL.
 
 ## Brand mark (integrated 2026-10-05, spec: docs/design-brand-mark-integration.md)
 

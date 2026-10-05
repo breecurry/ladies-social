@@ -19,9 +19,11 @@ schema): `/owner/members` and `/owner/insights` are live.
 
 All migrations through `20261016000001` are applied to the live project, and
 the avatar storage layer is configured and live.
-Next, in order: **build Phase 2F — hashtags, @-mentions and reposts**
-(designed in `docs/design-phase2f-hashtags-mentions-reposts.md`; takes
-migration `20261017000001`) → **Grove-Test**
+**Phase 2F (hashtags, @-mentions, reposts and quote-posts) is BUILT
+(2026-10-10) — see "Where things stand". ⚠️ Its migration
+`20261017000001` is written and tested but NOT YET APPLIED to the live
+project; the deployed code degrades gracefully until it is applied.**
+Next, in order: **apply migration `20261017000001`** → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
 the Owner's MFA enrolment → counsel sign-off, then flip `published: true`
 in `src/lib/legal.ts` (one line per document).
@@ -64,6 +66,82 @@ one of them. If the Owner enrolled a passkey before this change, she must
 re-enroll it once. Do not change this value again.
 
 ## Where things stand
+
+**Hashtags, @-mentions, reposts and quote-posts are built (Phase 2F,
+2026-10-10).** To `docs/design-phase2f-hashtags-mentions-reposts.md`, with
+two owner decisions honoured exactly: **both plain reposts AND quote-posts
+shipped together, as ordinary first-class features with no friction,
+warnings, or discouraging copy** (her explicit override of the design's
+defer-quotes recommendation — do not re-litigate), and **"Who can mention
+you" defaults to Everyone**.
+
+- **Hashtags**: parsed server-side in `create_post` (word boundary, Unicode
+  letters/numbers/underscore with at least one letter, folded canonical
+  form, 64-char cap, at most 30 distinct tags indexed per post), rendered
+  as accent links with the author's casing preserved, tag pages at
+  `/t/<canonical-tag>` (newest first, block- and mute-aware, warm empty
+  state), tag search as a second axis behind a leading `#` in the one
+  search box (people search stays @handle-only, untouched), and trending
+  ranked by **distinct people over a 48-hour window, recency-weighted —
+  never raw post volume**, shown with literal counts (1 is 1, zero is an
+  invitation, no suppression thresholds of any kind). Trending lives on the
+  pre-query Search screen (top five) and the `/t` page (top twenty),
+  snapshot-backed with a read-through refresh so it works with or without
+  pg_cron. Staff suppress a tag in two audited, reversible tiers from the
+  console's new Topics room (`/mod/tags`): de-trend (moderator+) pulls it
+  from trending and suggestions, block (admin+) also makes the tag page
+  unavailable; neither touches any post or author. Members report conduct,
+  never tags. The console shows the calm brigade signal (share of a tag's
+  48-hour participants on accounts under a week old) as information for a
+  human, never an automatic action.
+- **Mentions**: the client now links ONLY the mentions the server resolved
+  at post time (returned per post as id + current handle), so fake handles
+  are plain text, links never re-point to a later claimant of a handle,
+  and an unreachable account's mention falls back to plain text with no
+  status leak. The composer gained mention autocomplete (combobox pattern,
+  avatar + @handle only, follows ranked first, blocked accounts never
+  appear) and hashtag autocomplete on the same surface. Abuse controls:
+  the existing bidirectional block wall and mute suppression are kept and
+  asserted in suite 14; a new **"Who can mention you"** setting (Settings →
+  Privacy: Everyone default / People you follow / No one) gates both the
+  notification and mentioned-participant status at post time; and at most
+  **10 mention notifications fire per post** — past the cap mentions still
+  render and link, only the pings stop.
+- **Reposts and quote-posts**: the Repeat control sits between Reply and
+  Like with its count (hidden at zero); plain repost is one optimistic tap
+  with an undo toast (no confirmation — the like/follow treatment), undo is
+  the same control again. Reposts interleave in the Following feed (one
+  card however many followed people reposted it, "@handle reposted" /
+  "and N others" attribution, original author primary) and in the profile
+  Posts tab by repost time. A repost renders only while the original is
+  visible, its author reachable, and **no block exists between viewer and
+  either party nor between reposter and original author** — no stub, no
+  leak. Quote opens the composer with the original as a nested card;
+  a quote-post is a normal post carrying the original in a bordered card
+  linking to the thread, degrading to a neutral "This post is unavailable."
+  stub (the quoting member's own words always survive). The author gets
+  `reshare` / `quote` notifications, on by default, pref-gated (new rows in
+  Settings → Notifications), never to self, never across a block, not when
+  muted. Discover ranking gains the two repost signals as positive lifts
+  mirroring likes (reach-damped aggregate count + reposted-author
+  affinity); reposts are never a negative signal anywhere. `reply_control`
+  does not restrict reposting (amplification is not participation);
+  self-repost is refused in the database; self-quote is allowed.
+- Data layer: migration `20261017000001_hashtags_mentions_reposts.sql` —
+  `tags` / `post_tags` / `trending_tags` (RLS on, function-only, no direct
+  app-role access), `reshares` (RLS own-row, likes pattern),
+  `posts.quoted_post_id` + `posts.reshare_count`,
+  `profiles.mention_policy`, notif_type values `reshare` and `quote`, and
+  rebuilt read functions returning repost state, attribution, resolved
+  mentions, and the quoted card. `internal.blocked_pair()` was added for
+  the third-party block checks the repost walls need (the caller-scoped
+  `blocked_either` from 0014 rightly refuses them); it has no app-role
+  EXECUTE and is reachable only through the DEFINER read functions, so the
+  0014 block-graph-probing fix stands. Suite `14-phase2f.sql` covers all
+  of it; all 14 suites pass on a fresh database. ⚠️ **NOT yet applied to
+  the live project.** The deployed UI degrades gracefully until the apply:
+  mentions link by shape, tag/trending surfaces render their calm empty
+  or not-found states, and the repost action shows a calm error toast.
 
 **Profile pictures are built (Phase 2E, 2026-10-10).** The first image
 feature in the product, to `docs/design-phase2e-profile-pictures.md`, with
@@ -773,19 +851,13 @@ revised for open registration on 2026-10-07.
 
 ## Not started
 
-- [ ] **Phase 2F: hashtags, @-mentions and reposts — DESIGNED, NOT BUILT.**
-      Spec: `docs/design-phase2f-hashtags-mentions-reposts.md` (`067ec88`).
-      Takes migration **`20261017000001`** (unused). Two Owner decisions are
-      already made and must be honoured by the build:
-      **(1) BOTH plain reposts AND quote-posts ship** — the design recommended
-      deferring quote-posts as a "quote-dunk vector" and the Owner overruled
-      that reasoning explicitly: *"people love to add their own words to
-      things and that cannot be treated as inherently bad."* Add no friction,
-      warnings, interstitials or discouraging copy to quote-posts.
-      **(2) "Who can mention you" defaults to Everyone.**
-      A build was dispatched 2026-10-10 and died before its first milestone
-      when the API credit balance ran out — it pushed nothing, left no branch
-      and no partial migration. The brief is simply re-runnable.
+- [x] ~~**Phase 2F: hashtags, @-mentions and reposts**~~ — **BUILT
+      2026-10-10** to `docs/design-phase2f-hashtags-mentions-reposts.md`
+      (see "Where things stand"). Both owner decisions honoured: plain
+      reposts AND quote-posts shipped together as first-class features, and
+      "Who can mention you" defaults to Everyone. Migration
+      **`20261017000001`** is written and tested but **NOT applied to the
+      live project yet** — that apply is the next action.
 - [x] ~~Phase 2B remainder: Discover feed + the Discoverability settings
       toggle~~ — DONE 2026-10-09, migration `20261013000001` **applied to
       live and verified by Grove** (see "Where things stand")
@@ -805,6 +877,11 @@ ban-list kind are kept for the former). Also deferred: the daily audit log
 export to S3 Object Lock.
 
 ## Needs the owner
+
+- [ ] **Apply migration `20261017000001` (Phase 2F) to the live project** —
+      the hashtags/mentions/reposts data layer. Code is deployed and
+      degrades gracefully until the apply happens. (Applying migrations is
+      Grove's step, outside the build agent's scope, per standing practice.)
 
 - [ ] Attorney review of the Terms of Service and Privacy Policy — their
       pages ship an interim notice until then (the Guidelines are published;
