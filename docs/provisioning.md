@@ -8,7 +8,11 @@ dashboard because Supabase provides no API for them.
 The whole flow is driven by `scripts/provision.sh` (wired up as
 `npm run provision`). It is **idempotent**: run it again and it reuses the
 existing project, skips already-applied migrations, re-asserts configuration,
-and skips bootstrapping if the Owner already exists.
+and skips bootstrapping if the Owner already exists. It finds the project by
+`SUPABASE_PROJECT_REF` when given (preferred — refs are immutable), falling
+back to an exact-name match on `SUPABASE_PROJECT_NAME`; when neither matches
+anything it **stops with an error** instead of creating a project, unless you
+explicitly pass `SUPABASE_ALLOW_CREATE=yes` for a first-time setup.
 
 > **Secrets:** the script reads every credential from environment variables,
 > writes the app keys to `.env.local` (mode `600`), and prints only
@@ -57,7 +61,9 @@ Set these in your shell before running. **Values are never committed or printed.
 | `OWNER_DOB` | **yes** | Owner date of birth, `YYYY-MM-DD` (18+). |
 | `OWNER_PHONE` | no | Owner phone in E.164 (`+1…`), optional. |
 | `SUPABASE_ORG_SLUG` | no | Which organization to create the project in. Auto-detected if you belong to exactly one; required if you belong to several. Find it in the dashboard org URL `…/org/<slug>`. |
-| `SUPABASE_PROJECT_NAME` | no | Defaults to `United Feminist` — the hosted project's actual name. The script reuses an existing project by exact name, so changing this creates a duplicate project. |
+| `SUPABASE_PROJECT_REF` | no, but preferred | The live project's ref — the 20-character id in the dashboard URL (currently `hiphjzhlwiztqgezzipf`). When set, the script uses the project directly and never matches by name. |
+| `SUPABASE_PROJECT_NAME` | no | Defaults to `Herciety`, the hosted project's exact current name (renamed 2026-10-06). Only consulted when no ref is given; if nothing matches, the script stops rather than creating a project. |
+| `SUPABASE_ALLOW_CREATE` | no | Set to exactly `yes` to allow creating a brand-new project (first-time setup only). This is deliberately not the default: silent project creation on a name mismatch is how the original project got duplicated and then deleted by accident on 2026-10-06. |
 | `SUPABASE_REGION` | no | Defaults to `us-east-1` (US launch). |
 | `SUPABASE_INSTANCE_SIZE` | no | Defaults to `micro` (the compute the Pro plan includes). Needs a Pro org. |
 | `SITE_URL` | no | Defaults to `https://herciety.com` (the canonical domain). Sets the auth Site URL and redirect allow-list. |
@@ -82,7 +88,9 @@ CLI, with **no dashboard clicking**:
    that all required env vars are present; prints fingerprints only.
 2. **Resolve the organization.** `GET /v1/organizations`; auto-selects your only
    org or uses `SUPABASE_ORG_SLUG`.
-3. **Create the project** (or reuse one with the same name).
+3. **Resolve the project.** Uses `SUPABASE_PROJECT_REF` directly when given;
+   otherwise matches `SUPABASE_PROJECT_NAME` exactly. When nothing matches it
+   stops with instructions; only with `SUPABASE_ALLOW_CREATE=yes` does it
    `POST /v1/projects` with `name`, `organization_slug`, `db_pass`, `region`,
    `desired_instance_size`.
 4. **Wait for health.** Polls `GET /v1/projects/{ref}/health` until the db, auth

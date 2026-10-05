@@ -120,11 +120,20 @@ info "tooling: curl, node $(node -v), supabase $(supabase --version 2>/dev/null 
 : "${OWNER_DOB:?set OWNER_DOB (YYYY-MM-DD)}"
 
 # Optional inputs with sensible, product-correct defaults.
-# PROJECT_NAME deliberately stays "United Feminist": the script finds an
-# EXISTING hosted project by exact name (step 2), and the live project is
-# named that. Changing this default would make a re-provision create a
-# duplicate project instead of reusing the real one.
-PROJECT_NAME="${SUPABASE_PROJECT_NAME:-United Feminist}"
+# The hosted project is named "Herciety" (renamed 2026-10-06; it was
+# rebuilt the same day after the original project was deleted by
+# accident). Prefer SUPABASE_PROJECT_REF below — a ref is immutable,
+# a name is not, and a name mismatch is exactly how the duplicate-
+# project accident happened.
+PROJECT_NAME="${SUPABASE_PROJECT_NAME:-Herciety}"
+# The project ref (the 20-char id in the dashboard URL). When set, the
+# script uses it directly and the name is not consulted at all.
+PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
+# Creating a NEW project is a deliberate act, never a fallback: set
+# SUPABASE_ALLOW_CREATE=yes for a first-time provision. Without it the
+# script fails loudly when nothing matches, instead of silently
+# creating (and silently billing for) a duplicate project.
+ALLOW_CREATE="${SUPABASE_ALLOW_CREATE:-no}"
 REGION="${SUPABASE_REGION:-us-east-1}"               # US-only launch
 INSTANCE_SIZE="${SUPABASE_INSTANCE_SIZE:-micro}"     # Pro includes one Micro
 SITE_URL="${SITE_URL:-https://herciety.com}"
@@ -140,7 +149,7 @@ fp "OWNER_EMAIL"           "$OWNER_EMAIL"
 fp "OWNER_PASSWORD"        "$OWNER_PASSWORD" secret
 fp "OWNER_HANDLE"          "$OWNER_HANDLE"
 fp "OWNER_PHONE"           "$OWNER_PHONE"
-info "project=\"$PROJECT_NAME\" region=$REGION size=$INSTANCE_SIZE site=$SITE_URL rp_id=$WEBAUTHN_RP_ID"
+info "project=\"$PROJECT_NAME\"${PROJECT_REF:+ ref=$PROJECT_REF} region=$REGION size=$INSTANCE_SIZE site=$SITE_URL rp_id=$WEBAUTHN_RP_ID"
 
 SMTP_CONFIGURED="no"
 if [[ -n "${SMTP_HOST:-}" && -n "${SMTP_USER:-}" && -n "${SMTP_PASS:-}" ]]; then
@@ -177,22 +186,42 @@ if [[ "$INSTANCE_SIZE" != "nano" && "$ORG_PLAN" == "free" ]]; then
 fi
 
 # ----------------------------------------------------------------------------
-# 2. Create the project (or reuse an existing one with the same name)
+# 2. Resolve the project: by ref (preferred), then by exact name. Creating a
+#    new project requires explicit SUPABASE_ALLOW_CREATE=yes — a re-provision
+#    that cannot find the live project must STOP, not quietly spawn a
+#    duplicate (that silent-creation path is how the original project ended
+#    up duplicated and then deleted by accident on 2026-10-06).
 # ----------------------------------------------------------------------------
-step "Creating project (idempotent)"
+step "Resolving project"
 code="$(api GET /v1/projects)"; api_ok "$code" 200
 PROJECT_NAME_JSON="$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$PROJECT_NAME")"
-REF="$(jget "$RESP" "d.find(p=>p.name===$PROJECT_NAME_JSON && (p.organization_slug===$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$ORG_SLUG")))?.ref || ''")"
+ORG_SLUG_JSON="$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$ORG_SLUG")"
 
-if [[ -n "$REF" ]]; then
-  info "reusing existing project \"$PROJECT_NAME\" (ref: $REF)"
+if [[ -n "$PROJECT_REF" ]]; then
+  PROJECT_REF_JSON="$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$PROJECT_REF")"
+  REF="$(jget "$RESP" "d.find(p=>p.ref===$PROJECT_REF_JSON)?.ref || ''")"
+  [[ -n "$REF" ]] || die "SUPABASE_PROJECT_REF=$PROJECT_REF does not exist on this account. Check the dashboard URL for the right ref."
+  found_name="$(jget "$RESP" "d.find(p=>p.ref===$PROJECT_REF_JSON)?.name || ''")"
+  info "using project by ref: $REF (name: \"$found_name\")"
 else
-  SB_NAME="$PROJECT_NAME" SB_ORG="$ORG_SLUG" SB_REGION="$REGION" SB_SIZE="$INSTANCE_SIZE" \
-  node -e 'const fs=require("fs");const b={name:process.env.SB_NAME,organization_slug:process.env.SB_ORG,db_pass:process.env.SUPABASE_DB_PASSWORD,region:process.env.SB_REGION,desired_instance_size:process.env.SB_SIZE};fs.writeFileSync(process.argv[1],JSON.stringify(b),{mode:0o600});' "$BODY"
-  code="$(api POST /v1/projects "$BODY")"; api_ok "$code" 200 201
-  REF="$(jget "$RESP" 'd.ref')"
-  [[ -n "$REF" ]] || die "project created but no ref returned"
-  info "created project (ref: $REF)"
+  REF="$(jget "$RESP" "d.find(p=>p.name===$PROJECT_NAME_JSON && (p.organization_slug===$ORG_SLUG_JSON))?.ref || ''")"
+  if [[ -n "$REF" ]]; then
+    info "reusing existing project \"$PROJECT_NAME\" (ref: $REF)"
+  elif [[ "$ALLOW_CREATE" != "yes" ]]; then
+    die "no project named \"$PROJECT_NAME\" exists in org $ORG_SLUG, and creating one is not enabled.
+  If you meant to provision the EXISTING live project, set SUPABASE_PROJECT_REF
+  to its ref (dashboard -> project -> the 20-character id in the URL) and re-run.
+  If the name has drifted, set SUPABASE_PROJECT_NAME to the exact current name.
+  Only if you truly want a brand-new project (first-time setup), re-run with
+  SUPABASE_ALLOW_CREATE=yes. Refusing to create one silently."
+  else
+    SB_NAME="$PROJECT_NAME" SB_ORG="$ORG_SLUG" SB_REGION="$REGION" SB_SIZE="$INSTANCE_SIZE" \
+    node -e 'const fs=require("fs");const b={name:process.env.SB_NAME,organization_slug:process.env.SB_ORG,db_pass:process.env.SUPABASE_DB_PASSWORD,region:process.env.SB_REGION,desired_instance_size:process.env.SB_SIZE};fs.writeFileSync(process.argv[1],JSON.stringify(b),{mode:0o600});' "$BODY"
+    code="$(api POST /v1/projects "$BODY")"; api_ok "$code" 200 201
+    REF="$(jget "$RESP" 'd.ref')"
+    [[ -n "$REF" ]] || die "project created but no ref returned"
+    info "created project (ref: $REF)"
+  fi
 fi
 PROJECT_URL="https://${REF}.supabase.co"
 

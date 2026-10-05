@@ -81,7 +81,9 @@ First-run setup against a fresh Supabase project is a single command:
 npm run provision
 ```
 
-`scripts/provision.sh` creates the project, applies the migrations, enables
+`scripts/provision.sh` finds the project (by `SUPABASE_PROJECT_REF`, preferred,
+or exact name; creating a new one requires an explicit
+`SUPABASE_ALLOW_CREATE=yes`), applies the migrations, enables
 `pg_cron`, sets the required auth posture (30-minute JWTs, refresh-token
 rotation, mandatory email confirmation, TOTP + WebAuthn MFA), writes the app
 keys into `.env.local`, and runs `npm run bootstrap` to create the Owner and the

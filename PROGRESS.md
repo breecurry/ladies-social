@@ -183,12 +183,18 @@ Default/unset = noindex (fail-safe).
 
 ## Next session, start here
 
-1. **Apply migrations 0013 AND 0014 to the live project**: `supabase db
-   push` (or re-run `npm run provision`, which is idempotent). Both are
-   forward-only and idempotent; 0001-0012 are already applied. Apply
-   them together — 0013 must not run on the live project without 0014's
-   fixes going out in the same step, and open registration should not
-   begin before 0014 is live.
+1. **Provision the rebuilt live project.** The original Supabase project was
+   deleted by accident on 2026-10-06. The live project is now ref
+   `hiphjzhlwiztqgezzipf` (named `Herciety`, Curry Co org, us-east-1), with
+   migrations 0001-0015 applied but **no auth configuration set yet** — it
+   all has to be configured fresh. Run `npm run provision` with
+   `SUPABASE_PROJECT_REF=hiphjzhlwiztqgezzipf` to assert the auth posture
+   (30-minute JWTs, refresh rotation, required email confirmation, TOTP, Site
+   URL `https://herciety.com`) and to seed the Owner + the @herciety system
+   account (both steps are skipped automatically if already done). The script
+   now refuses to create a new project unless `SUPABASE_ALLOW_CREATE=yes` is
+   passed explicitly, so a name or ref mismatch stops loudly instead of
+   silently spawning a duplicate.
 2. **Phase 2B**: Discover feed (chronological, with the hide signal
    suppressing hidden accounts) + the age gate screens (spec §17) + the
    minimal report-review/ban tooling committed to before strangers can
