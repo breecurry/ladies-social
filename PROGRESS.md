@@ -1,34 +1,40 @@
 # PROGRESS: United Feminist
 
-Updated: 2026-10-02
+Updated: 2026-10-05
 
 ## Where things stand
 
-**The admission gate is gone.** The owner opened registration ("all are
-welcome"): no invite, no vouch, no inviter field, no approval queue, no gender
-screening of any kind. Enforcement is conduct-based and after the fact:
-bullying and harassment are banable offenses, and the ban-evasion blocklist
-(email/device hashes checked silently at signup) is now the load-bearing
-defence behind "I can ban whoever I want including any new accounts they may
-make."
+**Phase 2A, the text social core, is built.** Posts (text only, 500
+chars), threaded replies (adjacency list with denormalised root/depth,
+three visible levels then re-root), follows with the owner's exact
+mechanics (one-tap follow with undo toast, profile-only confirmed
+unfollow), the Following feed (fan-out-on-read, zero counts hidden),
+profiles with follower/following lists, people search by @handle, the
+conventional three-dot overflow with the full safety set (copy link,
+show-me-less, mute, block with confirmation, report with routing),
+in-app notifications with a red 9+ -capped badge and per-type prefs,
+and the re-architected settings IA (Account, Privacy, Safety,
+Notifications, Appearance, About) with the legal-name opt-in moved
+into Privacy with a preview.
 
-The entire vouch/admission system was deleted as dead code in the same change
-(tables, functions, types, RLS policies, pages, API routes, tests), and two
-forward-only migrations (0011, 0012) apply the removal safely to the live
-database. The first-run trap (new accounts defaulting to a `pending_vouch`
-trust level that nothing could ever promote them out of) is fixed by removing
-that enum value entirely: new accounts are full members the moment they exist.
-The `male_account` report reason was removed from the planned reports schema
-in `docs/architecture.md`; it never existed in the live database.
+The app shell replaced the old text-link layout: desktop left rail +
+centred 600px column, mobile 5-slot bottom tab bar, composer as a
+modal/bottom sheet with a late-revealing counter and per-post reply
+controls.
 
-What stays, deliberately: owner-only role granting enforced at the database
-layer (trigger + SECURITY DEFINER + REVOKE), the hash-chained audit log,
-ban/suspension machinery, email verification, and the bot pre-filter
-(disposable email domains, subnet velocity, profile coherence, device
-fingerprints), repurposed from review-queue routing to auto-flagging.
+Migration 0013 (`20261005000001_social_core.sql`) is forward-only and
+idempotent against the live database and is covered by a new security
+smoke suite (`supabase/tests/02-social-smoke.sql`): mutual-hard blocks
+in both directions, mute filtering, the structural guarantee that no
+feed/thread/search function can return a legal name, report routing
+with `owner_conflict` invisible in-app to everyone including the
+Owner, notification RLS, and DEFINER-only write paths. Typecheck,
+lint, build, and both smoke suites pass.
 
-Typecheck, lint, build, and the security smoke suite (now covering open
-signup, ban-evasion refusal, and the roles/audit invariants) all pass.
+**Not in 2A, deliberately:** Discover + ranking (2B, with moderation
+groundwork), the age gate screens (spec §17), reshares/quotes (schema
+arrives additively with the feature), image upload of any kind (hard-
+gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
 
 ## Done
 
@@ -51,30 +57,56 @@ signup, ban-evasion refusal, and the roles/audit invariants) all pass.
       legal name, date of birth); vouch/admission system deleted end to end;
       `pending_vouch` removed from the trust model; migrations 0011 + 0012
       are forward-only and idempotent against the live database.
+- [x] **Phase 2A: text social core (2026-10-05).** Migration 0013 (follows,
+      mutual-hard blocks, mutes, show-me-less, posts + threading, likes,
+      conduct-only reports with routing, notifications), the app shell,
+      feed, composer, thread view, profiles + lists, people search,
+      overflow safety menu, notifications surface, and the settings IA.
+      New smoke suite `02-social-smoke.sql` covering the social-core
+      security invariants.
 
 ## Next session, start here
 
-1. **Apply the new migrations to the live project**: `supabase db push`
-   (or re-run `npm run provision`, which is idempotent). Migrations 0011 and
-   0012 remove the admission system and fix the trust-level default.
-2. **Phase 2, text social core** (posts, threaded replies, follows, feed).
-   Full design spec: `docs/design-phase2-social-core.md`. The first-run trap
-   that blocked Phase 2 is fixed.
+1. **Apply migration 0013 to the live project**: `supabase db push` (or
+   re-run `npm run provision`, which is idempotent). 0013 is forward-only
+   and idempotent; 0001-0012 are already applied.
+2. **Phase 2B**: Discover feed (chronological, with the hide signal
+   suppressing hidden accounts) + the age gate screens (spec §17) + the
+   minimal report-review/ban tooling committed to before strangers can
+   find each other (nothing writes `banned_identifiers` yet).
 3. **Legal documents need revision for open registration** (separate task):
    ToS §1.2 (references the admission process), all of §3 "Admission and the
-   Vouching System" (§§3.1–3.7), §2.5 (invitation-system wording), §9.4
-   (invitation tokens), and the attorney-review preamble items 1–2; Community
+   Vouching System" (§§3.1-3.7), §2.5 (invitation-system wording), §9.4
+   (invitation tokens), and the attorney-review preamble items 1-2; Community
    Guidelines membership/vouching passages (opening "how members arrive",
    "The Community We Are Building", "Admission abuse", and the entire
    "Inviter accountability" section with its table).
 
+## Known gaps and deliberate skips in Phase 2A (re-flag, do not lose)
+
+- Swipe mute/block accelerator, keyboard j/k shortcuts, the new-posts
+  pill, offline banner/PWA caching, the one-time overflow tooltip, and
+  account deactivation/deletion UI (Settings, Account explains the
+  interim email path). All flagged by design; none block 2B.
+- The desktop right rail (persistent search + getting-started card at
+  xl) is not built; search is a primary nav destination, so nothing is
+  unreachable.
+- The on-card Follow pill appears in people rows (search, lists); feed
+  cards do not need it (Following-only feed) and thread reply cards do
+  not carry it yet; it becomes load-bearing with Discover in 2B.
+- Notifications fetch the latest 50 with no pager; fine for the
+  founding cohort.
+- Report history shows reason/status only (no deep link to the
+  reported content); enough to close the loop until the 2B review
+  tooling exists.
+
 ## Not started
 
-- [ ] Phase 2: text social core (posts, threaded replies, follows, feed)
+- [ ] Phase 2B: Discover + age gate + minimal moderation/ban tooling
 - [ ] Phase 3: media pipeline and moderation backbone (includes the ban
       actions that feed `banned_identifiers`)
 - [ ] Phase 4: direct messages with photos
-- [ ] Phase 5: discovery and the For You feed
+- [ ] Phase 5: discovery ranking and the For You feed
 - [ ] Phase 6: launch hardening
 
 Deferred, needs the owner's call: phone verification and age verification

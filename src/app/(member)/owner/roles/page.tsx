@@ -36,7 +36,7 @@ export default async function OwnerRolesPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-title">Roles</h1>
         <p className="max-w-prose text-body text-text-secondary">
-          Only you can grant or revoke roles — enforced in the database itself, not just in this
+          Only you can grant or revoke roles, enforced in the database itself, not just in this
           interface. The owner role is never grantable.
         </p>
       </div>

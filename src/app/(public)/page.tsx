@@ -12,7 +12,7 @@ export default async function LandingPage() {
         <h1 className="text-display text-text-primary">United Feminist</h1>
         <p className="max-w-prose text-body-lg text-text-secondary">
           A social platform built as a safe space for women and their allies. Simple on the surface,
-          genuinely sophisticated underneath — and safety is architecture here, not a settings page.
+          genuinely sophisticated underneath. Safety is architecture here, not a settings page.
         </p>
         <p className="max-w-prose text-body text-text-tertiary">
           Everyone is welcome to join. What keeps this space safe is conduct, not identity: bullying

@@ -260,6 +260,29 @@ create table banned_identifiers (
 -- ============================================================
 -- SOCIAL GRAPH
 -- ============================================================
+-- PHASE 2A IMPLEMENTATION NOTE (migration 20261005000001_social_core.sql
+-- is authoritative for everything below through notifications):
+--   * Shipped: follows, blocks (mutual-hard, with a SECURITY DEFINER
+--     blocked_either()/blocked_by() pair used inside RLS), mutes,
+--     hidden_accounts ("show me less", a Discover/ranking signal that
+--     deliberately does NOT filter the Following feed), text-only posts
+--     (adjacency list + trigger-maintained root/depth), post_mentions,
+--     likes, reports (via file_report(), routing computed server-side),
+--     notifications + notification_prefs.
+--   * Posts are written ONLY via create_post()/delete_post(); reports
+--     ONLY via file_report(); direct writes are REVOKEd from
+--     authenticated AND service_role.
+--   * Every feed/thread/search/list read function returns the author's
+--     @handle only; display_name is structurally absent from all
+--     return shapes (the legal-name rule enforced below the app layer).
+--   * RESHARES/QUOTES ARE NOT SHIPPED: posts has no quoted_post_id or
+--     reshare_count and there is no reshares table yet. That schema
+--     arrives ADDITIVELY with the reshare feature (a forward-only
+--     migration adds the columns, table, and notif_type values); the
+--     DDL below is the blueprint for that moment, not current truth.
+--   * Similarly deferred to their features: report_subject's 'message'
+--     value and the reshare/quote/dm notif_type values (the shipped
+--     enums are post/user and follow/like/reply/mention/system).
 create table follows (
   follower_id  uuid not null references profiles(user_id) on delete cascade,
   followee_id  uuid not null references profiles(user_id) on delete cascade,

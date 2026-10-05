@@ -87,7 +87,7 @@ export default async function OwnerAuditPage() {
                         ) : null}
                       </td>
                       <td className="py-2">
-                        {entry.target_type ? `${entry.target_type} ${entry.target_id ?? ""}` : "—"}
+                        {entry.target_type ? `${entry.target_type} ${entry.target_id ?? ""}` : "none"}
                       </td>
                     </tr>
                   ))}

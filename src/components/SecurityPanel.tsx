@@ -73,7 +73,7 @@ export function SecurityPanel() {
     });
     if (registerError) {
       setError(
-        "Could not register the security key. If this persists, the WebAuthn factor may not be enabled on the Supabase project yet (it is in beta) — use an authenticator app meanwhile.",
+        "Could not register the security key. If this persists, the WebAuthn factor may not be enabled on the Supabase project yet (it is in beta); use an authenticator app meanwhile.",
       );
     } else {
       setNotice("Security key registered. You are now at AAL2.");
@@ -158,7 +158,7 @@ export function SecurityPanel() {
           <Badge tone={aal === "aal2" ? "success" : "warning"}>{aal ?? "…"}</Badge>
         </div>
         <p className="text-body text-text-secondary">
-          Privileged actions — granting roles, reading the audit log, viewing contact details —
+          Privileged actions (granting roles, reading the audit log, viewing contact details)
           require AAL2: a second factor verified in this session.
         </p>
       </Card>
