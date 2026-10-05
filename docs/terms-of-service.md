@@ -1,4 +1,4 @@
-# United Feminist — Terms of Service
+# Herciety — Terms of Service
 
 ---
 
@@ -6,7 +6,7 @@
 
 **This is a comprehensive draft, not legal advice, and not a substitute for qualified legal counsel.**
 
-United Feminist operates an open-membership social platform for adults that handles user-generated content including images and video, operates a direct-messaging system, and uses fully open registration with conduct-based enforcement. Before these Terms of Service are published, the owner must have them reviewed by a lawyer who is:
+Herciety operates an open-membership social platform for adults that handles user-generated content including images and video, operates a direct-messaging system, and uses fully open registration with conduct-based enforcement. Before these Terms of Service are published, the owner must have them reviewed by a lawyer who is:
 
 - Licensed to practice in Tennessee and familiar with applicable state, federal, and (when EU/UK launch occurs) international law
 - Knowledgeable about platform liability, Section 230 of the Communications Decency Act, and its current scope
@@ -29,7 +29,7 @@ Do not publish these Terms of Service without counsel review.
 *Effective date: October 1, 2026*
 *Last updated: October 2, 2026*
 
-These Terms of Service ("Terms") are a binding legal agreement between you and Curry Co LLC ("Company," "we," "us," or "our"), the operator of the United Feminist platform available at unitedfeminist.com (the "Platform"). By creating an account or using the Platform in any way, you agree to be bound by these Terms. If you do not agree, do not use the Platform.
+These Terms of Service ("Terms") are a binding legal agreement between you and Curry Co LLC ("Company," "we," "us," or "our"), the operator of the Herciety platform available at herciety.com (the "Platform"). By creating an account or using the Platform in any way, you agree to be bound by these Terms. If you do not agree, do not use the Platform.
 
 ---
 
@@ -57,7 +57,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 **1.1 Age.** You must be at least 18 years old to create an account or use the Platform. By accepting these Terms, you represent that you are 18 or older. If we discover that an account belongs to a person under 18, we will immediately terminate that account and delete all associated content.
 
-**1.2 Membership.** United Feminist is designed as a safe space for women and for allies of any gender who are committed to the platform's purpose. Membership is open to any person who agrees to abide by these Terms and the Community Guidelines. Membership is conditional on conduct and may be permanently terminated for violations of these Terms or the Guidelines as described in Section 9.
+**1.2 Membership.** Herciety is designed as a safe space for women and for allies of any gender who are committed to the platform's purpose. Membership is open to any person who agrees to abide by these Terms and the Community Guidelines. Membership is conditional on conduct and may be permanently terminated for violations of these Terms or the Guidelines as described in Section 9.
 
 **1.3 Legal capacity.** You represent that you have the legal capacity to enter into a binding agreement under the laws of your jurisdiction, and that you are not barred from using the Platform under applicable law.
 
@@ -67,7 +67,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 ## 2. Account Registration and Identity
 
-**2.1 Real identity required.** United Feminist does not permit anonymous accounts. When you create an account, you must provide your real, legal name (or the name by which you are known and identified in daily life). We collect and verify this so that every member is accountable for their conduct.
+**2.1 Real identity required.** Herciety does not permit anonymous accounts. When you create an account, you must provide your real, legal name (or the name by which you are known and identified in daily life). We collect and verify this so that every member is accountable for their conduct.
 
 **Your legal name is not displayed publicly by default.** Your profile and your posts show your @handle. You may choose, in your account settings, to display your legal name as well, and you may change that choice at any time. Choosing not to display it does not make you anonymous — it means the platform knows who you are and the public does not.
 
@@ -97,7 +97,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 ## 4. Acceptable Use; Community Guidelines
 
-**4.1 Community Guidelines incorporated.** Our Community Guidelines ("Guidelines"), available at unitedfeminist.com/community-guidelines and incorporated into these Terms by reference, describe in detail what conduct is and is not acceptable on the Platform. By accepting these Terms, you agree to abide by the Guidelines.
+**4.1 Community Guidelines incorporated.** Our Community Guidelines ("Guidelines"), available at herciety.com/community-guidelines and incorporated into these Terms by reference, describe in detail what conduct is and is not acceptable on the Platform. By accepting these Terms, you agree to abide by the Guidelines.
 
 **4.2 General acceptable use.** Without limiting the Guidelines, you agree that you will not:
 
@@ -175,7 +175,7 @@ These Terms of Service ("Terms") are a binding legal agreement between you and C
 
 ## 8. Privacy
 
-Our collection, use, and storage of personal information is described in our Privacy Policy, available at unitedfeminist.com/privacy-policy. **[NOTE: The Privacy Policy is a separate document, currently in preparation. It will be finalized and reviewed by counsel before the Platform launches. This Terms of Service will be updated with a direct link when the Privacy Policy is published.]** The Privacy Policy is incorporated into these Terms by reference. By using the Platform, you agree to the terms of the Privacy Policy.
+Our collection, use, and storage of personal information is described in our Privacy Policy, available at herciety.com/privacy-policy. **[NOTE: The Privacy Policy is a separate document, currently in preparation. It will be finalized and reviewed by counsel before the Platform launches. This Terms of Service will be updated with a direct link when the Privacy Policy is published.]** The Privacy Policy is incorporated into these Terms by reference. By using the Platform, you agree to the terms of the Privacy Policy.
 
 ---
 
@@ -257,7 +257,7 @@ Subject to Section 13.4 below, any dispute arising from or related to these Term
 
 ## 14. Changes to These Terms
 
-We may update these Terms from time to time. When we make material changes, we will notify you by: posting the updated Terms at unitedfeminist.com/terms-of-service with a new "Last Updated" date; sending an in-app notification; and, for significant changes, sending an email to the address on your account.
+We may update these Terms from time to time. When we make material changes, we will notify you by: posting the updated Terms at herciety.com/terms-of-service with a new "Last Updated" date; sending an in-app notification; and, for significant changes, sending an email to the address on your account.
 
 Your continued use of the Platform after the effective date of updated Terms constitutes your acceptance of those Terms. If you do not accept the updated Terms, you must stop using the Platform and close your account.
 
@@ -283,7 +283,7 @@ We will not make retroactive changes that reduce your rights without providing a
 
 ---
 
-*United Feminist*
+*Herciety*
 *Operated by: Curry Co LLC*
 *466 E Broadway Blvd, Jefferson City, TN 37760*
 *legal@unitedfeminist.com*

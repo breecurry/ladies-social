@@ -1,4 +1,4 @@
-# United Feminist — Community Guidelines
+# Herciety — Community Guidelines
 
 *Effective date: October 1, 2026*
 
@@ -6,7 +6,7 @@
 
 ## Who We Are and Why These Guidelines Exist
 
-United Feminist is a social platform built for women and for the people who stand with them — including trans women, who are a full and welcome part of this community. Full stop.
+Herciety is a social platform built for women and for the people who stand with them — including trans women, who are a full and welcome part of this community. Full stop.
 
 We opened this platform to anyone genuinely committed to its purpose, because we believe the work of building feminist community does not benefit from shutting out allies. A safe space for women is not measured by who it excludes — it is defined by what it demands. Everyone here is expected to show up as an ally. The question is whether you actually do.
 
@@ -20,7 +20,7 @@ We have written these guidelines with respect for you as an adult. We will not l
 
 ## The Community We Are Building
 
-United Feminist is a place to post, connect, organize, share, and exist online without the constant background noise of harassment that defines so much of the internet. Women built it, women center it, and women's safety is its purpose. It is open to anyone who takes that purpose seriously.
+Herciety is a place to post, connect, organize, share, and exist online without the constant background noise of harassment that defines so much of the internet. Women built it, women center it, and women's safety is its purpose. It is open to anyone who takes that purpose seriously.
 
 This platform is inclusive of all women, including:
 - Trans women — you are not a special case or an asterisk; you belong here as fully as anyone else
@@ -201,7 +201,7 @@ Impersonation is presenting yourself as someone you are not — a specific real 
 **What this looks like:**
 - Creating an account with another person's name and photo to deceive others about who you are
 - Presenting your posts as coming from a well-known person or organization when they are not
-- Creating an account designed to look like an official United Feminist account
+- Creating an account designed to look like an official Herciety account
 
 Parody accounts are permitted if they are clearly labeled as parody. If there is any reasonable chance someone could mistake the account for the real thing, it is not clearly labeled enough.
 
@@ -340,4 +340,4 @@ Questions? Contact us at support@unitedfeminist.com.
 
 ---
 
-*United Feminist — Curry Co LLC — 466 E Broadway Blvd, Jefferson City, TN 37760*
+*Herciety — Curry Co LLC — 466 E Broadway Blvd, Jefferson City, TN 37760*
