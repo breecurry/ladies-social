@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
 import { AgeGateRejection } from "@/components/age-gate/AgeGateRejection";
 import { AgeGateBlocked } from "@/components/age-gate/AgeGateBlocked";
 import { DateOfBirthFields, type DobParts } from "@/components/age-gate/DateOfBirthFields";
+import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
 import { composeBirthDate, isAtLeast18 } from "@/lib/validation";
 
 /**
@@ -57,6 +58,11 @@ export function SignupForm() {
   const [dob, setDob] = useState<DobParts>({ month: "", day: "", year: "" });
   const [dobError, setDobError] = useState<string | null>(null);
   const [ageAttested, setAgeAttested] = useState(false);
+  const [tosAgreed, setTosAgreed] = useState(false);
+  // Single-use Turnstile token (empty until the widget solves; stays
+  // empty without a site key or when the script cannot load).
+  const captchaTokenRef = useRef("");
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // A device whose cookie was cleared but whose fingerprint is under an
   // active block still meets the blocked screen (spec §17.3). The form
@@ -104,6 +110,11 @@ export function SignupForm() {
       setField("ageAttested");
       return;
     }
+    if (!tosAgreed) {
+      setError("Please agree to the Terms of Service to create an account.");
+      setField("tosAgreed");
+      return;
+    }
 
     setSubmitting(true);
     const deviceFingerprint = await computeDeviceFingerprint().catch(() => "");
@@ -133,9 +144,11 @@ export function SignupForm() {
       email: String(form.get("email") ?? ""),
       dob: birthDate,
       ageAttested,
+      tosAgreed,
       handle: String(form.get("handle") ?? ""),
       password: String(form.get("password") ?? ""),
       deviceFingerprint,
+      captchaToken: captchaTokenRef.current,
     };
 
     try {
@@ -154,9 +167,13 @@ export function SignupForm() {
       } else {
         setError(body.error ?? "Something went wrong. Please try again.");
         setField(body.field ?? null);
+        // The token (if any) was consumed by this attempt; get a fresh
+        // one so retrying can actually succeed.
+        turnstileRef.current?.reset();
       }
     } catch {
       setError("Something went wrong. Please try again.");
+      turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -250,16 +267,54 @@ export function SignupForm() {
               name="ageAttested"
               checked={ageAttested}
               onChange={(e) => setAgeAttested(e.target.checked)}
+              aria-invalid={field === "ageAttested" && error ? true : undefined}
+              aria-describedby={field === "ageAttested" && error ? "ageAttested-error" : undefined}
               className="size-5 shrink-0 accent-(--accent) focus-visible:outline-2 focus-visible:outline-focus-ring"
             />
             <span className="text-body text-text-primary">I confirm that I am 18 or older.</span>
           </label>
           {field === "ageAttested" && error ? (
-            <p role="alert" className="text-caption text-danger">
+            <p id="ageAttested-error" role="alert" className="text-caption text-danger">
+              {error}
+            </p>
+          ) : null}
+          <label className="flex min-h-11 cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              name="tosAgreed"
+              checked={tosAgreed}
+              onChange={(e) => setTosAgreed(e.target.checked)}
+              aria-invalid={field === "tosAgreed" && error ? true : undefined}
+              aria-describedby={field === "tosAgreed" && error ? "tosAgreed-error" : undefined}
+              className="size-5 shrink-0 accent-(--accent) focus-visible:outline-2 focus-visible:outline-focus-ring"
+            />
+            <span className="text-body text-text-primary">
+              I agree to the{" "}
+              <Link
+                href="/terms-of-service"
+                target="_blank"
+                rel="noopener"
+                className="text-accent underline underline-offset-2"
+              >
+                Terms of Service
+                <span className="sr-only"> (opens in a new tab)</span>
+              </Link>
+              .
+            </span>
+          </label>
+          {field === "tosAgreed" && error ? (
+            <p id="tosAgreed-error" role="alert" className="text-caption text-danger">
               {error}
             </p>
           ) : null}
         </div>
+
+        <Turnstile
+          ref={turnstileRef}
+          onToken={(token) => {
+            captchaTokenRef.current = token ?? "";
+          }}
+        />
 
         <Button type="submit" disabled={submitting}>
           {submitting ? "Creating your account…" : "Join"}

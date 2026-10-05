@@ -38,11 +38,14 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   poweredByHeader: false,
   // The legal pages read docs/*.md from disk at request time; make sure
-  // the markdown ships inside the serverless bundle on the host.
+  // the markdown ships inside the serverless bundle on the host. The
+  // signup route reads the Terms to derive the consent version
+  // identifier recorded with each signup.
   outputFileTracingIncludes: {
     "/terms-of-service": ["./docs/terms-of-service.md"],
     "/privacy-policy": ["./docs/privacy-policy.md"],
     "/community-guidelines": ["./docs/community-guidelines.md"],
+    "/api/auth/signup": ["./docs/terms-of-service.md"],
   },
   async headers() {
     return [{ source: "/(.*)", headers: responseHeaders }];

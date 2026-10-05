@@ -66,6 +66,8 @@ export type UserPrivateRow = {
   last_login_ip: string | null;
   last_login_at: string | null;
   signup_flags: Json | null;
+  tos_agreed_at: string | null;
+  tos_version: string | null;
 };
 
 export type RoleAssignmentRow = {
@@ -617,6 +619,10 @@ export type Database = {
         Returns: { reference_code: string; created_at: string; expires_at: string }[];
       };
       clear_age_gate_block: { Args: { p_code: string }; Returns: boolean };
+      record_tos_consent: {
+        Args: { p_user_id: string; p_version: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       system_role: SystemRole;

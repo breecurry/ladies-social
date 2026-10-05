@@ -6,6 +6,7 @@ import { hashIdentifier } from "@/lib/crypto";
 import { padToUniformTime } from "@/lib/timing";
 import { runSignupTriage } from "@/lib/signup/triage";
 import { signupSchema, isAtLeast18, RESERVED_HANDLES } from "@/lib/validation";
+import { termsOfServiceVersion } from "@/lib/legal";
 import {
   AGE_GATE_COOKIE,
   getActiveAgeGateBlock,
@@ -194,9 +195,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { data: signUpData, error: signUpError } = await anonAuth.auth.signUp({
       email: input.email,
       password: input.password,
-      options: { emailRedirectTo: `${request.nextUrl.origin}/login` },
+      options: {
+        emailRedirectTo: `${request.nextUrl.origin}/login`,
+        // Turnstile token. While captcha is disabled in Supabase auth
+        // config this is ignored; once enabled, Supabase verifies it
+        // against the stored secret. Omitted when the widget produced
+        // nothing so the disabled state stays byte-identical to today.
+        ...(input.captchaToken ? { captchaToken: input.captchaToken } : {}),
+      },
     });
     if (signUpError) {
+      // A captcha refusal is retryable and must say so: the client
+      // resets the widget and the member tries again. Everything else
+      // keeps the generic shape.
+      if (signUpError.message.toLowerCase().includes("captcha")) {
+        return uniform(
+          { ok: false, error: "The security check could not be verified. Please try again." },
+          400,
+        );
+      }
       return uniform({ ok: false, error: "Could not create your account. Please try again." }, 400);
     }
     // Existing account (Supabase anti-enumeration returns a userless
@@ -232,6 +249,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       return uniform({ ok: false, error: "Could not create your account. Please try again." }, 500);
     }
+
+    // Record the Terms of Service consent the schema above just
+    // enforced, with an identifier for the exact document text agreed
+    // to (derived from the file — see termsOfServiceVersion). Best
+    // effort BY DESIGN: main deploys ahead of the database migration,
+    // so if record_tos_consent does not exist yet the error is ignored
+    // and the signup still succeeds — the agreement itself was already
+    // required by signupSchema, which does not depend on the database.
+    // Once the migration is applied this records on every signup.
+    await admin.rpc("record_tos_consent", {
+      p_user_id: user.id,
+      p_version: await termsOfServiceVersion(),
+    });
 
     return uniform({ ok: true, message: SUCCESS_MESSAGE }, 200);
   } catch {

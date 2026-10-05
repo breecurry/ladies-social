@@ -108,6 +108,47 @@ real text goes live at the same URL.** Aliases `/terms` `/tos` `/privacy`
 Community Guidelines beside the 18+ checkbox; the public footer and
 Settings → About link them too.
 
+**Terms of Service consent is required at signup and recorded (2026-10-05,
+migration 0019 `20261012000001_tos_consent.sql`).** The signup form carries a
+SEPARATE "I agree to the Terms of Service" checkbox — deliberately not
+bundled with the 18+ attestation — linking to `/terms-of-service` in a new
+tab. It is enforced server-side (`signupSchema`, `z.literal(true)`): a POST
+straight to `/api/auth/signup` without `tosAgreed: true` is rejected 400, so
+the checkbox is not skippable by bypassing the UI. On success the server
+records `user_private.tos_agreed_at` plus `tos_version` via the
+service_role-only `record_tos_consent()` (audited as `member.tos_consent`;
+RLS self + Owner, like all private data). The version identifier is DERIVED
+from `docs/terms-of-service.md` at request time — its "Last updated" line
+plus a sha256 content hash (`src/lib/legal.ts → termsOfServiceVersion()`) —
+never a hand-bumped constant, so it cannot go stale; while the document is
+unpublished it carries an `interim:` prefix that disappears by itself when
+the `published` flag flips. **Code/DB skew is safe in both directions:** the
+enforcement lives in the schema (no database needed), and the consent write
+is best-effort until the migration is applied, so deploying ahead of the
+migration never breaks signup.
+**Policy for accounts that predate the checkbox** (the Owner and the system
+account): their `tos_agreed_at` stays NULL — the truthful record that no
+consent was captured when they were created, before the Terms were published
+or any checkbox existed. Nothing gates sign-in on these columns; no lockout,
+no re-consent interruption. The Owner is the party OFFERING the terms
+(Curry Co LLC) and the system account is not a person, so there is no
+consent gap to remediate. If counsel ever wants affirmative re-consent from
+pre-existing accounts after publication, that is a deliberate future flow,
+not a backfill.
+
+**Bot protection: Cloudflare Turnstile is wired on signup AND login
+(2026-10-05), with enforcement still OFF.** Turnstile, not reCAPTCHA — no
+Google tracking on the most sensitive pages in the product. The widget
+(`src/components/Turnstile.tsx`) renders from `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+(already set in Vercel; without it the forms work untouched), passes its
+token into Supabase as `captchaToken`, resets it after any failed attempt
+(tokens are single-use), and degrades to a calm notice if the script cannot
+load. Supabase holds the Turnstile secret in auth config with
+`security_captcha_enabled = false`. **The flip to `true` happens only after
+this code is deployed** — and note the switch is GLOBAL to Supabase auth: it
+covers sign-in as well as signup, which is why the login form carries the
+widget too.
+
 **Phase 2A, the text social core, is built and hardened.** Posts (text
 only, 500
 chars), threaded replies (adjacency list with denormalised root/depth,

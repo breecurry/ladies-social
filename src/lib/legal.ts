@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -83,4 +84,37 @@ export async function loadLegalDocument(slug: LegalSlug): Promise<LegalDocument>
   };
   cache.set(slug, doc);
   return doc;
+}
+
+let termsVersionCache: string | null = null;
+
+/**
+ * Identifier for the exact Terms of Service text on disk, recorded
+ * with each member's signup consent (user_private.tos_version).
+ *
+ * Derived from the document itself — the parsed "Last updated" date
+ * plus a hash of the file's full contents — so it can never silently
+ * go stale: any change to docs/terms-of-service.md produces a new
+ * identifier with no human having to remember to bump anything. While
+ * the document is unpublished (its route shows the interim notice),
+ * the identifier carries an `interim:` prefix; when the `published`
+ * flag flips, new consents automatically record the clean version.
+ *
+ * Never throws: the consent write must not be able to break a signup,
+ * so a read failure degrades to a sentinel (the consent timestamp
+ * still gets recorded).
+ */
+export async function termsOfServiceVersion(): Promise<string> {
+  if (termsVersionCache) return termsVersionCache;
+  try {
+    const raw = await readFile(path.join(process.cwd(), "docs", "terms-of-service.md"), "utf8");
+    const hash = createHash("sha256").update(raw).digest("hex").slice(0, 16);
+    const doc = await loadLegalDocument("terms-of-service");
+    const date = doc.lastUpdated ?? doc.effectiveDate ?? "undated";
+    const prefix = LEGAL_DOCS["terms-of-service"].published ? "" : "interim:";
+    termsVersionCache = `${prefix}${date}#sha256:${hash}`;
+  } catch {
+    termsVersionCache = "unresolved";
+  }
+  return termsVersionCache;
 }

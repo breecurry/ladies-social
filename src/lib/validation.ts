@@ -105,7 +105,17 @@ export const signupSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your full date of birth.")
     .refine(isRealBirthDate, "Enter your full date of birth."),
   ageAttested: z.literal(true, "Please confirm that you are 18 or older."),
+  // A separate, independently required agreement — deliberately not
+  // bundled with the 18+ attestation. The literal(true) means a signup
+  // POSTed straight to the API without it (or with false) is rejected
+  // server-side, whatever the client did.
+  tosAgreed: z.literal(true, "Please agree to the Terms of Service to create an account."),
   deviceFingerprint: z.string().trim().max(128).optional().default(""),
+  // Cloudflare Turnstile token (absent until the widget solves, and in
+  // environments without a site key). Supabase verifies it when captcha
+  // is enabled in auth config; until then it is passed through and
+  // ignored, so this field must never be required here.
+  captchaToken: z.string().trim().max(2048).optional().default(""),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
