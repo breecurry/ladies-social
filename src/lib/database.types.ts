@@ -870,6 +870,7 @@ export type Database = {
         Args: {
           p_user: string;
           p_replies?: boolean;
+          p_reposts?: boolean;
           p_before?: string | null;
           p_limit?: number;
           p_before_id?: number | null;

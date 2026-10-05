@@ -246,7 +246,7 @@ do $$ declare v bigint; begin
 end $$;
 -- before removal, the parent context is present (positive control)
 do $$ declare r record; begin
-  select * into r from profile_posts('00000000-0000-0000-0000-000000000004', true, null, 20)
+  select * into r from profile_posts('00000000-0000-0000-0000-000000000004', true, false, null, 20)
     where id = current_setting('t.mod_reply')::bigint;
   if r.parent_excerpt not like '%SENTINEL-PARENT-TEXT%' then
     raise exception 'FAIL: fixture broken — visible parent produced no excerpt';
@@ -261,7 +261,7 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000005', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000005","aal":"aal1","session_id":"sc"}', false);
 do $$ declare r record; begin
-  select * into r from profile_posts('00000000-0000-0000-0000-000000000004', true, null, 20)
+  select * into r from profile_posts('00000000-0000-0000-0000-000000000004', true, false, null, 20)
     where id = current_setting('t.mod_reply')::bigint;
   if not found then raise exception 'FAIL: reply itself vanished (only the parent was removed)'; end if;
   if r.parent_excerpt like '%SENTINEL%' or coalesce(r.parent_author_handle, '') = 'eve' then
@@ -301,7 +301,7 @@ do $$ declare f text; begin
   end loop;
   foreach f in array array[
     'public.feed_following(timestamptz,integer,bigint)',
-    'public.profile_posts(uuid,boolean,timestamptz,integer,bigint)',
+    'public.profile_posts(uuid,boolean,boolean,timestamptz,integer,bigint)',
     'public.list_followers(uuid,timestamptz,integer,uuid)',
     'public.list_following(uuid,timestamptz,integer,uuid)',
     'public.get_notifications(timestamptz,integer,bigint)'] loop

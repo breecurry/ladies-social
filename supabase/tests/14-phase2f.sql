@@ -4,7 +4,8 @@
 --
 -- Headline properties:
 --   - hashtags parse with word boundaries, fold case-insensitively,
---     refuse pure numbers, truncate at 64 chars, index at most 30 per
+--     refuse pure numbers, refuse tokens past 40 chars (0026), index
+--     at most 30 per
 --     post, and the new tables are function-only (RLS on, no direct
 --     app-role reads);
 --   - the "Who can mention you" policy (default Everyone) gates both
@@ -164,7 +165,8 @@ do $$ declare tags_found text[]; begin
   end if;
 end $$;
 
--- 64-char truncation and the 30-distinct-tags cap.
+-- 40-char cap (0026): an over-long token is not a hashtag at all —
+-- nothing indexed, no truncated variant — and the 30-distinct-tags cap.
 set role authenticated;
 do $$ declare v bigint; body text := ''; i integer; begin
   v := create_post('#' || repeat('a', 70));
@@ -177,10 +179,9 @@ do $$ declare v bigint; body text := ''; i integer; begin
 end $$;
 reset role;
 do $$ declare n integer; begin
-  if not exists (select 1 from post_tags pt join tags t on t.id = pt.tag_id
-                 where pt.post_id = current_setting('t.post_long')::bigint
-                   and t.tag = repeat('a', 64)) then
-    raise exception 'FAIL: a 70-character tag was not truncated to 64';
+  if exists (select 1 from post_tags
+             where post_id = current_setting('t.post_long')::bigint) then
+    raise exception 'FAIL: a 70-character token was indexed as a hashtag (0026 caps tags at 40)';
   end if;
   select count(*) into n from post_tags
     where post_id = current_setting('t.post_stuffed')::bigint;
@@ -421,7 +422,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into reshares (user_id, post_id)
   values ('00000000-0000-0000-0000-000000000023', current_setting('t.post_mention1')::bigint);
 do $$ declare row record; begin
-  select * into row from profile_posts('00000000-0000-0000-0000-000000000023', false, null, 50, null) pp
+  select * into row from profile_posts('00000000-0000-0000-0000-000000000023', false, false, null, 50, null) pp
     where pp.id = current_setting('t.post_mention1')::bigint;
   if row is null then
     raise exception 'FAIL: a repost does not appear in the reposter''s Posts tab';

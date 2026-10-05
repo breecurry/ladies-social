@@ -10,14 +10,15 @@ import { useViewer } from "@/components/shell/Providers";
 const PAGE_SIZE = 20;
 
 /**
- * Profile Posts / Replies tab content with cursor paging. When the
- * viewer has muted this account, posts sit behind a reveal so muting
- * is never a trap you cannot see out of (spec §10.3).
+ * Profile Posts / Replies / Reposts tab content with cursor paging.
+ * When the viewer has muted this account, posts sit behind a reveal so
+ * muting is never a trap you cannot see out of (spec §10.3).
  */
 export function ProfilePostsList({
   userId,
   handle,
   replies,
+  reposts,
   initialPosts,
   mutedByViewer,
   isOwn,
@@ -25,6 +26,8 @@ export function ProfilePostsList({
   userId: string;
   handle: string;
   replies: boolean;
+  /** Reposts tab: only this member's reposts, newest repost first. */
+  reposts: boolean;
   initialPosts: ProfilePost[];
   mutedByViewer: boolean;
   isOwn: boolean;
@@ -57,9 +60,13 @@ export function ProfilePostsList({
         {isOwn && viewer.id === userId ? (
           <>
             <p className="text-body text-text-secondary">
-              {replies ? "You have not replied yet." : "You have not posted yet."}
+              {reposts
+                ? "You have not reposted yet."
+                : replies
+                  ? "You have not replied yet."
+                  : "You have not posted yet."}
             </p>
-            {!replies ? (
+            {!replies && !reposts ? (
               <button
                 type="button"
                 onClick={() => openCompose()}
@@ -71,7 +78,7 @@ export function ProfilePostsList({
           </>
         ) : (
           <p className="text-body text-text-secondary">
-            {replies ? "No replies yet." : "No posts yet."}
+            {reposts ? "No reposts yet." : replies ? "No replies yet." : "No posts yet."}
           </p>
         )}
       </div>
@@ -86,6 +93,9 @@ export function ProfilePostsList({
     const { data } = await supabase.rpc("profile_posts", {
       p_user: userId,
       p_replies: replies,
+      // Only sent when true, so the call keeps matching the live
+      // function if the 20261018000001 migration is not yet applied.
+      ...(reposts ? { p_reposts: true } : {}),
       // The cursor is sort_at (repost time for repost rows); fall back
       // to created_at for rows read before the 2F migration applies.
       p_before: last.sort_at ?? last.created_at,

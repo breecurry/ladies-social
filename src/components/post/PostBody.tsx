@@ -22,6 +22,11 @@ import { tokenizeBody } from "@/lib/text";
  * A hashtag links to its canonical tag page, with the author's casing
  * preserved in the visible text. A #token that is not a real tag (a
  * pure number, a URL fragment) renders as plain text.
+ *
+ * "Inert" segments — a well-shaped mention the server did not resolve
+ * (the member's mention policy refused it, or no such account), and a
+ * would-be hashtag past the 40-character cap — render in the muted
+ * tertiary text tone: deliberately not live, visibly so.
  */
 export function PostBody({
   body,
@@ -66,6 +71,10 @@ export function PostBody({
           >
             {segment.text}
           </Link>
+        ) : segment.kind === "inert" ? (
+          <span key={index} className="text-text-tertiary">
+            {segment.text}
+          </span>
         ) : (
           <Fragment key={index}>{segment.text}</Fragment>
         ),

@@ -26,7 +26,7 @@ type Suggestion =
  */
 export function activeTokenAt(text: string, caret: number): ActiveToken | null {
   const before = text.slice(0, caret);
-  const match = /(^|[^\p{L}\p{N}_])([@#])([\p{L}\p{N}_]{1,64})$/u.exec(before);
+  const match = /(^|[^\p{L}\p{N}_])([@#])([\p{L}\p{N}_]{1,40})$/u.exec(before);
   if (!match) return null;
   const sigil = match[2] === "@" ? ("@" as const) : ("#" as const);
   const token = match[3] ?? "";

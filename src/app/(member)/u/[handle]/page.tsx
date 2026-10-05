@@ -53,6 +53,7 @@ export default async function ProfilePage({
 
   const isOwn = profile.user_id === viewer.user.id;
   const replies = tab === "replies";
+  const reposts = tab === "reposts";
 
   const [
     { count: followerCount },
@@ -93,6 +94,10 @@ export default async function ProfilePage({
       p_user: profile.user_id,
       p_replies: replies,
       p_limit: 20,
+      // Only sent when true: the live function may predate the
+      // 20261018000001 migration, and an unknown named argument would
+      // fail the whole call — including the Posts and Replies tabs.
+      ...(reposts ? { p_reposts: true } : {}),
     }),
     // The block-aware, status-aware avatar key resolver — never a raw
     // profile read. An error (e.g. migration not yet applied) reads as
@@ -178,13 +183,15 @@ export default async function ProfilePage({
       ) : (
         <>
           <nav aria-label="Profile sections" className="flex border-b border-border bg-surface">
-            <TabLink href={`/u/${profile.handle}`} label="Posts" active={!replies} />
+            <TabLink href={`/u/${profile.handle}`} label="Posts" active={!replies && !reposts} />
             <TabLink href={`/u/${profile.handle}?tab=replies`} label="Replies" active={replies} />
+            <TabLink href={`/u/${profile.handle}?tab=reposts`} label="Reposts" active={reposts} />
           </nav>
           <ProfilePostsList
             userId={profile.user_id}
             handle={profile.handle}
             replies={replies}
+            reposts={reposts}
             initialPosts={posts ?? []}
             mutedByViewer={muteRow !== null && !isOwn}
             isOwn={isOwn}

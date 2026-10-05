@@ -1,30 +1,37 @@
 /**
  * Post-body tokenization for mentions and hashtags (Phase 2F design
  * §2, §10). These rules MUST agree exactly with the server parser in
- * create_post (migration 20261017000001): what looks like a mention
- * or a tag in the UI is precisely what the server treated as one.
+ * create_post (migrations 20261017000001 + 20261018000001): what looks
+ * like a mention or a tag in the UI is precisely what the server
+ * treated as one.
  *
  * Server rules mirrored here:
  * - A mention is '@' at a word boundary (start of text, or after a
  *   character that is not a letter, number, or underscore) followed by
  *   3-30 of [A-Za-z0-9_]. Whether it LINKS is decided by the resolved
- *   mentions stored at post time, never by the raw text.
+ *   mentions stored at post time, never by the raw text; a well-shaped
+ *   token the server did not resolve renders as deliberately inert,
+ *   muted text.
  * - A hashtag is '#' at the same word boundary followed by Unicode
  *   letters, numbers, and underscores with at least one letter; the
- *   canonical form is the first 64 characters, NFC-normalized and
- *   lowercased. Overflow past 64 characters is ordinary text, as is a
- *   pure-number or pure-underscore token.
+ *   canonical form is NFC-normalized and lowercased. A token longer
+ *   than 40 characters is not a hashtag at all: it renders as the same
+ *   inert, muted text, is not indexed, and does not link. A pure-number
+ *   or pure-underscore token is ordinary text.
  */
 
 export type BodySegment =
   | { kind: "text"; text: string }
   | { kind: "mention"; text: string; handle: string }
-  | { kind: "hashtag"; text: string; tag: string };
+  | { kind: "hashtag"; text: string; tag: string }
+  /** A recognised token that is intentionally not live: a refused or
+   *  unresolvable mention, or a would-be hashtag past the 40-char cap. */
+  | { kind: "inert"; text: string };
 
 const TOKEN = /(^|[^\p{L}\p{N}_])(@[A-Za-z0-9_]+|#[\p{L}\p{N}_]+)/gu;
 const MENTION_TOKEN = /^[A-Za-z0-9_]{3,30}$/;
 const HAS_LETTER = /\p{L}/u;
-const TAG_MAX = 64;
+const TAG_MAX = 40;
 
 /** The one canonical tag fold, matching internal.fold_tag in SQL. */
 export function foldTag(raw: string): string {
@@ -53,17 +60,25 @@ export function tokenizeBody(
     const token = sigilToken.slice(1);
     const tokenStart = match.index + boundary.length;
     if (sigil === "@") {
-      if (MENTION_TOKEN.test(token) && (resolvedHandles?.has(token.toLowerCase()) ?? true)) {
+      if (MENTION_TOKEN.test(token)) {
         pushText(segments, body.slice(cursor, tokenStart));
-        segments.push({ kind: "mention", text: `@${token}`, handle: token.toLowerCase() });
+        if (resolvedHandles?.has(token.toLowerCase()) ?? true) {
+          segments.push({ kind: "mention", text: `@${token}`, handle: token.toLowerCase() });
+        } else {
+          segments.push({ kind: "inert", text: `@${token}` });
+        }
         cursor = tokenStart + token.length + 1;
       }
     } else {
-      const visible = token.slice(0, TAG_MAX);
-      if (HAS_LETTER.test(visible)) {
+      if (HAS_LETTER.test(token)) {
         pushText(segments, body.slice(cursor, tokenStart));
-        segments.push({ kind: "hashtag", text: `#${visible}`, tag: foldTag(visible) });
-        cursor = tokenStart + visible.length + 1;
+        // Code points, matching the server's char_length(), not UTF-16 units.
+        if ([...token].length <= TAG_MAX) {
+          segments.push({ kind: "hashtag", text: `#${token}`, tag: foldTag(token) });
+        } else {
+          segments.push({ kind: "inert", text: `#${token}` });
+        }
+        cursor = tokenStart + token.length + 1;
       }
     }
     match = TOKEN.exec(body);
