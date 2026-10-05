@@ -12,10 +12,11 @@
 --     aal1 session are all refused;
 --   - aal2 still works and records auth_method = 'aal2';
 --   - the gate is Owner-only even with a fresh passkey;
---   - SCOPE IS NOT WIDENED: with a fresh passkey at aal1, grant_role
---     still raises, and the audit_log / user_private RLS policies
---     still return zero rows;
---   - the two new helper functions are callable by no app role.
+--   - the raising helper (require_owner_sensitive_auth) is callable by
+--     no app role; owner_sensitive_auth_method is callable by
+--     authenticated ONLY so RLS policies can evaluate it (that grant,
+--     and the widening of the gate to the other sensitive operations,
+--     is 20261020000001 — suite 17 proves all of it).
 \set ON_ERROR_STOP on
 begin;
 set search_path = public, extensions;
@@ -100,9 +101,10 @@ do $$ begin
 end $$;
 
 -- ============================================================
--- 2. A fresh passkey at aal1 unlocks the reveal, and ONLY the reveal:
---    grant_role still demands aal2, and the aal2 RLS policies on
---    audit_log and user_private still return nothing.
+-- 2. A fresh passkey at aal1 unlocks the reveal. (Until 20261020000001
+--    this section also proved the OTHER sensitive operations refused a
+--    passkey; the Owner has since decided to extend the gate to them,
+--    and suite 17 now owns every assertion about those operations.)
 -- ============================================================
 select set_config('request.jwt.claims',
   jsonb_build_object('sub', '00000000-0000-0000-0000-000000000001', 'aal', 'aal1', 'session_id', 'so',
@@ -114,18 +116,6 @@ do $$ declare r record; begin
                                              'fresh passkey check');
   if r.legal_name <> 'Ida Member' or r.email <> 'ida@test' then
     raise exception 'FAIL: reveal returned the wrong private record';
-  end if;
-  begin
-    perform grant_role('00000000-0000-0000-0000-000000000041', 'moderator');
-    raise exception 'FAIL: grant_role accepted a fresh passkey instead of aal2';
-  exception when others then
-    if sqlerrm like 'FAIL:%' then raise; end if;
-  end;
-  if exists (select 1 from audit_log) then
-    raise exception 'FAIL: audit_log readable at aal1 with a fresh passkey';
-  end if;
-  if exists (select 1 from user_private where user_id <> auth.uid()) then
-    raise exception 'FAIL: user_private readable at aal1 with a fresh passkey';
   end if;
 end $$;
 
@@ -180,18 +170,25 @@ end $$;
 reset role;
 
 -- ============================================================
--- 5. EXECUTE posture: the helpers are internal; the reveal stays
+-- 5. EXECUTE posture: the raising helper is internal; the method
+--    helper is authenticated-only (RLS policies evaluate it as the
+--    querying role since 20261020000001); the reveal stays
 --    authenticated-only.
 -- ============================================================
 do $$ declare f text; begin
   foreach f in array array['anon', 'authenticated', 'service_role'] loop
-    if has_function_privilege(f, 'public.owner_sensitive_auth_method()', 'execute') then
-      raise exception 'FAIL: % can execute owner_sensitive_auth_method', f;
-    end if;
     if has_function_privilege(f, 'public.require_owner_sensitive_auth()', 'execute') then
       raise exception 'FAIL: % can execute require_owner_sensitive_auth', f;
     end if;
   end loop;
+  foreach f in array array['anon', 'service_role'] loop
+    if has_function_privilege(f, 'public.owner_sensitive_auth_method()', 'execute') then
+      raise exception 'FAIL: % can execute owner_sensitive_auth_method', f;
+    end if;
+  end loop;
+  if not has_function_privilege('authenticated', 'public.owner_sensitive_auth_method()', 'execute') then
+    raise exception 'FAIL: authenticated cannot execute owner_sensitive_auth_method — the audit_log/user_private RLS policies would deny the Owner';
+  end if;
   if not has_function_privilege('authenticated', 'public.owner_reveal_identity(uuid, text)', 'execute') then
     raise exception 'FAIL: authenticated lost execute on owner_reveal_identity';
   end if;
