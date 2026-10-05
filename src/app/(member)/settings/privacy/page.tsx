@@ -4,6 +4,7 @@ import { getViewer } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { DisplayNameToggle } from "@/components/DisplayNameToggle";
 import { DiscoverToggle, SearchIndexToggle } from "@/components/settings/Toggles";
+import { MentionPolicyControl } from "@/components/settings/MentionPolicyControl";
 
 export const metadata: Metadata = { title: "Privacy" };
 
@@ -40,6 +41,15 @@ export default async function PrivacySettingsPage() {
           </div>
         </div>
         <DisplayNameToggle showing={showingName} />
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <h3 className="text-heading">Mentions</h3>
+        <MentionPolicyControl initial={viewer.profile.mention_policy ?? "everyone"} />
+        <p className="text-caption text-text-tertiary">
+          Blocking someone always stops their mentions from reaching you, whatever you choose
+          here.
+        </p>
       </Card>
 
       <Card className="flex flex-col gap-3">

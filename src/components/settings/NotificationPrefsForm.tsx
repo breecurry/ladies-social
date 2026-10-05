@@ -6,13 +6,15 @@ import { useToast } from "@/components/shell/ToastProvider";
 import { useViewer } from "@/components/shell/Providers";
 import { ToggleRow } from "@/components/settings/Toggles";
 
-export type PrefKey = "follow" | "reply" | "mention" | "like" | "message";
+export type PrefKey = "follow" | "reply" | "mention" | "like" | "message" | "reshare" | "quote";
 
 const ROWS: Array<{ key: PrefKey; label: string; helper: string }> = [
   { key: "reply", label: "Replies", helper: "When someone replies to one of your posts." },
   { key: "mention", label: "Mentions", helper: "When someone mentions your @handle." },
   { key: "follow", label: "New followers", helper: "When someone follows you." },
   { key: "like", label: "Likes", helper: "When someone likes one of your posts." },
+  { key: "reshare", label: "Reposts", helper: "When someone reposts one of your posts." },
+  { key: "quote", label: "Quotes", helper: "When someone quotes one of your posts." },
 ];
 
 const DM_ROW: { key: PrefKey; label: string; helper: string } = {

@@ -1,12 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Users, At, CaretDown } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { ReplyControl } from "@/lib/database.types";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/shell/ToastProvider";
+import {
+  ComposerAutocomplete,
+  activeTokenAt,
+  type ActiveToken,
+} from "@/components/compose/ComposerAutocomplete";
 
 export interface ReplyTarget {
   id: number;
@@ -61,6 +66,35 @@ export function Composer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mention/hashtag autocomplete (Phase 2F §9): track the token the
+  // caret sits in; the listbox decorates the field, never steals focus.
+  const [token, setToken] = useState<ActiveToken | null>(null);
+  const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
+  const listboxId = useId();
+
+  const syncToken = useCallback((value: string, caret: number | null) => {
+    setToken(caret === null ? null : activeTokenAt(value, caret));
+  }, []);
+
+  const insertCompletion = useCallback(
+    (target: ActiveToken, insert: string) => {
+      const field = fieldRef.current;
+      const current = field?.value ?? "";
+      const next = `${current.slice(0, target.start)}${insert} ${current.slice(target.end)}`;
+      onDraftChange(next);
+      setToken(null);
+      setActiveOptionId(null);
+      if (field) {
+        const caret = target.start + insert.length + 1;
+        requestAnimationFrame(() => {
+          field.focus();
+          field.setSelectionRange(caret, caret);
+        });
+      }
+    },
+    [onDraftChange],
+  );
 
   const remaining = LIMIT - draft.length;
   const empty = draft.trim().length === 0;
@@ -119,13 +153,37 @@ export function Composer({
           data-autofocus
           value={draft}
           maxLength={LIMIT}
-          onChange={(event) => onDraftChange(event.target.value)}
+          onChange={(event) => {
+            onDraftChange(event.target.value);
+            syncToken(event.target.value, event.target.selectionStart);
+          }}
+          onSelect={(event) =>
+            syncToken(event.currentTarget.value, event.currentTarget.selectionStart)
+          }
+          onBlur={() => {
+            setToken(null);
+            setActiveOptionId(null);
+          }}
+          role="combobox"
+          aria-expanded={token !== null}
+          aria-controls={listboxId}
+          aria-activedescendant={activeOptionId ?? undefined}
+          aria-autocomplete="list"
           placeholder={replyTo ? `Reply to @${replyTo.handle}` : "Share something with the community"}
           aria-label={replyTo ? `Reply to @${replyTo.handle}` : "New post"}
           rows={4}
           className="min-h-28 w-full resize-none bg-transparent text-body-lg text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </div>
+
+      <ComposerAutocomplete
+        token={token}
+        fieldRef={fieldRef}
+        listboxId={listboxId}
+        activeId={activeOptionId}
+        onActiveIdChange={setActiveOptionId}
+        onSelect={insertCompletion}
+      />
 
       {error ? (
         <p role="alert" className="text-caption text-danger">
