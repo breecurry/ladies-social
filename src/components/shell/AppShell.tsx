@@ -367,7 +367,7 @@ function AccountMenu({
           {isOwner ? (
             <Link
               role="menuitem"
-              href="/owner/roles"
+              href="/owner"
               onClick={() => setOpen(false)}
               className="flex min-h-11 items-center gap-3 px-4 text-body text-text-primary hover:bg-accent-subtle"
             >

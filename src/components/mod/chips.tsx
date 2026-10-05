@@ -96,6 +96,8 @@ export function AccountStatusChip({
           Banned
         </span>
       );
+    case "deactivated":
+      return <span className={`${chipBase} text-text-tertiary`}>Deactivated</span>;
     default:
       return <span className={`${chipBase} text-text-tertiary`}>{status}</span>;
   }

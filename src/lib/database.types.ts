@@ -304,6 +304,74 @@ export type PersonRow = {
 
 export type FollowListRow = PersonRow & { followed_at: string };
 
+/**
+ * The five coarse activity bucket labels (Phase 2D spec §3.4) — the
+ * complete vocabulary that may describe a member's activity outside
+ * the audited identity reveal. Derived server-side; a raw last-login
+ * timestamp never reaches the client on a browsable surface.
+ */
+export type ActivityBucket =
+  | "Active recently"
+  | "This month"
+  | "Earlier"
+  | "Dormant"
+  | "New, not yet active";
+
+/** One directory row from owner_directory(). @handle is the only identity. */
+export type DirectoryRow = {
+  user_id: string;
+  handle: string;
+  founding: boolean;
+  status: AccountStatus;
+  status_expires_at: string | null;
+  staff_role: string | null;
+  joined_at: string;
+  activity_bucket: ActivityBucket;
+};
+
+/** The member-detail glance view from owner_member_detail(): standing
+ * and shape, never the person (Phase 2D spec §6). */
+export type MemberDetailRow = DirectoryRow & {
+  is_system: boolean;
+  post_count: number;
+  follower_count: number;
+  following_count: number;
+};
+
+/** The AAL2-gated, reason-stated, audit-logged identity reveal
+ * (Phase 2D spec §7). Device signals arrive as a count, never hashes. */
+export type IdentityRevealRow = {
+  handle: string;
+  legal_name: string;
+  email: string;
+  phone: string | null;
+  phone_verified_at: string | null;
+  signup_ip: string | null;
+  last_login_ip: string | null;
+  last_login_at: string | null;
+  device_signal_count: number;
+};
+
+/** One identity-free row of the logged directory export (spec §9.2). */
+export type DirectoryExportRow = {
+  handle: string;
+  founding: boolean;
+  status: AccountStatus;
+  staff_role: string | null;
+  joined_at: string;
+  activity_bucket: ActivityBucket;
+};
+
+/** The shared filter arguments of the owner_directory* functions. */
+export type DirectoryFilterArgs = {
+  p_query?: string | null;
+  p_statuses?: AccountStatus[] | null;
+  p_staff_only?: boolean;
+  p_joined_after?: string | null;
+  p_joined_before?: string | null;
+  p_activity?: string[] | null;
+};
+
 /** Row shape returned by get_notifications(). */
 export type NotificationItem = {
   id: number;
@@ -706,6 +774,23 @@ export type Database = {
         Args: { p_target: string };
         Returns: ModEnforcementRow[];
       };
+      owner_member_count: { Args: Record<string, never>; Returns: number };
+      owner_directory: {
+        Args: DirectoryFilterArgs & {
+          p_before_created?: string | null;
+          p_before_user?: string | null;
+          p_limit?: number;
+        };
+        Returns: DirectoryRow[];
+      };
+      owner_directory_count: { Args: DirectoryFilterArgs; Returns: number };
+      owner_member_detail: { Args: { p_handle: string }; Returns: MemberDetailRow[] };
+      owner_reveal_identity: {
+        Args: { p_user: string; p_reason: string };
+        Returns: IdentityRevealRow[];
+      };
+      owner_directory_export: { Args: DirectoryFilterArgs; Returns: DirectoryExportRow[] };
+      owner_metrics: { Args: { p_range?: string }; Returns: Json };
       my_account_status: { Args: Record<string, never>; Returns: MyAccountStatus[] };
       refresh_my_status: { Args: Record<string, never>; Returns: boolean };
       record_age_gate_block: {
