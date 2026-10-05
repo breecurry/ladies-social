@@ -20,6 +20,13 @@ export interface ReplyTarget {
   replyControl: ReplyControl;
 }
 
+/** The post being quoted when the composer opens in quote mode. */
+export interface QuoteTarget {
+  id: number;
+  handle: string;
+  excerpt: string;
+}
+
 const LIMIT = 500;
 const SOFT_BAND = 60;
 
@@ -40,13 +47,16 @@ function AudienceIcon({ value, size = 16 }: { value: ReplyControl; size?: number
 }
 
 /**
- * The post composer (spec §5): one component for new posts and replies.
- * Late-revealing character counter, inline audience control, optimistic
- * close on success. The surrounding modal/sheet lives in ComposeProvider.
+ * The post composer (spec §5): one component for new posts, replies,
+ * and quote-posts (Phase 2F §15 — the original renders as a nested
+ * compact card above the field). Late-revealing character counter,
+ * inline audience control, optimistic close on success. The
+ * surrounding modal/sheet lives in ComposeProvider.
  */
 export function Composer({
   viewerHandle,
   replyTo,
+  quote,
   draft,
   onDraftChange,
   onClose,
@@ -54,6 +64,7 @@ export function Composer({
 }: {
   viewerHandle: string;
   replyTo?: ReplyTarget;
+  quote?: QuoteTarget;
   draft: string;
   onDraftChange: (value: string) => void;
   onClose: () => void;
@@ -107,6 +118,7 @@ export function Composer({
       p_body: draft,
       p_parent: replyTo?.id ?? null,
       p_reply_control: replyTo ? "everyone" : audience,
+      p_quote: quote?.id ?? null,
     });
     setBusy(false);
     if (rpcError) {
@@ -129,7 +141,7 @@ export function Composer({
         >
           ✕
         </button>
-        <h2 className="text-heading">{replyTo ? "Reply" : "New post"}</h2>
+        <h2 className="text-heading">{replyTo ? "Reply" : quote ? "Quote" : "New post"}</h2>
         <Button onClick={() => void post()} disabled={empty || remaining < 0 || busy}>
           {busy ? "Posting…" : "Post"}
         </Button>
@@ -139,6 +151,15 @@ export function Composer({
         <p className="text-caption text-text-tertiary">
           Replying to @{replyTo.handle}: {replyTo.excerpt}
         </p>
+      ) : null}
+
+      {quote ? (
+        <div className="rounded-md border border-border bg-background px-3 py-2">
+          <p className="text-caption text-text-tertiary">@{quote.handle}</p>
+          <p className="line-clamp-3 whitespace-pre-wrap break-words text-body text-text-secondary">
+            {quote.excerpt}
+          </p>
+        </div>
       ) : null}
 
       <div className="flex gap-3">

@@ -86,9 +86,11 @@ export function ProfilePostsList({
     const { data } = await supabase.rpc("profile_posts", {
       p_user: userId,
       p_replies: replies,
-      p_before: last.created_at,
+      // The cursor is sort_at (repost time for repost rows); fall back
+      // to created_at for rows read before the 2F migration applies.
+      p_before: last.sort_at ?? last.created_at,
       p_limit: PAGE_SIZE,
-      // Composite cursor: id breaks created_at ties so posts sharing a
+      // Composite cursor: id breaks timestamp ties so posts sharing a
       // timestamp are never skipped across a page boundary.
       p_before_id: last.id,
     });
@@ -102,8 +104,9 @@ export function ProfilePostsList({
     <div className="flex flex-col">
       {posts.map((post) => (
         <PostCard
-          key={post.id}
+          key={`${post.id}-${post.sort_at ?? post.created_at}`}
           post={post}
+          attribution={post.is_reshare ? [handle] : null}
           parentContext={
             replies && post.parent_author_handle
               ? { handle: post.parent_author_handle, excerpt: post.parent_excerpt ?? "" }

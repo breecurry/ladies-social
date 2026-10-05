@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChatCircle, Heart } from "@phosphor-icons/react";
+import { ChatCircle, Heart, Repeat, Quotes } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { ReplyControl, ResolvedMention, QuotedCard } from "@/lib/database.types";
 import { relativeTime, fullTimestamp } from "@/lib/format";
@@ -35,9 +35,13 @@ export interface PostCardData {
 
 /**
  * The post card (spec §4.2): avatar, handle-forward identity block,
- * body, reply-control note, and the Reply/Like action row with ZERO
- * COUNTS HIDDEN. The identity block renders the @handle only — never
- * a legal name; the data shape makes anything else impossible.
+ * body, reply-control note, and the Reply/Repeat/Like action row with
+ * ZERO COUNTS HIDDEN. The identity block renders the @handle only —
+ * never a legal name; the data shape makes anything else impossible.
+ *
+ * Phase 2F adds the Repeat action (plain repost and quote-post, both
+ * first-class), the repost attribution line, and the nested card a
+ * quote-post carries.
  */
 export function PostCard({
   post,
@@ -45,6 +49,7 @@ export function PostCard({
   avatarSize = 48,
   parentContext,
   followPill = false,
+  attribution,
 }: {
   post: PostCardData;
   /** feed = clickable card; root = thread hero with full timestamp. */
@@ -59,6 +64,9 @@ export function PostCard({
    * person" signal, so Following cards never pass this.
    */
   followPill?: boolean;
+  /** Handles of the people whose reposts surfaced this card, newest
+   * first — the "@handle reposted" line (Phase 2F §16). */
+  attribution?: string[] | null;
 }) {
   const router = useRouter();
   const viewer = useViewer();
@@ -66,9 +74,35 @@ export function PostCard({
   const { openCompose } = useCompose();
   const [liked, setLiked] = useState(post.viewer_liked);
   const [likeCount, setLikeCount] = useState(post.like_count);
+  const [reshared, setReshared] = useState(post.viewer_reshared ?? false);
+  const [reshareCount, setReshareCount] = useState(post.reshare_count ?? 0);
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const [hiddenUndo, setHiddenUndo] = useState<(() => Promise<void>) | null>(null);
+  const repeatRef = useRef<HTMLDivElement>(null);
+  const repeatTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isOwn = post.author_id === viewer.id;
+
+  useEffect(() => {
+    if (!repeatOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (repeatRef.current && !repeatRef.current.contains(event.target as Node)) {
+        setRepeatOpen(false);
+      }
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setRepeatOpen(false);
+      repeatTriggerRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [repeatOpen]);
 
   if (hiddenUndo) {
     return (
@@ -121,6 +155,57 @@ export function PostCard({
     }
   };
 
+  // A plain repost is one optimistic tap with an undo toast (Phase 2F
+  // §15) — the like/follow treatment, no confirmation dialog. Undoing
+  // later is the same control again.
+  const removeRepost = async () => {
+    setReshared(false);
+    setReshareCount((n) => Math.max(n - 1, 0));
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase
+      .from("reshares")
+      .delete()
+      .eq("user_id", viewer.id)
+      .eq("post_id", post.id);
+    if (error) {
+      setReshared(true);
+      setReshareCount((n) => n + 1);
+      showToast("Could not undo the repost. Try again.");
+    }
+    router.refresh();
+  };
+
+  const repost = async () => {
+    setRepeatOpen(false);
+    setReshared(true);
+    setReshareCount((n) => n + 1);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase
+      .from("reshares")
+      .insert({ user_id: viewer.id, post_id: post.id });
+    if (error) {
+      setReshared(false);
+      setReshareCount((n) => Math.max(n - 1, 0));
+      showToast("Could not repost that. Try again.");
+      return;
+    }
+    showToast("Reposted", {
+      actionLabel: "Undo",
+      onAction: removeRepost,
+      durationMs: 6000,
+    });
+    router.refresh();
+  };
+
+  const quote = () => {
+    setRepeatOpen(false);
+    openCompose(undefined, {
+      id: post.id,
+      handle: post.author_handle,
+      excerpt: post.body.length > 200 ? `${post.body.slice(0, 200)}…` : post.body,
+    });
+  };
+
   const openThread = () => {
     if (variant === "feed") router.push(`/post/${post.id}`);
   };
@@ -140,6 +225,12 @@ export function PostCard({
       replyControl: post.reply_control,
     });
 
+  const repeatLabelBase = reshared ? "Reposted" : "Repost";
+  const repeatLabel =
+    reshareCount > 0
+      ? `${repeatLabelBase}, ${reshareCount} ${reshareCount === 1 ? "repost" : "reposts"}`
+      : repeatLabelBase;
+
   return (
     <article
       aria-label={`Post by @${post.author_handle}, ${relativeTime(post.created_at)}`}
@@ -150,6 +241,12 @@ export function PostCard({
         variant === "feed" ? "cursor-pointer transition-colors duration-(--duration-fast) hover:bg-surface-raised" : ""
       }`}
     >
+      {attribution && attribution.length > 0 ? (
+        <p className="flex items-center gap-1.5 text-caption text-text-tertiary">
+          <Repeat size={14} aria-hidden />
+          {attributionLine(attribution, viewer.handle)}
+        </p>
+      ) : null}
       {parentContext ? (
         <p className="text-caption text-text-tertiary">
           Replying to @{parentContext.handle}: {parentContext.excerpt}
@@ -195,6 +292,8 @@ export function PostCard({
 
       <PostBody body={post.body} mentions={post.mentions ?? null} />
 
+      {post.quoted ? <QuotedPreview quoted={post.quoted} /> : null}
+
       {variant === "root" ? (
         <p className="text-caption text-text-tertiary">{fullTimestamp(post.created_at)}</p>
       ) : null}
@@ -219,6 +318,64 @@ export function PostCard({
             <span className="text-caption text-text-tertiary">{post.reply_count}</span>
           ) : null}
         </button>
+        <div ref={repeatRef} className="relative">
+          <button
+            ref={repeatTriggerRef}
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={repeatOpen}
+            aria-label={repeatLabel}
+            onClick={() => setRepeatOpen((v) => !v)}
+            className={`flex min-h-11 items-center gap-1.5 rounded-md px-2 ${
+              reshared ? "text-accent" : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Repeat size={20} weight={reshared ? "bold" : "regular"} aria-hidden />
+            {reshareCount > 0 ? (
+              <span className={`text-caption ${reshared ? "text-accent" : "text-text-tertiary"}`}>
+                {reshareCount}
+              </span>
+            ) : null}
+          </button>
+          {repeatOpen ? (
+            <div
+              role="menu"
+              aria-label="Repost options"
+              className="absolute bottom-full left-0 z-30 mb-1 min-w-44 rounded-md bg-surface-raised py-2 shadow-e2"
+            >
+              {isOwn ? null : reshared ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-body text-text-primary hover:bg-accent-subtle"
+                  onClick={() => {
+                    setRepeatOpen(false);
+                    void removeRepost();
+                  }}
+                >
+                  <Repeat size={20} aria-hidden /> Undo repost
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-body text-text-primary hover:bg-accent-subtle"
+                  onClick={() => void repost()}
+                >
+                  <Repeat size={20} aria-hidden /> Repost
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-body text-text-primary hover:bg-accent-subtle"
+                onClick={quote}
+              >
+                <Quotes size={20} aria-hidden /> Quote
+              </button>
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           aria-pressed={liked}
@@ -237,5 +394,56 @@ export function PostCard({
         </button>
       </div>
     </article>
+  );
+}
+
+/** "@handle reposted" / "@a and N others reposted" / "You reposted". */
+function attributionLine(handles: string[], viewerHandle: string): string {
+  const first = handles[0];
+  if (first === undefined) return "";
+  const name = first === viewerHandle ? "You" : `@${first}`;
+  if (handles.length === 1) return `${name} reposted`;
+  return `${name} and ${handles.length - 1} ${handles.length === 2 ? "other" : "others"} reposted`;
+}
+
+/**
+ * The nested compact card inside a quote-post (Phase 2F §16): the
+ * quoted author's identity and body, linking to the original thread.
+ * When the original is deleted, removed, its author unreachable, or a
+ * block stands between any of the people involved, the server sends
+ * only the unavailable stub — no author, no text, no reason.
+ */
+function QuotedPreview({ quoted }: { quoted: QuotedCard }) {
+  if (quoted.unavailable) {
+    return (
+      <div className="rounded-md border border-border bg-background px-3 py-2">
+        <p className="text-body text-text-tertiary">This post is unavailable.</p>
+      </div>
+    );
+  }
+  return (
+    <Link
+      href={`/post/${quoted.id}`}
+      onClick={(event) => event.stopPropagation()}
+      className="block rounded-md border border-border bg-background p-3 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
+    >
+      <span className="flex items-center gap-2">
+        <Avatar handle={quoted.handle} size={24} link={false} userId={quoted.author_id} />
+        <span className="truncate text-label font-semibold text-text-primary">
+          @{quoted.handle}
+        </span>
+        <span className="text-caption text-text-tertiary">
+          · {relativeTime(quoted.created_at)}
+        </span>
+        {quoted.founding ? (
+          <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-micro text-accent">
+            Founding
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-1 block line-clamp-4 whitespace-pre-wrap break-words text-body text-text-primary">
+        {quoted.body}
+      </span>
+    </Link>
   );
 }

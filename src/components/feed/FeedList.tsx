@@ -26,9 +26,11 @@ export function FeedList({ initialPosts }: { initialPosts: FeedPost[] }) {
     setError(false);
     const supabase = createSupabaseBrowserClient();
     const { data, error: rpcError } = await supabase.rpc("feed_following", {
-      p_before: last.created_at,
+      // The cursor is sort_at (repost time for repost rows); fall back
+      // to created_at for rows read before the 2F migration applies.
+      p_before: last.sort_at ?? last.created_at,
       p_limit: PAGE_SIZE,
-      // Composite cursor: id breaks created_at ties so posts sharing a
+      // Composite cursor: id breaks timestamp ties so posts sharing a
       // timestamp are never skipped across a page boundary.
       p_before_id: last.id,
     });
@@ -44,7 +46,12 @@ export function FeedList({ initialPosts }: { initialPosts: FeedPost[] }) {
   return (
     <div className="flex flex-col">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCard
+          key={`${post.id}-${post.sort_at ?? post.created_at}`}
+          post={post}
+          attribution={post.reshared_by ?? null}
+          followPill={post.viewer_follows === false}
+        />
       ))}
       {exhausted ? (
         <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
