@@ -55,7 +55,7 @@ export default async function TagPage({ params }: { params: Promise<{ tag: strin
   return (
     <div className="flex flex-col lg:mt-6 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
       <header className="flex flex-col gap-1 border-b border-border bg-surface px-4 py-4">
-        <h1 className="text-title text-text-primary">#{header.tag}</h1>
+        <h1 className="break-words text-title text-text-primary">#{header.tag}</h1>
         {header.post_count > 0 ? (
           <p className="text-caption text-text-tertiary">
             {header.post_count} {header.post_count === 1 ? "post" : "posts"}

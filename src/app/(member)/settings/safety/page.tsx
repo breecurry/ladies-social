@@ -106,7 +106,7 @@ export default async function SafetySettingsPage() {
         ) : (
           (blocks ?? []).map((row) => (
             <div key={row.blocked_id} className="flex items-center justify-between gap-3">
-              <span className="text-body text-text-primary">@{handleOf(row.blocked_id)}</span>
+              <span className="min-w-0 truncate text-body text-text-primary">@{handleOf(row.blocked_id)}</span>
               <UnblockButton targetUserId={row.blocked_id} targetHandle={handleOf(row.blocked_id)} />
             </div>
           ))
@@ -120,7 +120,7 @@ export default async function SafetySettingsPage() {
         ) : (
           (mutes ?? []).map((row) => (
             <div key={row.muted_id} className="flex items-center justify-between gap-3">
-              <span className="text-body text-text-primary">@{handleOf(row.muted_id)}</span>
+              <span className="min-w-0 truncate text-body text-text-primary">@{handleOf(row.muted_id)}</span>
               <UnmuteButton targetUserId={row.muted_id} />
             </div>
           ))
@@ -137,7 +137,7 @@ export default async function SafetySettingsPage() {
         ) : (
           (hidden ?? []).map((row) => (
             <div key={row.hidden_id} className="flex items-center justify-between gap-3">
-              <span className="text-body text-text-primary">@{handleOf(row.hidden_id)}</span>
+              <span className="min-w-0 truncate text-body text-text-primary">@{handleOf(row.hidden_id)}</span>
               <UnhideButton targetUserId={row.hidden_id} />
             </div>
           ))

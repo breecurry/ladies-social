@@ -106,10 +106,10 @@ export function SearchClient({ trending }: { trending: TrendingTagRow[] }) {
               key={row.tag}
               href={`/t/${encodeURIComponent(row.tag)}`}
               aria-label={`hashtag ${row.tag}, ${row.post_count} ${row.post_count === 1 ? "post" : "posts"}`}
-              className="flex min-h-11 items-center justify-between border-b border-border bg-surface px-4 py-3 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
+              className="flex min-h-11 items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
             >
-              <span className="text-label text-accent">#{row.tag}</span>
-              <span className="text-caption text-text-tertiary">
+              <span className="min-w-0 truncate text-label text-accent">#{row.tag}</span>
+              <span className="shrink-0 text-caption text-text-tertiary">
                 {row.post_count} {row.post_count === 1 ? "post" : "posts"}
               </span>
             </Link>

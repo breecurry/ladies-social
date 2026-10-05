@@ -33,7 +33,7 @@ export default async function OwnerAuditPage() {
   const needsStepUp = aalData?.currentLevel !== "aal2";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col gap-2">
         <h1 className="text-title">Audit log</h1>
         <p className="max-w-prose text-body text-text-secondary">
@@ -81,7 +81,7 @@ export default async function OwnerAuditPage() {
                       <td className="py-2 pr-4">
                         <code className="text-caption">{entry.action}</code>
                         {entry.detail && Object.keys(entry.detail as object).length > 0 ? (
-                          <div className="text-caption text-text-tertiary">
+                          <div className="break-all text-caption text-text-tertiary">
                             {JSON.stringify(entry.detail)}
                           </div>
                         ) : null}

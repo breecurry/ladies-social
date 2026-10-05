@@ -45,10 +45,10 @@ export function TrendingModule({ rows }: { rows: TrendingTagRow[] }) {
               key={row.tag}
               href={`/t/${encodeURIComponent(row.tag)}`}
               aria-label={`hashtag ${row.tag}, ${row.distinct_people} ${row.distinct_people === 1 ? "person" : "people"}`}
-              className="flex min-h-11 items-center justify-between px-4 py-2 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
+              className="flex min-h-11 items-center justify-between gap-3 px-4 py-2 transition-colors duration-(--duration-fast) hover:bg-surface-raised"
             >
-              <span className="text-label text-accent">#{row.tag}</span>
-              <span className="text-caption text-text-tertiary">
+              <span className="min-w-0 truncate text-label text-accent">#{row.tag}</span>
+              <span className="shrink-0 text-caption text-text-tertiary">
                 {row.distinct_people} {row.distinct_people === 1 ? "person" : "people"}
               </span>
             </Link>

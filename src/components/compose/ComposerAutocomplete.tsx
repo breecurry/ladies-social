@@ -184,9 +184,9 @@ export function ComposerAutocomplete({
             </>
           ) : (
             <>
-              <span className="text-label text-accent">#{suggestion.tag}</span>
+              <span className="min-w-0 truncate text-label text-accent">#{suggestion.tag}</span>
               {suggestion.postCount > 0 ? (
-                <span className="text-caption text-text-tertiary">
+                <span className="shrink-0 text-caption text-text-tertiary">
                   {suggestion.postCount} {suggestion.postCount === 1 ? "post" : "posts"}
                 </span>
               ) : null}

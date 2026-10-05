@@ -46,7 +46,7 @@ export default async function OwnerMembersPage({
 
   if (totalError || rowsError) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 p-4">
         <h1 className="text-title">Members</h1>
         <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface px-6 py-16 text-center shadow-e1">
           <h2 className="text-heading text-text-primary">
@@ -65,7 +65,7 @@ export default async function OwnerMembersPage({
   const initialRows: DirectoryRow[] = rows ?? [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-title">Members</h1>

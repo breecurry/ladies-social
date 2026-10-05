@@ -53,7 +53,7 @@ export default async function OwnerMemberDetailPage({
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <p className="text-caption text-text-tertiary">
         <Link className="text-accent underline-offset-4 hover:underline" href="/owner/members">
           Members

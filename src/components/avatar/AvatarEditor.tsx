@@ -22,7 +22,8 @@ import { AVATAR_MAX_BYTES, AVATAR_MIN_DIM, AVATAR_REJECTION_MESSAGE } from "@/li
  * ever leave this component.
  */
 
-const VIEWPORT = 288; // crop viewport css px
+/** The crop viewport's css-px ceiling; it shrinks with the screen below 352px wide. */
+const MAX_VIEWPORT = 288;
 const EXPORT_SIZE = 1024; // square export edge
 const MAX_ZOOM = 3;
 
@@ -119,6 +120,11 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
 
   const [url] = useState(() => URL.createObjectURL(file));
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  // The crop square's real rendered size: 288px with room to spare,
+  // smaller on narrow phones (min(288px, 100vw - 64px) in CSS). All
+  // crop maths read this measured value so the export stays correct.
+  const [viewport, setViewport] = useState(MAX_VIEWPORT);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   // Up-front size check with a stated reason (spec 6.5); the server
   // re-checks everything.
@@ -133,22 +139,39 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  const coverScale = dims ? Math.max(VIEWPORT / dims.w, VIEWPORT / dims.h) : 1;
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+    const measure = () => {
+      const width = node.getBoundingClientRect().width;
+      if (width > 0) setViewport(width);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [phase.step]);
+
+  const coverScale = dims ? Math.max(viewport / dims.w, viewport / dims.h) : 1;
   const scale = coverScale * zoom;
 
   const clampOffset = useCallback(
     (next: { x: number; y: number }, atZoom: number) => {
       if (!dims) return next;
       const s = coverScale * atZoom;
-      const maxX = Math.max(0, (dims.w * s - VIEWPORT) / 2);
-      const maxY = Math.max(0, (dims.h * s - VIEWPORT) / 2);
+      const maxX = Math.max(0, (dims.w * s - viewport) / 2);
+      const maxY = Math.max(0, (dims.h * s - viewport) / 2);
       return {
         x: Math.min(maxX, Math.max(-maxX, next.x)),
         y: Math.min(maxY, Math.max(-maxY, next.y)),
       };
     },
-    [dims, coverScale],
+    [dims, coverScale, viewport],
   );
+
+  // The offset is re-clamped where it is used, so a viewport resize
+  // mid-crop (e.g. a rotation) can never show or export past the edge.
+  const shownOffset = clampOffset(offset, zoom);
 
   const onImageLoad = () => {
     const img = imageRef.current;
@@ -166,9 +189,9 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
     setPhase({ step: "uploading" });
     try {
       // The visible square in image coordinates.
-      const sourceSize = VIEWPORT / scale;
-      const sourceX = dims.w / 2 - (VIEWPORT / 2 + offset.x) / scale;
-      const sourceY = dims.h / 2 - (VIEWPORT / 2 + offset.y) / scale;
+      const sourceSize = viewport / scale;
+      const sourceX = dims.w / 2 - (viewport / 2 + shownOffset.x) / scale;
+      const sourceY = dims.h / 2 - (viewport / 2 + shownOffset.y) / scale;
       const exportEdge = Math.min(EXPORT_SIZE, Math.max(AVATAR_MIN_DIM, Math.round(sourceSize)));
       const canvas = document.createElement("canvas");
       canvas.width = exportEdge;
@@ -234,6 +257,7 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
         {phase.step === "error" && !dims ? null : (
           <div className="flex flex-col items-center gap-3">
             <div
+              ref={viewportRef}
               role="application"
               aria-label="Photo position. Drag, or use the arrow keys, to move the photo inside the circle."
               tabIndex={0}
@@ -275,8 +299,8 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
               onPointerUp={() => {
                 dragRef.current = null;
               }}
-              className="relative touch-none overflow-hidden rounded-md bg-background"
-              style={{ width: VIEWPORT, height: VIEWPORT, cursor: "move" }}
+              className="relative aspect-square touch-none overflow-hidden rounded-md bg-background"
+              style={{ width: `min(${MAX_VIEWPORT}px, calc(100vw - 64px))`, cursor: "move" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- local
                   object URL being positioned on a canvas, not a remote image */}
@@ -295,7 +319,7 @@ function AvatarCropDialog({ file, onClose }: { file: File; onClose: () => void }
                     ? {
                         width: dims.w * scale,
                         height: dims.h * scale,
-                        transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+                        transform: `translate(calc(-50% + ${shownOffset.x}px), calc(-50% + ${shownOffset.y}px))`,
                       }
                     : { visibility: "hidden" }
                 }

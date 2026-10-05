@@ -38,7 +38,7 @@ export default async function OwnerInsightsPage({
   const payload = error ? null : parseMetricsPayload(data);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col gap-2">
         <h1 className="text-title">Insights</h1>
         <p className="max-w-prose text-body text-text-secondary">
