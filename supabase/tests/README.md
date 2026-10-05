@@ -17,6 +17,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/04-known-vulnerabilities.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/05-hardening-regressions.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/06-age-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/07-moderation.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/08-tos-consent.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -224,3 +225,27 @@ Covers migration 0018 (the moderation console's data layer):
   (claim, warn, remove, suspend, lift, ban, dismiss, reporter-reveal,
   filing), the ban entry records signal KINDS never values, and the
   chain still verifies end to end afterwards.
+## What the Terms-consent suite (08) proves
+
+Covers migration 0019 (the Terms of Service agreement recorded at
+signup):
+
+- `user_private.tos_agreed_at` and `tos_version` exist and are
+  **nullable** — accounts that predate the consent checkbox read as
+  exactly what they are (no consent captured) and nothing locks them
+  out;
+- no account carries a consent it never gave: both columns start NULL
+  and only `record_tos_consent()` can set them;
+- recording is service_role-only (an authenticated member can neither
+  call the function nor write the columns directly), stamps the
+  consent moment and the **exact version string** of the document
+  agreed to, and appends a `member.tos_consent` audit row carrying
+  that version — the audit chain still verifies end to end;
+- an empty version is refused (no unattributable consents), a
+  non-member returns false and writes nothing, and the 200-character
+  version guard holds.
+
+The HTTP half — the signup route refusing a POST whose `tosAgreed`
+field is absent or false — is enforced by `signupSchema`
+(`z.literal(true)`) before any database call, and is verified with
+curl against a running build; see PROGRESS.md.
