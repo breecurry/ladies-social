@@ -260,8 +260,9 @@ create table banned_identifiers (
 -- ============================================================
 -- SOCIAL GRAPH
 -- ============================================================
--- PHASE 2A IMPLEMENTATION NOTE (migration 20261005000001_social_core.sql
--- is authoritative for everything below through notifications):
+-- PHASE 2A IMPLEMENTATION NOTE (migrations 20261005000001_social_core.sql
+-- and 20261006000001_social_core_hardening.sql are together authoritative
+-- for everything below through notifications):
 --   * Shipped: follows, blocks (mutual-hard, with a SECURITY DEFINER
 --     blocked_either()/blocked_by() pair used inside RLS), mutes,
 --     hidden_accounts ("show me less", a Discover/ranking signal that
@@ -269,6 +270,20 @@ create table banned_identifiers (
 --     (adjacency list + trigger-maintained root/depth), post_mentions,
 --     likes, reports (via file_report(), routing computed server-side),
 --     notifications + notification_prefs.
+--   * HARDENED (0014, after an independent security audit + adversarial
+--     QA pass): the block helpers are caller-scoped and their app-role
+--     EXECUTE is revoked — RLS policies call twins in an `internal`
+--     schema that PostgREST does not expose, so no member can probe
+--     block state between other people or confirm "did she block me?"
+--     via RPC. follows_read filters blocks in both directions (the raw
+--     table can no longer leak a blocker's social graph to the person
+--     she blocked). get_thread returns nothing — not a tombstone — when
+--     the ROOT author is blocked either way. file_report carries a 24h
+--     (reporter, accused, reason) duplicate guard and a 10/hour cap.
+--     Mentions require a word boundary before '@'; search escapes LIKE
+--     metacharacters; reply depth caps at 30; all paged reads use
+--     composite (created_at, id) cursors; parent/notification excerpts
+--     require visibility = 'visible'.
 --   * Posts are written ONLY via create_post()/delete_post(); reports
 --     ONLY via file_report(); direct writes are REVOKEd from
 --     authenticated AND service_role.
@@ -824,7 +839,13 @@ create policy notif_own on notifications for select using (user_id = auth.uid())
 create policy notif_own_update on notifications for update using (user_id = auth.uid());
 
 -- -------- blocks / mutes / follows / likes / reshares: own-row write, sensible read
-create policy follows_read   on follows  for select using (auth.uid() is not null);
+-- ⚠️ follows reads MUST filter blocks on BOTH columns (hardening lesson,
+-- migration 0014): the list functions filtering blocks means nothing if
+-- the raw table read underneath does not — a blocked member could
+-- enumerate her blocker's whole social graph with one PostgREST query.
+create policy follows_read   on follows  for select using (auth.uid() is not null
+    and not internal.blocked_either(auth.uid(), follower_id)
+    and not internal.blocked_either(auth.uid(), followee_id));
 create policy follows_write  on follows  for insert with check (follower_id = auth.uid()
     and not exists (select 1 from blocks b where b.blocker_id = followee_id and b.blocked_id = auth.uid()));
 create policy follows_delete on follows  for delete using (follower_id = auth.uid());
@@ -837,6 +858,21 @@ create policy likes_delete   on likes    for delete using (user_id = auth.uid())
 create policy likes_read     on likes    for select using (auth.uid() is not null);
 -- reshares mirror likes.
 ```
+
+**RLS helper functions and the `internal` schema (hardening lesson,
+2026-10-06).** Postgres checks EXECUTE on a function referenced in a
+policy against the *querying* role, even for SECURITY DEFINER functions
+— so any helper a policy uses must be executable by `authenticated`,
+and anything executable by `authenticated` in the `public` schema is
+callable from the browser via PostgREST RPC with arbitrary arguments.
+The rule going forward: policy helpers live in the `internal` schema
+(granted to `authenticated`, **never** added to the API-exposed schema
+list), and any helper that answers questions about relationships must
+be caller-scoped — it answers only when `auth.uid()` is one of the
+parties, and raises otherwise. The 0013 versions of `blocked_either`/
+`blocked_by` violated this and let any member probe block state between
+two other people; migration 0014 is the fix and
+`tests/04-known-vulnerabilities.sql` is the permanent gate.
 
 ## 2.2 Threading model — why adjacency list, not materialized path or closure table
 
@@ -884,6 +920,8 @@ media.unitedfeminist.com ──► Cloudflare (cache + CSAM scan + Worker auth f
 ```
 
 Signup flow (open registration): email + password + legal name + date of birth + @handle → per-IP rate limit and handle availability → **ban-evasion check**: email and device-fingerprint hashes matched against `banned_identifiers`; a match is silently refused with a success-shaped, uniformly-timed response → bot pre-filter (disposable email domains, subnet velocity, profile-coherence heuristics) **auto-flags** the account but never blocks it → account created at `trust_level = 'member'`, active immediately → Supabase sends the confirmation email; the account cannot sign in until the address is confirmed. Device fingerprint hash + signup IP recorded. There is no admission step, no review queue, and no appearance or gender screening of any kind, by locked decision. Removal is conduct-based and after the fact.
+
+**Security response headers** (shipped 2026-10-06, `next.config.ts`): `Referrer-Policy: strict-origin-when-cross-origin` — threat-model-critical, because a member clicking an external link planted in a post or bio must not broadcast `Referer: …/u/alice` (membership + whose profile she was on) to the link's owner — plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a restrictive `Permissions-Policy` (camera, microphone, geolocation, payment, usb all denied). **CSP is a tracked follow-up**: the theme-init inline script in `layout.tsx` needs a nonce or hash first (see PROGRESS.md).
 
 ## 3.2 Media upload pipeline (identical for posts, avatars, and DMs)
 

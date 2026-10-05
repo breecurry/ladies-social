@@ -1,10 +1,11 @@
 # PROGRESS: United Feminist
 
-Updated: 2026-10-05
+Updated: 2026-10-06
 
 ## Where things stand
 
-**Phase 2A, the text social core, is built.** Posts (text only, 500
+**Phase 2A, the text social core, is built and hardened.** Posts (text
+only, 500
 chars), threaded replies (adjacency list with denormalised root/depth,
 three visible levels then re-root), follows with the owner's exact
 mechanics (one-tap follow with undo toast, profile-only confirmed
@@ -30,6 +31,52 @@ feed/thread/search function can return a legal name, report routing
 with `owner_conflict` invisible in-app to everyone including the
 Owner, notification RLS, and DEFINER-only write paths. Typecheck,
 lint, build, and both smoke suites pass.
+
+**Security hardening pass (2026-10-06).** An independent security audit
+and an adversarial QA pass each reviewed Phase 2A; every P1 and P2
+finding from both is fixed by migration 0014
+(`20261006000001_social_core_hardening.sql`, forward-only, idempotent —
+0013 itself is untouched) plus app-layer changes:
+
+- **Block-state probing is dead.** `blocked_either`/`blocked_by` were
+  RPC-callable with arbitrary ids (any member could map blocks between
+  two other people, and a blocked person could ask point-blank "did she
+  block me?"). `public.*` versions lost all app-role EXECUTE and
+  `blocked_either` is caller-scoped; the RLS policies call twins in a
+  new `internal` schema that PostgREST does not expose. `notif_enabled`
+  likewise revoked.
+- **The follows table filters blocks** (both directions, both columns).
+  Previously a blocked member could enumerate her blocker's entire
+  follower/following graph with a direct table read — the worst finding
+  of the pass. Side effect, correct by design: follows that predate a
+  block disappear from both parties' lists and counts.
+- **`get_thread` returns nothing for a blocked author's root post**, so
+  the app 404s instead of rendering a tombstone that confirms the post
+  exists. In-thread tombstones are unchanged.
+- **Reports are rate-limited**: one per (reporter, accused, reason) per
+  24h, ten per reporter per hour, both refused with calm copy —
+  mass-reporting can no longer bury a victim's queue.
+- **Mentions require a word boundary** before `@` ("noreply@cat" no
+  longer notifies @cat), **search escapes LIKE wildcards** ("a_a" no
+  longer matches "ada"), **reply depth caps at 30**, **pagination uses
+  composite (created_at, id) cursors** so timestamp ties are never
+  skipped, and moderation-removed posts can never surface as parent
+  excerpts or notification excerpts.
+- **Security response headers shipped** in `next.config.ts`:
+  `Referrer-Policy: strict-origin-when-cross-origin` (an external link
+  click no longer broadcasts *whose profile the member was viewing*),
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a
+  restrictive `Permissions-Policy`.
+- **OverflowMenu closes on Escape** and returns focus to its trigger
+  (keyboard users could open the safety menu but not dismiss it).
+
+Test suites: `04-known-vulnerabilities.sql` is converted from
+NOTICE-based documentation to a hard-failing regression gate (all six
+QA findings fixed), and the new `05-hardening-regressions.sql` covers
+the follows filter, report limits, root-post guard, depth cap, excerpt
+visibility, and structural EXECUTE-privilege guards. One existing
+assertion changed: 02 §8 files the moderator report as `spam` instead
+of repeating `harassment`, which the new duplicate guard would refuse.
 
 **Not in 2A, deliberately:** Discover + ranking (2B, with moderation
 groundwork), the age gate screens (spec §17), reshares/quotes (schema
@@ -64,12 +111,20 @@ gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
       overflow safety menu, notifications surface, and the settings IA.
       New smoke suite `02-social-smoke.sql` covering the social-core
       security invariants.
+- [x] **Phase 2A security hardening (2026-10-06).** Every P1/P2 finding
+      from the independent security audit and the adversarial QA pass,
+      fixed in migration 0014 + app layer (see "Where things stand").
+      `04-known-vulnerabilities.sql` now hard-fails on regression; new
+      `05-hardening-regressions.sql` gates the fixes.
 
 ## Next session, start here
 
-1. **Apply migration 0013 to the live project**: `supabase db push` (or
-   re-run `npm run provision`, which is idempotent). 0013 is forward-only
-   and idempotent; 0001-0012 are already applied.
+1. **Apply migrations 0013 AND 0014 to the live project**: `supabase db
+   push` (or re-run `npm run provision`, which is idempotent). Both are
+   forward-only and idempotent; 0001-0012 are already applied. Apply
+   them together — 0013 must not run on the live project without 0014's
+   fixes going out in the same step, and open registration should not
+   begin before 0014 is live.
 2. **Phase 2B**: Discover feed (chronological, with the hide signal
    suppressing hidden accounts) + the age gate screens (spec §17) + the
    minimal report-review/ban tooling committed to before strangers can
@@ -83,6 +138,29 @@ gated on NCMEC + PhotoDNA registration), DMs, owner moderation queue.
    "Inviter accountability" section with its table).
 
 ## Known gaps and deliberate skips in Phase 2A (re-flag, do not lose)
+
+### Deferred from the 2026-10-06 hardening pass (deliberate, tracked)
+
+- **Content-Security-Policy is not set yet.** The theme-init inline
+  script in `src/app/layout.tsx` needs a nonce or hash before a useful
+  CSP can ship; doing it badly (`unsafe-inline`) would be security
+  theatre. Separate follow-up task; the other response headers are live.
+- **`middleware.ts` is not renamed to `proxy.ts`** even though Next.js 16
+  emits a deprecation notice suggesting it. That file is route
+  protection; renaming it inside a security fix pass was judged not
+  worth the risk. Do it as its own tiny change with its own verification.
+- **Post ids remain sequential bigints.** The security audit flagged
+  sequential ids as a probing aid (a blocked person can watch id gaps to
+  infer activity). Moving to UUIDs or opaque short codes is a costly
+  structural change — needs the owner's call, banked for Phase 2B+.
+- **The Owner's personal account is still unblockable**
+  (`forbid_blocking_protected` protects both `is_system` accounts and
+  the owner role). Both auditors recommend protecting only `is_system`
+  so the Owner's human account is blockable like anyone's; this is the
+  owner's personal decision and is deliberately NOT changed here. If
+  she says yes it is a one-line follow-up migration; if no, drop it.
+
+### Skips carried over from the 2A build
 
 - Swipe mute/block accelerator, keyboard j/k shortcuts, the new-posts
   pill, offline banner/PWA caching, the one-time overflow tooltip, and

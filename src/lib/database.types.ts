@@ -326,25 +326,41 @@ export type Database = {
         Returns: string;
       };
       feed_following: {
-        Args: { p_before?: string | null; p_limit?: number };
+        Args: { p_before?: string | null; p_limit?: number; p_before_id?: number | null };
         Returns: FeedPost[];
       };
       get_thread: { Args: { p_post: number }; Returns: ThreadPost[] };
       profile_posts: {
-        Args: { p_user: string; p_replies?: boolean; p_before?: string | null; p_limit?: number };
+        Args: {
+          p_user: string;
+          p_replies?: boolean;
+          p_before?: string | null;
+          p_limit?: number;
+          p_before_id?: number | null;
+        };
         Returns: ProfilePost[];
       };
       search_people: { Args: { p_query: string; p_limit?: number }; Returns: PersonRow[] };
       list_followers: {
-        Args: { p_user: string; p_before?: string | null; p_limit?: number };
+        Args: {
+          p_user: string;
+          p_before?: string | null;
+          p_limit?: number;
+          p_before_user?: string | null;
+        };
         Returns: FollowListRow[];
       };
       list_following: {
-        Args: { p_user: string; p_before?: string | null; p_limit?: number };
+        Args: {
+          p_user: string;
+          p_before?: string | null;
+          p_limit?: number;
+          p_before_user?: string | null;
+        };
         Returns: FollowListRow[];
       };
       get_notifications: {
-        Args: { p_before?: string | null; p_limit?: number };
+        Args: { p_before?: string | null; p_limit?: number; p_before_id?: number | null };
         Returns: NotificationItem[];
       };
       notif_mark_all_read: { Args: Record<string, never>; Returns: undefined };

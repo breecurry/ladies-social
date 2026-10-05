@@ -88,6 +88,9 @@ export function ProfilePostsList({
       p_replies: replies,
       p_before: last.created_at,
       p_limit: PAGE_SIZE,
+      // Composite cursor: id breaks created_at ties so posts sharing a
+      // timestamp are never skipped across a page boundary.
+      p_before_id: last.id,
     });
     setLoading(false);
     if (!data) return;
