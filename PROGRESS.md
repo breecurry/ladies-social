@@ -56,12 +56,21 @@ re-enroll it once. Do not change this value again.
 (the markdown stays the single source of truth; react-markdown with no
 raw-HTML pass-through, so no XSS surface). `/terms-of-service` and
 `/privacy-policy` are public 200 pages but show an interim
-"being finalised with counsel" notice instead of draft text: both drafts
-still contain unresolved owner decisions (ToS §7.7 `[OWNER DECISION
-REQUIRED]` on DM-access scope; six `[RETENTION PERIOD NOT YET DECIDED]`
-brackets in Privacy Policy §8; attorney notes on arbitration/class waiver)
-and describe features that do not exist yet (DMs, image upload and CSAM
-scanning, phone verification). **When a document gets sign-off, flip its
+"being finalised with counsel" notice instead of draft text. **As of
+2026-10-07 every owner decision blocking them is RESOLVED** — ToS §7.7 was
+deleted outright (end-to-end encryption makes administrator access to DM
+content without a member report technically impossible, which moots the
+question), and all six Privacy Policy §8 retention periods are filled in
+(account data 30 days after deletion, public content deleted with the
+account, DM ciphertext deleted with the account, technical and security data
+90 days, moderation records 2 years, ban-evasion signals 2 years). Every
+description of a feature that does not exist has been removed: phone number
+collection, image upload, CSAM scanning of images, and the Twilio, Hive,
+PhotoDNA and AWS vendor entries. **The only thing still standing between
+these documents and publication is attorney sign-off** on the remaining
+judgment calls (arbitration and class waiver, DPA execution, and whether the
+retention periods survive the applicable statutes of limitations).
+**When a document gets sign-off, flip its
 `published` flag in `src/lib/legal.ts` — one line per document — and the
 real text goes live at the same URL.** Aliases `/terms` `/tos` `/privacy`
 `/guidelines` `/legal` redirect to the canonical routes. Signup links the
@@ -390,9 +399,12 @@ export to S3 Object Lock.
 
 - [ ] Attorney review of the Terms of Service and Privacy Policy — their
       pages ship an interim notice until then (the Guidelines are published;
-      counsel can still review them post-publication). Publication is also
-      blocked on owner decisions: ToS §7.7 (administrator DM-access scope)
-      and the six retention periods in Privacy Policy §8. Once a document is
+      counsel can still review them post-publication). **No owner decisions
+      remain outstanding: ToS §7.7 is deleted and all six Privacy Policy §8
+      retention periods are set (2026-10-07).** What is left is counsel's own
+      judgment on arbitration and class waiver, DPA execution with current
+      vendors, and whether the retention periods cover the applicable
+      statutes of limitations. Once a document is
       signed off, flip its `published` flag in `src/lib/legal.ts`.
 - [ ] Trademark search on "Hersciety" (the earlier "United Feminist" name was
       never cleared either)
@@ -416,9 +428,24 @@ export to S3 Object Lock.
   `banned_identifiers` on every permanent ban.
 - **Real names are collected but not publicly displayed by default.**
   Pseudonymity with accountability.
-- **DMs are not end-to-end encrypted in V1**, but the schema, franking, and
-  key tables make E2E a later configuration change rather than a rewrite.
-  If E2E is ever switched on, the CSAM posture for DM images must be
-  reopened, because scanning does not survive encryption.
+- 🔒 **DMs ARE end-to-end encrypted. Owner decision, 2026-10-07.** This
+  reverses the earlier "not E2E in V1" position, which the owner overruled.
+  She was right on the facts: end-to-end encryption and moderation are not
+  mutually exclusive. Reporting works by client-side report-with-evidence —
+  the reporting member's own device attaches the decrypted messages, and
+  cryptographic franking proves the sender really sent them and the reporter
+  did not fabricate them. The `user_devices` and `one_time_prekeys` tables
+  from migration 0007 exist for exactly this and are finally populated by the
+  DM build. **First release is text-only and 1:1 only**; group chat is a
+  harder protocol and comes later.
+  **The one capability given up is proactive server-side CSAM hash-scanning
+  of DM images — and that costs nothing today, because no image upload exists
+  anywhere in the product.** It only becomes a real trade-off if DM images
+  are ever enabled, which is a separate gated decision with its own
+  preconditions in `docs/design-phase2c-direct-messages.md`.
+  ⚠️ Build caveats: browser E2E is roughly 60-80% of native-app security, so
+  the crypto must pass an external audit before it ships; and libsignal is
+  AGPLv3, so a permissively-licensed implementation is required.
+  Full design: `docs/design-phase2c-direct-messages.md`.
 - **Images are served through Cloudflare** so free CSAM scanning sees them,
   and EXIF is stripped at upload so location data never reaches storage.
