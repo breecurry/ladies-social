@@ -224,7 +224,7 @@ We use third-party vendors to operate the Platform. Each vendor receives only th
 
 | Provider | What they do | Data they receive |
 |---|---|---|
-| Supabase | Database, authentication, and real-time infrastructure | All account data, content, and message ciphertext stored in the database; authentication credentials |
+| Supabase | Database, authentication, and real-time infrastructure | All account data, content, and message content stored in the database; authentication credentials |
 | Vercel | Application hosting and delivery | Request logs, IP addresses, application traffic |
 | Cloudflare | CDN and email routing | Domain traffic, email routing metadata |
 | Resend | Transactional email delivery | Email addresses, email content (verification, notifications, alerts) |
