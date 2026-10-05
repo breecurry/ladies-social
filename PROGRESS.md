@@ -13,16 +13,15 @@ Deployment below); row-level security blocks anonymous reads; owner
 `@getbakedwithbre` and system `@hersciety` accounts intact; zero runtime
 errors.
 
-Next, in order: **apply migration `20261014000001` (admin dashboard) to the
-live project** — the Phase 2D code is on main but its seven `owner_*`
-functions do not exist in production until Grove applies it (write-then-review
-protocol, same as every migration) → **profile pictures / avatars** (designed
-in `docs/design-phase2e-profile-pictures.md`; unblocked now that the
-moderation console is live; PhotoDNA is voluntary and NCMEC pre-registration
-is not required) → **Grove-Test** (adversarial) → **Grove-Security**
-(mandatory before any public launch) → the Owner's MFA enrolment → counsel
-sign-off, then flip `published: true` in `src/lib/legal.ts` (one line per
-document).
+Next, in order: **apply migrations `20261014000001` (admin dashboard),
+`20261015000001` (avatars) and `20261016000001` (analytics) to the live
+project** — the code for all three is on main but their functions and tables
+do not exist in production until Grove applies them (write-then-review
+protocol, same as every migration) → **R2 buckets + media-zone env for
+avatars** (see "Where things stand") → **Grove-Test** (adversarial) →
+**Grove-Security** (mandatory before any public launch) → the Owner's MFA
+enrolment → counsel sign-off, then flip `published: true` in
+`src/lib/legal.ts` (one line per document).
 
 Everything the older version of this list named is now done: the Supabase
 Site URL is `https://www.hersciety.com`, Resend SMTP is configured and
@@ -62,6 +61,85 @@ one of them. If the Owner enrolled a passkey before this change, she must
 re-enroll it once. Do not change this value again.
 
 ## Where things stand
+
+**Profile pictures are built (Phase 2E, 2026-10-10).** The first image
+feature in the product, to `docs/design-phase2e-profile-pictures.md`, with
+the safety model as the spine:
+
+- **Upload → crop → store → serve**: the own-profile avatar gains a camera
+  edit affordance and the Edit profile dialog a photo row; both open the
+  crop step (square frame, circular-mask preview, drag + zoom slider +
+  arrow-key nudging; rejections always state their reason). The client
+  exports a square and uploads via ticket → presigned PUT to the R2
+  **staging** bucket (never served) → commit, where the server is the
+  authority: real bytes sniffed (static JPEG/PNG/WebP only, 8 MB cap,
+  256px minimum, ~50 MP decompression-bomb ceiling), decoded,
+  **auto-oriented first, then re-encoded so EXIF/GPS/XMP/ICC and the EXIF
+  thumbnail are gone** before anything servable exists (proven by
+  `npm run test:avatar-pipeline`), three square WebP variants (96/192/400)
+  plus a blurhash written to the **media** bucket under an opaque 48-hex
+  CSPRNG key — no handle, user id, counter, timestamp, or filename
+  anywhere; the original filename is never read, stored, or returned, and
+  a new upload always mints a new key. Serving is public-with-unguessable-
+  key through the Cloudflare media zone (`NEXT_PUBLIC_MEDIA_URL`,
+  immutable cache), matching post media by design.
+- **Scanning (owner decision 2026-10-09, supersedes the spec's §13
+  recommendation): Cloudflare's zone-level CSAM Scanning Tool only**,
+  already enabled on the zone; it operates on Cloudflare's cache, out of
+  band. There is deliberately **zero scanning code and no scanning vendor**
+  in the app. What the law needs when out-of-band detection fires is built:
+  **removal preserves, never hard-deletes** — a report freezes the accused's
+  current avatar key as evidence at filing time (`reports.
+  reported_avatar_key`), any report in open/in_review/escalated/actioned
+  blocks purging, a csam-reason report pins a `legal_hold` (the ≥1-year
+  anchor, Owner path only), and a moderation removal is retained for the
+  2-year moderation-records window. Only a clean, unreported,
+  self-removed/superseded object is ever deleted from storage, and the
+  database makes that call, never the route.
+- **The resolver is the control, not the UI**: every surface resolves
+  photos through `avatar_keys()` — SECURITY DEFINER, authenticated-only —
+  which gates on **`blocked_either(auth.uid(), owner)`, the bidirectional
+  POSTS semantics** (a block in either direction means the real key reaches
+  neither party; `profiles_read`'s one-way `blocked_by` is deliberately not
+  relied on), and on standing: suspended/banned/deactivated/deleted owners,
+  removed/purged objects, and non-member viewers all resolve to nothing.
+  Mute changes nothing (identity is not a feed). Logged-out visitors never
+  see an avatar (auth gate + anon holds no EXECUTE). The 0009 column grant
+  that let members write `profiles.avatar_media_key` directly is revoked —
+  the pipeline functions are the only writers.
+- **Surfaces**: the letter avatar stays the deliberate default everywhere
+  (zero new tokens). Photos appear on post cards, replies, profile headers,
+  people rows, notifications, the DM surfaces and the member's own nav
+  circles, resolved through one batched client cache. **Staff surfaces stay
+  letter-placeholder-only**: the moderation console and Owner directory
+  render no member photo, except the one deliberate place — the case view's
+  "Reported profile photo" panel, blurred by default (average-color block,
+  no clear pixels) behind a click-to-reveal with the report category named,
+  with Remove (preserving, member notified with the rule, reversible via
+  Reinstate) on the ladder's `remove_content` rung. **A csam-reported image
+  never renders in the console at all** — excluded at the database.
+- Suite `12-avatars.sql` proves the mutual-hard block in both directions,
+  the logged-out/suspended/banned nothing-answers, the evidence freeze and
+  purge refusals, preserve-and-reinstate, the ticket rate limit, the
+  locked tables (RLS, zero policies, zero direct grants), the absence of
+  any filename column, and the structural absence of `display_name` from
+  every avatar function. `tests/13` and all earlier suites still pass.
+
+⚠️ **Migration `20261015000001_avatars.sql` is written, tested (fresh
+apply + re-run clean three times, including a re-run after the later
+`20261016000001` was applied), and NOT yet applied to the live project.**
+Until Grove applies it, every avatar RPC errors and every surface renders
+the letter placeholder; nothing crashes. New tables `avatar_media` and
+`avatar_upload_tickets` carry RLS with zero policies; the
+0-tables-without-RLS invariant holds.
+
+⚠️ **Avatars need infrastructure before the feature is live** (the code
+degrades to letter placeholders until then): two R2 buckets (staging +
+media), an R2 API token, the `media.hersciety.com` zone mapped to the media
+bucket with the Cloudflare CSAM Scanning Tool enabled on it (the owner has
+enabled the tool at the zone level already), and the env vars documented in
+`.env.example` (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_STAGING_BUCKET`, `R2_MEDIA_BUCKET`, `NEXT_PUBLIC_MEDIA_URL`).
 
 **The Owner's admin dashboard is built (Phase 2D, 2026-10-10).** The
 Owner-tools cluster is now a hub at `/owner` with two new rooms alongside

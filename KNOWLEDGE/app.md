@@ -182,3 +182,52 @@ re-derive). The facts an agent must not violate:
   git history at commit `c5554c2`.
 - Vector (SVG) source still unknown — if the owner produces one, the
   two wordmark PNGs collapse to a single `currentColor` SVG (spec §8).
+
+## Avatars (Phase 2E) — the first image feature (built 2026-10-10)
+
+Spec: `docs/design-phase2e-profile-pictures.md`. Migration
+`20261015000001_avatars.sql` (write-then-review; Grove applies). The
+facts an agent must not violate:
+
+- **Scanning is Cloudflare's zone-level CSAM Scanning Tool ONLY** (owner
+  decision 2026-10-09, superseding the spec's section 13 recommendation).
+  It runs on Cloudflare's cache, out of band. There is deliberately NO
+  scanning code, NO PhotoDNA, NO Hive, and none may be added without a
+  new owner decision. The in-band half of the duty IS built and must
+  stay: **removal preserves, never hard-deletes** (report holds,
+  `legal_hold` on csam-reason reports, 2-year retention of
+  moderation-removed objects).
+- **The avatar key resolver is `avatar_keys()` and it gates on
+  `blocked_either(auth.uid(), owner)` — BIDIRECTIONAL, the posts
+  semantics.** Never resolve an avatar through a raw `profiles` read:
+  `profiles_read` filters only one direction (`internal.blocked_by`).
+  A UI placeholder fallback is not the control; the key must never
+  reach a blocked client. Any new surface that shows an avatar goes
+  through `avatar_keys()` (client: `useAvatarMedia`; server: the RPC).
+- **Keys are opaque**: 48-hex CSPRNG, objects at
+  `av/{key}/{96|192|400}.webp`, staging at `st/{48hex}`. A new upload
+  mints a NEW key. No filename column exists anywhere and none may be
+  added; the uploaded filename is never read, stored, or returned.
+- **Metadata dies server-side** in `src/lib/media/ingest.ts`:
+  auto-orient first, then full re-encode — no `withMetadata` anywhere.
+  `npm run test:avatar-pipeline` is the gate proving EXIF/GPS/XMP/ICC
+  do not survive; keep it green.
+- **Members cannot write `profiles.avatar_media_key` directly** (the
+  0009 column grant is revoked). The only writers are
+  `avatar_commit_record`, `remove_avatar`, `mod_remove_avatar`,
+  `mod_reinstate_avatar`.
+- **Staff surfaces render the letter placeholder only** — never pass
+  `userId`/`media` to `Avatar` in `/mod` or `/owner` surfaces. The one
+  exception is the case view's reported-photo panel
+  (`mod_avatar_evidence`): blurred by default, click-to-reveal, and
+  csam-reported images are excluded at the database.
+- **Serving** is public-with-unguessable-key via the Cloudflare media
+  zone (`NEXT_PUBLIC_MEDIA_URL`), matching post media. The signed-token
+  Worker variant was considered and deliberately not built. Env:
+  `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+  `R2_STAGING_BUCKET`, `R2_MEDIA_BUCKET`, `NEXT_PUBLIC_MEDIA_URL` —
+  all absent means every surface degrades to the letter placeholder
+  and upload fails cleanly.
+- Suite `supabase/tests/12-avatars.sql` asserts all of the above
+  structurally and behaviourally. Extend it; never weaken the
+  both-directions block assertions.
