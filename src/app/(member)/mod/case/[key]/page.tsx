@@ -10,6 +10,7 @@ import { AccountStatusChip, PriorityChip, StateChip } from "@/components/mod/chi
 import { CaseActions } from "@/components/mod/CaseActions";
 import { ReporterReveal } from "@/components/mod/ReporterReveal";
 import { ThreadContext } from "@/components/mod/ThreadContext";
+import { DmEvidence } from "@/components/mod/DmEvidence";
 
 export const metadata: Metadata = { title: "Case" };
 
@@ -37,6 +38,14 @@ export default async function ModCasePage({ params }: { params: Promise<{ key: s
   ]);
   const account = contextRows?.[0];
   if (!account || !reports || reports.length === 0) notFound();
+
+  // DM report evidence (account-level cases only; a message report has
+  // no subject post). Errors — including the DM migration not yet being
+  // applied — read as "no DM evidence".
+  const { data: dmEvidence } =
+    parsed.postId === null
+      ? await supabase.rpc("mod_dm_evidence", { p_target: parsed.accusedId })
+      : { data: null };
 
   const [{ data: thread }, { data: accountPosts }] = await Promise.all([
     parsed.postId !== null
@@ -106,6 +115,9 @@ export default async function ModCasePage({ params }: { params: Promise<{ key: s
         <section aria-label="Reported content in context" className="rounded-lg border border-border bg-surface">
           <ThreadContext posts={thread} />
         </section>
+      ) : null}
+      {dmEvidence && dmEvidence.length > 0 ? (
+        <DmEvidence rows={dmEvidence} accusedHandle={account.handle} />
       ) : null}
       {accountPosts && accountPosts.length > 0 ? (
         <section aria-label="Recent posts" className="rounded-lg border border-border bg-surface">

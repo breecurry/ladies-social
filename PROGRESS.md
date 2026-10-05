@@ -52,6 +52,32 @@ re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
+**Direct messages are built — end-to-end encrypted, text-only, 1:1 —
+and ship DARK behind the `dm_e2e_enabled` feature flag (Phase 2C,
+2026-10-05).** The server stores ciphertext only: migration
+`20261011000001_direct_messages.sql` wires the (until now empty)
+`user_devices` / `one_time_prekeys` tables from 0007, adds
+conversations with the silent one-request cap, Messages settings, and
+client-side report-with-evidence whose franking commitments the
+database verifies with pgcrypto — the reporter cannot fabricate a
+message and the sender cannot deny one, while the platform reads ONLY
+what a reporter chooses to attach. The crypto is an X3DH-style
+agreement plus a Double Ratchet on audited MIT primitives
+(@noble/curves, @noble/ciphers, @noble/hashes — libsignal is AGPLv3
+and deliberately unused), unit-tested with `npm run test:dm-crypto`.
+The inbox rules are enforced in the database, not the UI: main inbox
+only from people you follow; everyone else gets exactly one silent
+request (no notification, no badge, preview-only, no second message
+until accepted, and declining can never grant a second one); block /
+DMs-off / "no one" all refuse with the identical message so a block is
+indistinguishable. Every DM surface is @handle-only (suite
+09-dm-smoke asserts it structurally). **Nothing is reachable until the
+external cryptographic audit passes and both flag layers are flipped —
+`DM_E2E_ENABLED` in the environment and the `dm_e2e_enabled` row in
+app_config; see KNOWLEDGE/app.md for the exact go-live order.** There
+is no readable-by-the-platform fallback: off means the surfaces do not
+exist. ⚠️ Migration 0020 is NOT applied to the live project.
+
 **The moderation console is built (Phase 2B, 2026-10-05).** Reports can
 finally be actioned. Migration `20261010000001` is the data layer: the full
 enforcement ladder as SECURITY DEFINER functions (dismiss/reopen, warn,
@@ -337,6 +363,17 @@ polish; moderation shipping does not auto-flip it.
       fixed in migration 0014 + app layer (see "Where things stand").
       `04-known-vulnerabilities.sql` now hard-fails on regression; new
       `05-hardening-regressions.sql` gates the fixes.
+- [x] **Phase 2C, direct messages (2026-10-05, dark behind the flag).**
+      Migration 0020 (`20261011000001_direct_messages.sql`): E2E DM
+      schema (ciphertext-only messages, devices + one-time prekeys,
+      conversations with the one-request cap, dm_settings,
+      franking-verified report evidence), all member functions gated on
+      the `dm_e2e_enabled` app_config flag. Crypto layer + IndexedDB
+      stores + inbox/thread/requests/settings surfaces + the console's
+      DM-evidence transcript. New smoke suite `09-dm-smoke.sql` and the
+      `test:dm-crypto` protocol unit test. OFF in production until the
+      external crypto audit; `message` added to `report_subject` and
+      `notif_type`.
 - [x] **Phase 2B, age gate (spec §17).** Migration 0017
       (`20261009000001_age_gate.sql`): `age_gate_blocks` — a block row is
       a hashed device fingerprint, timestamps and a short reference code,
@@ -461,7 +498,9 @@ polish; moderation shipping does not auto-flip it.
       (the age gate and the moderation console are done — see below)
 - [ ] Phase 3: media pipeline and moderation backbone (CSAM scanning; the ban
       actions that feed `banned_identifiers` shipped with the console)
-- [ ] Phase 4: direct messages with photos
+- [ ] Phase 4: DM images (text DMs shipped dark in 2C; images stay
+      gated behind the five preconditions in the 2C design §17, chiefly
+      NCMEC/PhotoDNA and the attorney-reviewed CSAM posture)
 - [ ] Phase 5: discovery ranking and the For You feed
 - [ ] Phase 6: launch hardening
 
@@ -493,6 +532,14 @@ export to S3 Object Lock.
       safety@unitedfeminist.com actually send; until then every copy queues
       durably in `safety_email_outbox` and sends on the first load after the
       key exists
+- [ ] Commission the external cryptographic audit of the DM build —
+      the gate for turning messages on (budget guidance in the security
+      research: roughly $15k-$50k). Until it passes, both layers of the
+      `dm_e2e_enabled` flag stay off and no member can reach a DM
+      surface
+- [ ] After review, apply migration `20261011000001` to the live
+      project (Grove does this; the code is deployed and degrades
+      gracefully until then)
 - [ ] Choose the founding cohort (the first 10-50 people she asks to join)
 - [ ] Decide on point-in-time database recovery (~$100/mo) at launch
 

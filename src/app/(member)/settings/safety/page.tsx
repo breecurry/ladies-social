@@ -8,6 +8,8 @@ import { relativeTime } from "@/lib/format";
 import { Card } from "@/components/ui";
 import { UnblockButton } from "@/components/profile/UnblockButton";
 import { UnmuteButton, UnhideButton } from "@/components/settings/SafetyActions";
+import { DmSettingsCard } from "@/components/dm/DmSettingsCard";
+import { dmFeatureOn } from "@/lib/dm/server";
 
 export const metadata: Metadata = { title: "Safety" };
 
@@ -42,6 +44,16 @@ export default async function SafetySettingsPage() {
   if (!viewer) redirect("/login");
 
   const supabase = await createSupabaseServerClient();
+  const dmEnabled = await dmFeatureOn();
+  const dmSettings = dmEnabled
+    ? (
+        await supabase
+          .from("dm_settings")
+          .select("requests_from, dms_enabled, read_receipts")
+          .eq("user_id", viewer.user.id)
+          .maybeSingle()
+      ).data
+    : null;
   const [{ data: blocks }, { data: mutes }, { data: hidden }, { data: reports }] =
     await Promise.all([
       supabase.from("blocks").select("blocked_id").eq("blocker_id", viewer.user.id),
@@ -73,6 +85,19 @@ export default async function SafetySettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-title">Safety</h2>
+
+      {dmEnabled ? (
+        <Card className="flex flex-col gap-3">
+          <h3 className="text-heading">Messages</h3>
+          <DmSettingsCard
+            initial={{
+              requests_from: dmSettings?.requests_from ?? "everyone",
+              dms_enabled: dmSettings?.dms_enabled ?? true,
+              read_receipts: dmSettings?.read_receipts ?? false,
+            }}
+          />
+        </Card>
+      ) : null}
 
       <Card className="flex flex-col gap-3">
         <h3 className="text-heading">Blocked accounts</h3>
@@ -132,7 +157,13 @@ export default async function SafetySettingsPage() {
                 <p className="text-body text-text-primary">
                   {REASON_LABELS[report.reason]}{" "}
                   <span className="text-caption text-text-tertiary">
-                    · about {report.subject_type === "post" ? "a post" : "an account"} ·{" "}
+                    · about{" "}
+                    {report.subject_type === "post"
+                      ? "a post"
+                      : report.subject_type === "message"
+                        ? "direct messages"
+                        : "an account"}{" "}
+                    ·{" "}
                     {relativeTime(report.created_at)}
                   </span>
                 </p>

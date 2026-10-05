@@ -4,6 +4,7 @@ import { getViewer } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui";
 import { NotificationPrefsForm } from "@/components/settings/NotificationPrefsForm";
+import { dmFeatureOn } from "@/lib/dm/server";
 
 export const metadata: Metadata = { title: "Notifications" };
 
@@ -25,11 +26,16 @@ export default async function NotificationSettingsPage() {
         )
       : {};
 
+  const dmEnabled = await dmFeatureOn();
+
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-title">Notifications</h2>
       <Card>
-        <NotificationPrefsForm initial={prefs as Record<string, boolean>} />
+        <NotificationPrefsForm
+          initial={prefs as Record<string, boolean>}
+          showMessages={dmEnabled}
+        />
       </Card>
     </div>
   );

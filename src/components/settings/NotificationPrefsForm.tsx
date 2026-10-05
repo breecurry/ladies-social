@@ -6,7 +6,7 @@ import { useToast } from "@/components/shell/ToastProvider";
 import { useViewer } from "@/components/shell/Providers";
 import { ToggleRow } from "@/components/settings/Toggles";
 
-export type PrefKey = "follow" | "reply" | "mention" | "like";
+export type PrefKey = "follow" | "reply" | "mention" | "like" | "message";
 
 const ROWS: Array<{ key: PrefKey; label: string; helper: string }> = [
   { key: "reply", label: "Replies", helper: "When someone replies to one of your posts." },
@@ -15,11 +15,24 @@ const ROWS: Array<{ key: PrefKey; label: string; helper: string }> = [
   { key: "like", label: "Likes", helper: "When someone likes one of your posts." },
 ];
 
+const DM_ROW: { key: PrefKey; label: string; helper: string } = {
+  key: "message",
+  label: "Messages",
+  helper:
+    "When someone you accepted sends you a message. Message requests never notify you, whatever you choose here.",
+};
+
 /**
  * Per-type notification toggles mapped to the notification_prefs
  * JSONB (spec §8.2.4). A missing key means enabled.
  */
-export function NotificationPrefsForm({ initial }: { initial: Record<string, boolean> }) {
+export function NotificationPrefsForm({
+  initial,
+  showMessages = false,
+}: {
+  initial: Record<string, boolean>;
+  showMessages?: boolean;
+}) {
   const viewer = useViewer();
   const { showToast } = useToast();
   const [prefs, setPrefs] = useState<Record<string, boolean>>(initial);
@@ -41,9 +54,10 @@ export function NotificationPrefsForm({ initial }: { initial: Record<string, boo
     }
   };
 
+  const rows = showMessages ? [...ROWS, DM_ROW] : ROWS;
   return (
     <div className="flex flex-col gap-4">
-      {ROWS.map((row) => (
+      {rows.map((row) => (
         <ToggleRow
           key={row.key}
           label={row.label}
