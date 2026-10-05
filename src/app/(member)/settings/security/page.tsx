@@ -11,7 +11,7 @@ export default async function SecurityPage() {
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6">
-      <h1 className="text-title">Two-factor authentication</h1>
+      <h1 className="text-title">Sign-in and verification</h1>
       <SecurityPanel />
     </div>
   );
