@@ -256,6 +256,27 @@ Default/unset = noindex (fail-safe).
       `/owner/age-gate` (look up a quoted code, clear that one block);
       authority re-checked in the database. New smoke suite
       `06-age-gate.sql`.
+      **Policy for accounts created before the §17 screens shipped
+      (deliberate, 2026-10-05): they are treated as verified, because
+      they are.** Every account ever created through the app passed the
+      SAME server-enforced 18+ self-attestation at signup — the check
+      has existed in `create_application()` (0008) and `create_member()`
+      (0011) since each function's first day, the signup schema has
+      rejected under-18 dates since Phase 1, and every `user_private`
+      row carries `age_attested_at` (NOT NULL since 0002) plus a
+      `member.signup` audit entry as evidence. §17 changed the
+      *screens* and the *retention*, not the assurance method, so
+      "re-verifying" an existing member would re-collect a birth date
+      we deliberately do not retain, to establish a fact the database
+      already records. There is no pre-gate cohort to remediate; no
+      sign-in interstitial, no backfill, and no new column is needed
+      (the migration adds no columns to existing tables — it only
+      drops one — and was proven against a populated database:
+      pre-existing accounts keep posting, searching and signing in
+      untouched). If the age-assurance METHOD is ever upgraded (e.g.
+      risk-triggered facial estimation per the decision record), that
+      is the moment existing accounts may need a completion flow —
+      self-attestation to self-attestation is not that moment.
 
 ## Next session, start here
 
@@ -278,7 +299,13 @@ Default/unset = noindex (fail-safe).
    migration 0017 is **not yet applied to the live project**; the next
    `npm run provision` (or `supabase db push`) applies it. ⚠️ 0017 drops
    `user_private.dob` (data minimisation, see Done) — deliberate and
-   flagged; the owner's own stored DOB is removed by it too.
+   flagged; the owner's own stored DOB is removed by it too. **Deploy
+   order does not matter and signup keeps working in either skew**:
+   new code + un-migrated DB degrades gracefully (under-18 still gets
+   the rejection screen; the device block silently no-ops until 0017
+   exists), and old code + migrated DB works because the replaced
+   functions keep their signatures. Verified against a populated
+   database simulating live accounts signed up before the gate.
 3. **Legal documents need revision for open registration** (separate task):
    ToS §1.2 (references the admission process), all of §3 "Admission and the
    Vouching System" (§§3.1-3.7), §2.5 (invitation-system wording), §9.4
