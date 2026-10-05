@@ -18,6 +18,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/05-hardening-regressions.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/06-age-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/07-moderation.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/08-tos-consent.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/09-dm-smoke.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -249,3 +250,58 @@ The HTTP half — the signup route refusing a POST whose `tosAgreed`
 field is absent or false — is enforced by `signupSchema`
 (`z.literal(true)`) before any database call, and is verified with
 curl against a running build; see PROGRESS.md.
+
+## What the DM suite (09) proves
+
+Covers migration 0020 (Phase 2C — end-to-end encrypted direct
+messages, text-only, 1:1):
+
+- **the feature flag holds at the database**: with no
+  `app_config.dm_e2e_enabled = true` row (the shipped default), every
+  member-facing DM function refuses with one calm message, and the
+  badge count returns 0 instead of erroring — Direct messages stay
+  unreachable below the app layer until the external crypto audit
+  passes and the flag is deliberately flipped;
+- **the server stores ciphertext only, structurally**: `dm_messages`
+  has no plaintext column (the test fails the moment one is added),
+  and no DM function returns or even references `display_name`
+  (checked against `pg_proc` for all 16 functions) — every DM surface
+  is @handle-only below the app layer;
+- device registration enforces key shapes, keeps exactly ONE active
+  device per account (a new registration revokes the old), and
+  one-time prekeys are consumed at most once each; a member with no
+  registered device cannot be messaged yet, said honestly;
+- **the inbox rules are server-enforced**: a sender the recipient
+  follows lands in the main inbox; a stranger gets EXACTLY ONE silent
+  request — no notification of any kind, never counted in the unread
+  badge, invisible in Primary, visible in Requests — and cannot send
+  a second message until accepted; the recipient cannot reply before
+  accepting; declining hides the request without telling the sender
+  and the one-message cap survives, so no path yields a second
+  request;
+- **block, DMs-off, and "no one" raise the IDENTICAL refusal** (send
+  and prekey-bundle alike), so a blocked person cannot distinguish a
+  block; an existing conversation stays readable on BOTH sides across
+  a block (the history may be the evidence) while sending stops;
+- **franking works end to end**: a genuine reported message verifies
+  against the server's stored commitment (pgcrypto HMAC, the
+  salamander-safe HMAC-key construction), and a fabricated plaintext
+  is stored and shown as unverified — the reporter cannot fabricate,
+  the sender cannot deny;
+- **the moderation hand-off**: a DM report files with
+  `subject_type = 'message'`, appears in the queue as an account
+  case, the moderator reads exactly the transcript the reporter
+  attached (with per-message franking verdicts), a plain member
+  cannot, the reporter sees her own report, and the safety@ email
+  copy names no reporter and carries no message text;
+- notifications fire only for accepted conversations, honour the new
+  `message` pref and the per-conversation mute, and marking a thread
+  read clears them;
+- "delete for me" clears only the deleter's view; the other member
+  keeps her copy; a new message resurfaces the thread with only the
+  new content;
+- RLS lockdown: no app role (member or service_role) can touch
+  `dm_conversations`, `dm_messages`, `dm_report_evidence`, or
+  `one_time_prekeys` directly; another member's `user_devices` and
+  `dm_settings` rows are invisible; a non-participant cannot fetch a
+  conversation through the functions either.
