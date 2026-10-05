@@ -85,9 +85,7 @@ export default async function OwnerMembersPage({
         <p className="text-body text-text-secondary" aria-live="polite">
           {matchCount === 0
             ? null
-            : matchCount < 5
-              ? "Fewer than 5 members match"
-              : `${matchCount.toLocaleString("en-US")} members match`}
+            : `${matchCount.toLocaleString("en-US")} ${matchCount === 1 ? "member matches" : "members match"}`}
         </p>
       ) : null}
 
