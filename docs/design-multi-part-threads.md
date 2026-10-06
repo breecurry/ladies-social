@@ -395,3 +395,60 @@ Possible future direction, noted once and not designed here: Threads also ships 
 A member writes her first post as she always has. When she runs out of room, or simply wants to keep going, she taps **Add to thread** and gets a second part with its own fresh 500 characters, joined to the first by a connector so it is obvious they post together. She can add up to 25 parts, reorder them with up and down controls, and remove any one with a single tap and an Undo that mends the chain behind it. If she pastes something too long, the composer flows the overflow into new connected parts automatically and offers one Undo, splitting only at sentence and word boundaries and never through a mention, a hashtag, or a link. Empty parts cannot be posted: trailing ones are dropped, an interior gap is flagged until she fills or removes it. The button says **Post all N** so she knows exactly what she is about to send, and the whole thread posts completely or not at all, with her draft kept safe if it fails. On a phone with the keyboard up, only the part she is editing is full height, the rest collapse to chips, and Add-to-thread, the counter, and Post ride in a bar above the keyboard.
 
 A reader sees a chain as one card in the feed, labeled **Show this thread, 5 parts**, so no one person's long thread can dominate the timeline. Opening it reads the whole thing from the top, the author's parts flat and connected, other people's replies nested in their places, each part captioned **Part 2 of 4** for everyone including a screen reader. A profile shows the head of each thread, not every part. If the author removes a part, the thread renumbers and a quiet marker shows where it was. If the author is suspended or banned, the entire thread disappears as one, never in pieces. Reposting or quoting a single part tells the reader there is more and takes them to the top of the thread. The whole design adds no new token and sits on the reply tree the product already has.
+
+---
+
+## 25. Implementation notes (appended at build time, 2026-10-05)
+
+The design above was implemented as written (migration 20261024000001,
+composer, thread view, feeds, profile). These notes record the concrete
+choices the build made where the design left them to the implementer,
+so the next person does not re-derive them.
+
+- **The tie-break is (created_at, id), not created_at alone.** Section
+  10.1 says "earliest-created same-author direct reply." An atomically
+  published chain inserts every part in one transaction, and now() is
+  transaction-fixed, so all parts share one created_at; the post id (a
+  monotonically assigned bigint) is the deterministic second key. The
+  result is identical to the section 10.1 reading in every case the
+  composer produces.
+- **Chain detection lives in the database**, as the single source
+  section 21 asked for: internal.chain_head_of(post) walks up the
+  spine, internal.chain_info(post) returns head, live "k of N" over
+  readable parts, and the is-continuation flag. get_thread returns a
+  structural spine_seq per row (hidden parts keep their place so the
+  thread view can put the removed-part marker exactly where the part
+  was); the feeds and profile_posts return chain_index and chain_count
+  (null unless 2 or more readable parts). The client computes nothing
+  structural on its own.
+- **The reply composer stays single-part.** A chain starts at a
+  top-level post by the section 10 definition, so a multi-part reply
+  would not be recognized or rendered as a chain; "Add to thread" is
+  not offered when composing a reply. A quote-mode draft may thread
+  (the quoted pointer rides part 1 only).
+- **The idempotency key** (section 14) is a client uuid scoped to
+  (member, key), minted at the first tap of Post all N, kept for
+  retries of that attempt, discarded on any draft edit or on success,
+  and honoured by the server for 24 hours. The key row is written in
+  the same transaction as the posts: a failed publish rolls it back
+  (so the retry re-runs in full), a committed one answers the retry
+  with the existing head id. Concurrent duplicates serialize on the
+  key's primary key.
+- **Pre-migration degradation**: the code deploys before the migration
+  applies, so the composer probes the chain_head() RPC once per page
+  load and offers "Add to thread" only when it exists; the thread page
+  falls back to the old root resolution when the resolver is missing;
+  all new row fields are optional in the client types. Nothing errors
+  against the un-migrated schema.
+- **The counter's reveal threshold** kept the existing composer's
+  behavior exactly: the counter appears when 60 or fewer characters
+  remain (i.e. from 440 characters of 500), in code points.
+- **feed_hashtag also carries the chain cue.** The tag stream includes
+  replies, so a chain part that mentions a tag can surface there out
+  of context; it now reads "Part k of N - Show this thread" like a
+  reposted part (section 18's treatment, applied to one more surface).
+- **Remaining polish, deliberately not shipped**: the nested compact
+  card inside a quote-post does not yet carry the "Part k of N" corner
+  marker from section 18 (the card already links to the thread, which
+  opens from the head with the part highlighted); drag-to-reorder (a
+  pointer-only enhancement over the up/down buttons) was not built.

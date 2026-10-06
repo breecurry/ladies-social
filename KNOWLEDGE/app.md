@@ -491,3 +491,54 @@ applied at build time**). The facts an agent must not violate:
 - `Card` (`src/components/ui.tsx`) pads `p-4 sm:p-6`; padding
   overrides via `className` are UNRELIABLE (stylesheet order beats
   class order) — flush cards must use `padded={false}`.
+
+## Multi-part threads ("Add to thread", built 2026-10-05)
+
+Spec: `docs/design-multi-part-threads.md` (approved; implemented as
+written). Migration `20261024000001`. Operating facts that must stay
+true:
+
+- **A chain is a shape, not a record.** The maximal run of consecutive
+  same-author posts down a reply spine starting at a TOP-LEVEL post;
+  the continuation of a part is its earliest same-author direct reply,
+  ordered `(created_at, id)` — the id matters because an atomically
+  published chain shares one transaction timestamp. No new posts
+  column. `internal.chain_head_of` / `internal.chain_info` are the one
+  source of chain truth; every surface (get_thread's `spine_seq`, the
+  feeds' `chain_index`/`chain_count`, the Replies-tab filter) derives
+  from them. If the definition ever changes, change it there only.
+- **The 25-part cap is derived, not taste**: create_post refuses a
+  reply at depth >= 30; 25 parts put the last part at depth 24 and
+  leave five levels for readers. Enforced in the composer AND in
+  create_thread. Do not raise it without raising the depth cap story.
+- **create_thread is the only multi-part write path.** It loops
+  create_post inside one transaction so every per-part check (active
+  author, 500 cap, empty-body, mentions, hashtags, reply control,
+  depth) is reused verbatim — never duplicate those checks. Its
+  idempotency key is `(user_id, uuid)` in `internal.thread_idempotency`
+  (no app-role access, RLS on, zero policies), honoured 24h, swept
+  opportunistically inside the function (no cron dependency). The key
+  row lives and dies with the posting transaction.
+- **Replies are single-part on purpose**: a chain starts at a top-level
+  post by definition, so the reply composer never offers "Add to
+  thread". A quote chain is fine (the quote rides part 1 only).
+- **Deploy-before-migrate posture**: the composer feature-probes the
+  `chain_head()` RPC once per page load (`probeMultiPart` in
+  Composer.tsx; negative results retry on next mount) and offers
+  multi-part only when it exists. The thread page treats a chain_head
+  error as "no resolver" and falls back to the old behavior. All new
+  row fields (`spine_seq`, `chain_index`, `chain_count`) are optional
+  in `database.types.ts`.
+- **Numbering is live, never stored.** "Part k of N" counts only
+  readable parts, so deleting part 3 of 5 renumbers to 1..4 and the
+  thread view shows "The author removed this part" at the gap. A
+  wholly unreachable chain (suspension/ban/mute/block/all-deleted)
+  renders ONE "This thread is unavailable" — never a stack of blank
+  part cards, never the shape of a banned member's thread.
+- **The splitter and the counter share `src/lib/text.ts`**
+  (`codePointLength`, `splitForThread`, `PART_LIMIT`, `PART_CAP`).
+  Both count code points, matching Postgres char_length. The splitter
+  never lands inside anything `tokenizeBody` draws as a token (plus
+  URLs); whitespace-free runs longer than 500 are the only hard-break
+  case and the UI names it. Keep the tokenizer and splitter in the
+  same file so they cannot drift.

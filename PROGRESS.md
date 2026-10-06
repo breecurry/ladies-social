@@ -1191,3 +1191,73 @@ Five scoped fixes from the pre-launch security audit, in one pass:
   response header after deploy (Vercel docs say custom headers override
   the platform default; one community report disagrees — check, don't
   assume).
+
+## Multi-part threads — "Add to thread" (2026-10-05)
+
+Built to `docs/design-multi-part-threads.md` (the approved spec; its
+judgment calls were implemented, not re-litigated). The owner's ask: write a
+long post as connected replies to your own thread, like Threads.
+
+- **Composer**: a fresh draft is one part and looks exactly as before. "Add
+  to thread" (full-width, Plus glyph) appends a part with its own fresh 500
+  characters, joined by the thread-rail connector and captioned "Part k of
+  N" in words. Per-part late-reveal counter (shows at 60 remaining,
+  warning, danger at 0); typing stops at 500 and offers "Add another part";
+  a paste past 500 auto-flows into connected parts with ONE Undo, splitting
+  at sentence boundaries first, then paragraph > newline > space, never
+  inside a @mention/#hashtag/URL (the splitter shares `src/lib/text.ts`
+  with the renderer and counts code points); a single >500 tokenless run
+  hard-breaks and the notice says so. Reorder via Move up/down buttons
+  (44px, named for SR), remove with Undo toast; the last part cannot be
+  removed. Trailing empty parts are dropped at publish; an interior empty
+  part is flagged in place and blocks Post with the reason named (and read
+  via aria-describedby). Cap: **25 parts** — derived from create_post's
+  depth-30 refusal (last part at depth 24 leaves five reply levels); the
+  Add control disables with the reason, never hides. Button reads **"Post
+  all N"**. Mobile (<lg): unfocused parts collapse to chips (position,
+  first line, full marker, controls); Add + the focused counter + Post ride
+  a sticky bar above the keyboard.
+- **Atomic publish**: new `create_thread(p_bodies[], p_reply_control,
+  p_quote, p_key)` RPC inserts every part through `create_post` in ONE
+  transaction (all existing per-part checks reused verbatim) — all parts or
+  none. `p_key` is a client uuid minted per publish attempt and honoured
+  for 24 hours (`internal.thread_idempotency`), so a retry after a lost
+  response returns the already-posted head instead of double-posting; the
+  key row commits/rolls back with the posts, and editing the draft mints a
+  fresh key. Multi-part publish is NOT optimistically closed: on failure
+  the composer keeps everything and says "Nothing was posted, so your
+  draft is safe."
+- **Display**: a chain is structural (maximal same-author run down the
+  spine from a top-level post; continuation = earliest same-author reply,
+  tie-broken by (created_at, id) since one transaction = one timestamp).
+  `get_thread` now returns `spine_seq`; ThreadView renders the spine FLAT
+  (parts never consume the root+2 nesting budget), labels each card "Part
+  k of N" over the parts actually visible, shows a slim "The author
+  removed this part" marker at a deleted part (live renumbering), and
+  collapses a fully-unreachable chain to ONE "This thread is unavailable."
+  Opening any part resolves to the head via the new `chain_head()` RPC and
+  scrolls/highlights the tapped part. Feed/Discover/profile show a chain
+  head as ONE card with "Show this thread · N parts" (spelled out for SR);
+  a reposted or tag-feed mid-chain part carries "Part k of N · Show this
+  thread." The profile Replies tab now suppresses chain continuations
+  (they are the thread, not self-replies); genuine replies and non-spine
+  self-replies are untouched.
+- **Migration `20261024000001_multi_part_threads.sql`** — WRITTEN AND
+  VERIFIED LOCALLY, **NOT applied to the live project** (Grove applies).
+  Fresh apply + two re-runs clean (idempotent); full suite 01–19 green, 20
+  fails identically at baseline `8a86a34` (the pre-existing suspended-
+  profile-readable bug that migration `20261023000001`, owned by another
+  agent, addresses — unrelated to this work). get_thread, feed_following,
+  feed_discover, feed_hashtag and profile_posts were dropped (exact single
+  signatures, return shapes grew) and recreated with identical arguments —
+  no leftover second signatures — and their revoke/grant lockdown
+  re-applied. Until the migration applies, the deployed code degrades
+  cleanly: the composer probes `chain_head()` once per page load and hides
+  "Add to thread" when it is missing, the thread page falls back to the
+  old root resolution, and every card renders without chain cues (the new
+  row fields are optional).
+- **Not done, noted**: the quoted compact card inside a quote-post does not
+  yet carry a "Part k of N" corner marker (design §18 names it for
+  whenever quote surfaces chain parts; the link already lands on the full
+  thread from the head). Reorder is buttons-only (drag was spec'd as a
+  pointer-only enhancement, not required).
