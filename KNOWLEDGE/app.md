@@ -207,6 +207,13 @@ locked.
   anonymous users cannot register passkeys; a user with verified MFA
   factors must be at aal2 to MANAGE passkeys (`insufficient_aal` is
   mapped to plain copy).
+- **Removing the LAST passkey is refused when no verified second
+  factor exists** (`SecurityPanel.tsx`, `removalWouldStrand`): without
+  it the Owner — who uses passkeys as her ONLY second factor, by
+  explicit choice — could make the privileged-action gate permanently
+  unreachable. The refusal message suggests adding a replacement
+  passkey, never TOTP. Do not add TOTP nagging; do not make TOTP a
+  requirement.
 
 ## Migrations
 
@@ -221,7 +228,18 @@ passkey gate) is likewise written, tested fresh + re-run locally, and
 NOT applied — until Grove applies it, role changes, unbans and the
 audit_log/user_private reads still demand aal2 and the new passkey
 step-up prompts degrade to a refused action (same deploy-skew posture
-as `20261019000001`).
+as `20261019000001`). Migration `20261022000001` (post_mentions block
+filter + the suspension-expiry sweep) is written and tested (fresh
+apply + two re-runs locally, suites 01-17 green) and NOT applied — no
+deployed code depends on it, so there is no skew at all: until Grove
+applies it, mention metadata still leaks across blocks and lapsed
+suspensions still clear only on sign-in (the pre-fix behaviour,
+nothing worse). It installs pg_cron (first migration to do so) and
+schedules `hersciety-status-expiry-sweep` (*/5) running
+`sweep_expired_statuses()`, which mirrors `refresh_my_status()`
+exactly — same status flip, same `mod.status_expired` audit action, no
+notification. Any future lapsed-status logic must change BOTH
+functions together.
 
 ## Tests
 

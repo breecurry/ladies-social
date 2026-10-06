@@ -1140,3 +1140,54 @@ Until the migration is applied, production code degrades cleanly: the
 feature is dark (env unset), `dmFeatureOn()` treats any error as off,
 and even with env set the DB functions still gate on the absent
 `dm_enabled` row.
+
+## Pre-launch audit batch: mentions RLS, suspension expiry, pepper, last-passkey guard, HSTS (2026-10-05)
+
+Five scoped fixes from the pre-launch security audit, in one pass:
+
+- **Migration `20261022000001`** (written, tested locally — fresh apply
+  plus two re-runs, all 17 suites green — **NOT YET APPLIED to the live
+  project**; Grove applies it):
+  - `post_mentions_read` now excludes rows across a block, mirroring
+    `posts_read`: a blocked member can no longer enumerate who was
+    mentioned in posts she cannot see, or which posts mention a person.
+    Mention metadata is as protected as the post itself.
+  - **Suspensions now actually end** (Community Guidelines promise):
+    installs `pg_cron` (1.6.4 available on the live project, previously
+    not installed) and schedules `hersciety-status-expiry-sweep` every 5
+    minutes running `sweep_expired_statuses()`, which mirrors
+    `refresh_my_status()` exactly — status → `active`,
+    `status_expires_at` → null, one `mod.status_expired` audit row per
+    member (actor honestly `system`; the sign-in path records the member
+    — neither path notifies, by matched design). The sign-in path stays
+    as belt-and-braces; READ COMMITTED predicate re-check means the two
+    can never double-process. Until the migration is applied, behaviour
+    is exactly as before: lapsed suspensions clear only on sign-in.
+  - NOTE for whoever applies it: installing pg_cron also makes the 0025
+    `hersciety-trending-tags` schedule *possible* — that job was silently
+    skipped when 0025 ran on live (no pg_cron then). Trending has a
+    read-through fallback, so this is an optimisation, not a bug; re-run
+    0025's DO block or schedule it by hand if wanted.
+- **`IDENTIFIER_HASH_PEPPER` is now required** (`requireEnv`): the
+  `"dev-only-pepper"` fallback is gone. In this public repo that fallback
+  was a known HMAC key — if the env var ever went missing from a deploy,
+  anyone could compute identifier hashes and probe ban status. The var IS
+  set in Vercel (prod + preview), so nothing changes live; a deploy that
+  loses it now fails signup/ban/age-gate requests loudly instead of
+  weakening silently. Local dev needs the var in `.env.local`
+  (`.env.example` updated; `openssl rand -hex 32`). No script or test
+  depended on the fallback.
+- **Last-passkey guard** (`SecurityPanel.tsx`): removing your final
+  passkey is refused when no verified second factor exists, with a calm
+  message to add a replacement passkey first. Without this, the Owner
+  (passkeys-only by explicit choice — no TOTP, do not nag) could strand
+  herself out of every privileged action. No TOTP push added.
+- **HSTS completed** in `next.config.ts`: `max-age=63072000;
+  includeSubDomains; preload`, overriding Vercel's bare-max-age platform
+  default. `includeSubDomains` is what extends coverage to
+  `media.hersciety.com`. ⚠️ `preload` marks eligibility only — actually
+  submitting hersciety.com to hstspreload.org is a deliberate,
+  slow-to-reverse human step that has NOT been taken. Verify the live
+  response header after deploy (Vercel docs say custom headers override
+  the platform default; one community report disagrees — check, don't
+  assume).

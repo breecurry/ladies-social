@@ -117,8 +117,34 @@ export function SecurityPanel() {
     setBusy(false);
   };
 
+  // Removing the last passkey while no verified second factor exists
+  // would make the privileged-action gate (AAL2 or a fresh passkey
+  // confirmation) permanently unreachable — role changes, unbans, the
+  // audit log, and identity reveals would all be locked until a
+  // re-enrolment. Refuse that one removal, calmly.
+  const removalWouldStrand = passkeys.length <= 1 && !factors.some((f) => f.verified);
+  const strandMessage =
+    "This is your only passkey, and no other verified sign-in check is enrolled. " +
+    "Removing it would leave you with no way to confirm it's you for protected actions. " +
+    "Add a replacement passkey first, then remove this one.";
+
+  const requestRemovePasskey = (passkey: PasskeyListItem) => {
+    setError(null);
+    setNotice(null);
+    if (removalWouldStrand) {
+      setError(strandMessage);
+      return;
+    }
+    setRemoving(passkey);
+  };
+
   const removePasskey = async () => {
     if (!removing) return;
+    if (removalWouldStrand) {
+      setError(strandMessage);
+      setRemoving(null);
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -269,7 +295,11 @@ export function SecurityPanel() {
                       >
                         Rename
                       </Button>
-                      <Button variant="ghost" disabled={busy} onClick={() => setRemoving(passkey)}>
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => requestRemovePasskey(passkey)}
+                      >
                         Remove
                       </Button>
                     </span>

@@ -17,6 +17,17 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   {
+    // Vercel's platform default is `max-age=63072000` with nothing else;
+    // declaring the header here overrides it. `includeSubDomains` matters
+    // because media.hersciety.com (the R2 media zone) is otherwise not
+    // covered by HSTS at all. `preload` marks the domain ELIGIBLE for the
+    // browser preload list — actually submitting hersciety.com to
+    // hstspreload.org is a separate, deliberate step (and slow to reverse),
+    // taken by a human, not by this config.
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
+  },
+  {
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
   },
