@@ -32,6 +32,27 @@ const bodySchema = z.object({
   banDevice: z.boolean(),
 });
 
+/** The success branch of requireUser(): a signed-in caller and her RLS-scoped client. */
+type AuthedCaller = Exclude<Awaited<ReturnType<typeof requireUser>>, { response: NextResponse }>;
+
+/**
+ * Staff gate shared by GET and POST: admin or owner, read from the
+ * caller's OWN role_assignments rows through her user-scoped client
+ * (self-rows are always readable, so no RLS surprise is possible
+ * here). mod_ban() re-enforces the same tier at the database —
+ * mod_assert_actionable(p_target, 2) admits exactly admin (2) and
+ * owner (3) — this check exists so that NO privileged read below ever
+ * runs for a non-staff caller.
+ */
+async function callerIsAdminOrOwner(auth: AuthedCaller): Promise<boolean> {
+  const { data: roles } = await auth.supabase
+    .from("role_assignments")
+    .select("role")
+    .eq("user_id", auth.user.id)
+    .is("revoked_at", null);
+  return (roles ?? []).some((r) => r.role === "admin" || r.role === "owner");
+}
+
 /**
  * GET /api/mod/ban?target=<uuid> — which ban-evasion signal CATEGORIES
  * exist for this account (booleans only, never values), so the ban
@@ -46,14 +67,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
 
-  // Role check via the caller's own (RLS-scoped) role assignments.
-  const { data: roles } = await auth.supabase
-    .from("role_assignments")
-    .select("role")
-    .eq("user_id", auth.user.id)
-    .is("revoked_at", null);
-  const isAdminOrOwner = (roles ?? []).some((r) => r.role === "admin" || r.role === "owner");
-  if (!isAdminOrOwner) {
+  if (!(await callerIsAdminOrOwner(auth))) {
     return NextResponse.json({ ok: false, error: "Not permitted." }, { status: 403 });
   }
 
@@ -76,8 +90,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/mod/ban — permanent ban, the one unrecoverable console
- * action. ADMIN AND OWNER ONLY, enforced inside mod_ban() at the
- * database (which also refuses the Owner and the system account).
+ * action. ADMIN AND OWNER ONLY: checked HERE first (so the privileged
+ * handle lookup below never runs for a non-staff caller) and enforced
+ * again inside mod_ban() at the database (which also refuses the Owner
+ * and the system account).
  *
  * The typed-@handle gate is re-checked HERE, server-side, so no client
  * bug can submit a ban without the handle having been reproduced.
@@ -100,11 +116,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const { target, rule, note, confirmHandle, banEmail, banPhone, banDevice } = parsed.data;
 
-  // The typed gate, verified against the real handle server-side.
-  const { data: profile } = await auth.supabase
+  // Authority FIRST, before any privileged read below. Without this,
+  // any authenticated member could use the typed-handle gate as an
+  // oracle to confirm user_id→handle mappings — including for banned
+  // and suspended accounts that profiles_read deliberately hides.
+  if (!(await callerIsAdminOrOwner(auth))) {
+    return NextResponse.json({ ok: false, error: "Not permitted." }, { status: 403 });
+  }
+
+  // The typed gate, verified against the real handle server-side. This
+  // read must NOT go through the caller's RLS: profiles_read honours
+  // internal.blocked_by (and, since 20261023000001, hides enforced
+  // accounts from ordinary readers), so a target who had blocked the
+  // acting admin would vanish from a user-scoped read and her ban
+  // could never be confirmed by that admin. The service client is safe
+  // here only because the admin/owner check above has already passed.
+  const admin = createSupabaseAdminClient();
+  const { data: profile } = await admin
     .from("profiles")
     .select("handle")
     .eq("user_id", target)
+    // profiles_read shows a 'deleted' row to NOBODY, staff included.
+    // The service client bypasses RLS, so re-impose that one branch:
+    // a deleted account stays exactly as unavailable as it was before.
+    .neq("status", "deleted")
     .maybeSingle();
   if (!profile) {
     return NextResponse.json({ ok: false, error: "That account is unavailable." }, { status: 404 });
@@ -121,7 +156,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let emailHash: string | null = null;
   let phoneHash: string | null = null;
   if (banEmail || banPhone) {
-    const admin = createSupabaseAdminClient();
     const { data: priv } = await admin
       .from("user_private")
       .select("email, phone_e164")

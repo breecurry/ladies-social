@@ -31,6 +31,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/18-revoke-grants-and-signup-path.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/19-dm-adversarial.sql
 # 20 is EXPECTED to fail — see its own section below.
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/20-suspension-visibility-regression.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/21-ban-route-authority-and-follow-counts.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -602,3 +603,32 @@ another member calling `refresh_my_status()` on her own account cannot
 clear someone else's expiry, and only the suspended member's own call
 restores her to `active`. Nothing else in the schema — no cron
 extension is installed, no trigger, no Owner action — clears it.
+
+## What the ban-route-authority / follow-counts suite proves (21)
+
+Regression coverage for the 2026-10 small-fix batch (ban-through-a-block
+and list-matching follow counts):
+
+- the database facts the `/api/mod/ban` fix rests on: a member who has
+  blocked an admin is INVISIBLE to that admin's user-scoped `profiles`
+  read (which is why the route's typed-handle gate must use the service
+  client, after its own admin/owner check), while `mod_ban()` itself
+  goes straight through the block — moderation never consults blocks;
+- `mod_ban()` admits exactly admin and owner (tier >= 2): a moderator
+  and a plain member are both refused with the permission error — the
+  same set the route now gates on BEFORE any privileged read;
+- the enumeration that authority-first ordering prevents: an ordinary
+  member cannot read a banned member's profile row at all, so a
+  service-client handle lookup without a prior authority check would
+  hand that hidden mapping to any authenticated caller;
+- `profile_follow_counts()` (migration `20261025000001`) returns
+  numbers EQUAL to the row counts of `list_followers()` /
+  `list_following()` for the same viewer — asserted against the lists
+  themselves, not just hardcoded expectations, so the suite fails if
+  the predicates ever drift — across every state: untouched, suspended
+  counterparty, banned counterparty, counterparty-blocked-the-viewer,
+  own-profile view, and a viewer<->owner block (counts go to zero with
+  the lists);
+- structure: exactly ONE `profile_follow_counts` signature in
+  `pg_proc`, EXECUTE for `authenticated` only (not `anon`, not
+  `service_role`, not `public`).

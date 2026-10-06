@@ -67,6 +67,47 @@ re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
+**Small-fix batch (2026-10, migration `20261025000001` — written, tested,
+NOT yet applied to the live project; the deployed code degrades gracefully
+until Grove applies it).** Three independent fixes:
+
+1. **Ban-through-a-block** (`src/app/api/mod/ban/route.ts`): the POST
+   handler's typed-handle gate read `profiles` through the CALLER'S
+   RLS-scoped client; since `20261023000001`, `profiles_read` honours
+   `internal.blocked_by`, so a target who had blocked the acting admin
+   vanished from that read and the route 404'd — the ban could not be
+   completed by that admin. The route now (a) checks the caller is
+   admin/owner FIRST, via her own `role_assignments` (the exact set
+   `mod_ban()` enforces — `mod_assert_actionable(target, 2)`), then (b)
+   does the handle lookup with the service client, re-imposing only the
+   nobody-sees-`deleted` branch of `profiles_read`. Order matters: the
+   privileged read before the authority check would have been a
+   handle↔user_id oracle for accounts RLS deliberately hides. Suite 21
+   pins all four database facts this rests on.
+2. **Follow counts now agree with the follow lists**
+   (`src/app/(member)/u/[handle]/page.tsx` + migration
+   `20261025000001`): the profile header counted raw `follows` rows, so
+   suspended/banned counterparties and block relationships still counted
+   while the lists (`list_followers()`/`list_following()`) filtered them
+   — "12 followers" above a list of 10, and a side channel revealing
+   what the lists hide. New `profile_follow_counts(p_user)` reuses the
+   lists' predicate VERBATIM; the page calls it and falls back to the
+   old raw counts only when the RPC is missing (deploy-before-migrate
+   posture). Suite 21 asserts counts == lists against the lists
+   themselves, so predicate drift fails the build.
+3. **Stale comment** in `supabase/tests/19-dm-adversarial.sql` §5
+   corrected (duplicate evidence ids are de-duplicated since
+   `20261023000001`; the 10-id boundary test's comment described the
+   old gap). Comment only; no assertion changed.
+
+Gates at push time: `tsc` clean, `eslint` clean, `next build` clean; all
+21 local suites pass (the new migration applied three times in a row —
+idempotent — with exactly one `profile_follow_counts` signature in
+`pg_proc`). ⚠️ Stale docs noticed, deliberately left alone: suite 20's
+header and `supabase/tests/README.md` still say the profile-row leak is
+EXPECTED TO FAIL, but `20261023000001` fixed it and suite 20 now passes
+clean end to end — a docs-only follow-up should update both.
+
 **Hashtags, @-mentions, reposts and quote-posts are built (Phase 2F,
 2026-10-10).** To `docs/design-phase2f-hashtags-mentions-reposts.md`, with
 two owner decisions honoured exactly: **both plain reposts AND quote-posts

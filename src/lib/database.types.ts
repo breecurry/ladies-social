@@ -480,6 +480,13 @@ export type PersonRow = {
 export type FollowListRow = PersonRow & { followed_at: string };
 
 /**
+ * The one row profile_follow_counts() returns: follower/following
+ * counts filtered with the same predicate as the follow lists, so the
+ * number above a list always matches the rows in it.
+ */
+export type FollowCountsRow = { follower_count: number; following_count: number };
+
+/**
  * The five coarse activity bucket labels (Phase 2D spec §3.4) — the
  * complete vocabulary that may describe a member's activity outside
  * the audited identity reveal. Derived server-side; a raw last-login
@@ -898,6 +905,7 @@ export type Database = {
         };
         Returns: FollowListRow[];
       };
+      profile_follow_counts: { Args: { p_user: string }; Returns: FollowCountsRow[] };
       get_notifications: {
         Args: { p_before?: string | null; p_limit?: number; p_before_id?: number | null };
         Returns: NotificationItem[];

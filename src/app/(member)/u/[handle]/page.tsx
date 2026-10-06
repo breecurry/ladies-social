@@ -68,22 +68,21 @@ export default async function ProfilePage({
   const reposts = tab === "reposts";
 
   const [
-    { count: followerCount },
-    { count: followingCount },
+    countsResult,
     { data: followRow },
     { data: muteRow },
     { data: blockRow },
     { data: posts },
     { data: avatarRows },
   ] = await Promise.all([
-    supabase
-      .from("follows")
-      .select("follower_id", { count: "exact", head: true })
-      .eq("followee_id", profile.user_id),
-    supabase
-      .from("follows")
-      .select("followee_id", { count: "exact", head: true })
-      .eq("follower_id", profile.user_id),
+    // Counts that AGREE WITH THE LISTS at /u/<handle>/followers and
+    // /following: profile_follow_counts() filters with the exact
+    // predicate list_followers()/list_following() use, so enforced
+    // accounts and blocked counterparties are excluded from the number
+    // exactly as they are from the rows. An error (e.g. the
+    // 20261025000001 migration not yet applied — main deploys before
+    // migrations) falls back to the raw counts below.
+    supabase.rpc("profile_follow_counts", { p_user: profile.user_id }),
     supabase
       .from("follows")
       .select("followee_id")
@@ -120,6 +119,30 @@ export default async function ProfilePage({
   const blockedByViewer = blockRow !== null;
   const avatarRow = avatarRows?.[0];
   const avatar = avatarRow ? { key: avatarRow.avatar_key, blurhash: avatarRow.blurhash } : null;
+
+  // Pre-migration fallback: when profile_follow_counts() does not
+  // exist yet, show the raw follows counts this page always showed.
+  // Once the migration lands, the RPC path above is the only one taken.
+  const counts = countsResult.error ? null : (countsResult.data?.[0] ?? null);
+  let followerCount: number;
+  let followingCount: number;
+  if (counts) {
+    followerCount = counts.follower_count;
+    followingCount = counts.following_count;
+  } else {
+    const [followers, following] = await Promise.all([
+      supabase
+        .from("follows")
+        .select("follower_id", { count: "exact", head: true })
+        .eq("followee_id", profile.user_id),
+      supabase
+        .from("follows")
+        .select("followee_id", { count: "exact", head: true })
+        .eq("follower_id", profile.user_id),
+    ]);
+    followerCount = followers.count ?? 0;
+    followingCount = following.count ?? 0;
+  }
 
   return (
     <div className="flex flex-col lg:mt-6 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
@@ -175,11 +198,11 @@ export default async function ProfilePage({
           <p className="text-caption text-text-tertiary">Joined {joinedDate(profile.created_at)}</p>
           <div className="flex gap-4 pt-1">
             <Link href={`/u/${profile.handle}/followers`} className="hover:underline">
-              <span className="text-label text-text-primary">{followerCount ?? 0}</span>{" "}
+              <span className="text-label text-text-primary">{followerCount}</span>{" "}
               <span className="text-caption text-text-tertiary">Followers</span>
             </Link>
             <Link href={`/u/${profile.handle}/following`} className="hover:underline">
-              <span className="text-label text-text-primary">{followingCount ?? 0}</span>{" "}
+              <span className="text-label text-text-primary">{followingCount}</span>{" "}
               <span className="text-caption text-text-tertiary">Following</span>
             </Link>
           </div>

@@ -542,3 +542,44 @@ true:
   URLs); whitespace-free runs longer than 500 are the only hard-break
   case and the UI names it. Keep the tokenizer and splitter in the
   same file so they cannot drift.
+
+## Small-fix batch: ban-through-a-block + list-matching follow counts (migration 20261025000001)
+
+- **Staff routes must never gate a staff action on a USER-SCOPED read
+  of the target.** `profiles_read` honours `internal.blocked_by` for
+  every non-self reader — staff included (deliberate, re-affirmed in
+  20261023000001) — and hides enforced profiles from ordinary members.
+  So any route that reads the TARGET through `auth.supabase` before a
+  moderation action breaks the moment the target blocks the acting
+  staff member. The pattern (now in `src/app/api/mod/ban/route.ts`,
+  both handlers via `callerIsAdminOrOwner()`): 1) verify the caller's
+  authority from her OWN `role_assignments` rows (self-rows always
+  readable), 2) only then read the target with
+  `createSupabaseAdminClient()`, re-imposing the nobody-sees-`deleted`
+  branch by hand. NEVER reverse that order: a service-role read before
+  the authority check is a handle↔user_id oracle for hidden accounts.
+  The other mod routes (`action`, `avatar`, `reporters`) are immune —
+  they pass ids straight to SECURITY DEFINER functions that re-check
+  tier. `api/owner/roles` does a user-scoped handle resolve but is
+  safe today only because grant_role/revoke_role are Owner-only and
+  the Owner is unblockable AND reviewer+; if that route is ever opened
+  to admins, it inherits this same bug.
+- **mod_ban() admits exactly admin+owner** (`mod_assert_actionable(t, 2)`
+  → tier 2 = admin, 3 = owner). The route-level gate mirrors that set;
+  keep them matched if the tier ever changes.
+- **Follower/following counts must come from `profile_follow_counts()`**
+  (20261025000001), never from counting `follows` rows: the raw count
+  disagrees with `list_followers()`/`list_following()` (which exclude
+  non-active/restricted counterparties and anyone blocked either way
+  with the viewer) and the difference is a side channel revealing
+  enforced/blocked accounts. The function reuses the lists' predicate
+  VERBATIM — if the lists' predicate ever changes, change the counts
+  function in the same migration, and suite 21 (which asserts
+  counts == lists against the lists themselves) will catch a drift.
+  The profile page falls back to raw counts ONLY while the migration
+  is unapplied (deploy-before-migrate posture, same as avatar_keys).
+- **Stale-docs debt** (left alone on purpose — suite 20 is
+  edit-protected): suite 20's header comment and tests/README.md still
+  describe the profile-row visibility leak as EXPECTED TO FAIL, but
+  20261023000001 fixed it and suite 20 passes clean end to end now.
+  A docs-only pass should update both.

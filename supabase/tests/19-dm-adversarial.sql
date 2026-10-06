@@ -300,9 +300,11 @@ end $$;
 
 -- Exactly 10 ids (the boundary itself) must succeed when all 10 are
 -- real and belong to the conversation. Reuse the two real ids,
--- repeated to make up the count — the duplicate-id gap above means
--- this succeeds too (not a boundary-specific concern; confirms >10 is
--- the only hard line, not >=10).
+-- repeated to make up the count — duplicate ids in the input are
+-- still ACCEPTED (they were never a refusal condition; since
+-- 20261023000001 they are merely de-duplicated at the evidence
+-- snapshot, as the section above asserts), so this call isolates the
+-- array-length boundary itself: >10 is the only hard line, not >=10.
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000075', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000075","aal":"aal1","session_id":"h"}', false);
