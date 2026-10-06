@@ -27,6 +27,10 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/14-phase2f.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/15-reposts-tab-and-tag-cap.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/16-passkey-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/17-extended-passkey-gate.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/18-revoke-grants-and-signup-path.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/19-dm-adversarial.sql
+# 20 is EXPECTED to fail — see its own section below.
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/20-suspension-visibility-regression.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -453,3 +457,148 @@ every number is the literal number, plus the collection it needs):
   internal active-count helper is callable by no app role); the three
   new tables all have RLS enabled, and the ledger and tracked-since
   tables are not even directly readable.
+
+## What the revoke-grants / signup-path suite proves (18)
+
+Independent QA (Grove-Test) on migration
+`20261021000002_revoke_internal_function_grants.sql`, which revoked
+EXECUTE on eleven SECURITY DEFINER functions from
+`anon`/`authenticated`/`public` after a pre-launch audit found them
+reachable by unauthenticated callers. This suite proves the fix closed
+the hole WITHOUT breaking the one legitimate caller, `service_role`:
+
+- catalog state matches intent for all eleven functions
+  (`has_function_privilege` against `anon`/`authenticated`, not just
+  "the revoke returned success" — a revoke against an already-absent
+  grant is a silent no-op); `service_role` keeps EXECUTE on all eleven,
+  which is the entire premise the fix relies on;
+- the five RLS-helper functions deliberately left reachable by
+  `authenticated` (`is_active_member`, `is_owner`, `is_admin_or_owner`,
+  `is_moderator_or_above`, `is_reviewer_or_above`) still are — RLS
+  policy expressions evaluate as the invoking role, so revoking any of
+  these would have broken row-level security platform-wide;
+- `search_people` — never part of this fix — still works for both
+  `anon` and `authenticated` (the exact control used in the live
+  verification);
+- runtime proof, not just catalog state: an actual `anon` session and
+  an actual `authenticated` session attempting `revoke_user_sessions`
+  and `append_audit` are both refused with `insufficient_privilege`,
+  while `search_people` and the five RLS helpers actually execute;
+- the FULL signup pipeline (`record_signup_attempt` →
+  `count_signup_attempts_from_ip` → `identifier_is_banned` ×2 →
+  `count_signups_from_subnet` → `create_member` →
+  `record_tos_consent`), replayed as `service_role` in the exact order
+  `src/app/api/auth/signup/route.ts` calls it, succeeds end to end;
+- the rate limiter actually trips past its own configured cap, and
+  `count_signups_from_subnet` catches a /24 of distinct IPs, not just
+  exact-IP repeats;
+- ban evasion is enforced twice: the pre-check (`identifier_is_banned`)
+  AND `create_member`'s own belt-and-braces guard both refuse a banned
+  email hash, and the refusal creates NOTHING (no `profiles` row, no
+  `user_private` row) — not a partially-created account;
+- the under-18 guard on `create_member` still holds through the same
+  call path (regression coverage that the grant change touched nothing
+  in the function body).
+
+**What this suite does NOT cover (see the QA report, UNVERIFIED):** a
+true browser-to-GoTrue HTTP signup — there is no Docker in this
+sandbox to stand up Supabase Auth/PostgREST locally, so
+`anonAuth.auth.signUp()` itself (the one call in the route that is
+NOT one of the eleven revoked functions) is exercised only by static
+source review, not by execution.
+
+## What the DM adversarial suite proves (19)
+
+Independent QA (Grove-Test), written separately from the author's own
+09-dm-smoke.sql, targeting what an adversary tries next:
+
+- exact body-length boundaries: 1 char and exactly 2000 chars succeed
+  (including 2000 four-byte emoji — char_length counts codepoints, not
+  bytes, so there is no hidden byte-size ceiling); 2001 and 10000 both
+  refuse the same way; empty and spaces-only both refuse;
+- **FINDING, reproduced not asserted-fixed**: the blank-message guard
+  (`char_length(btrim(p_body)) < 1`) uses Postgres's single-argument
+  `btrim()`, which strips ONLY ascii spaces — a body of pure newlines
+  or pure tabs satisfies the guard and is ACCEPTED as a visually blank
+  message. The test is written so that it starts FAILING (loudly,
+  labeled REGRESSION) the moment this is fixed, as a tripwire against
+  silently re-introducing it;
+- a null byte cannot reach a `text` column at all — Postgres refuses
+  it at the protocol level ("null character not permitted") before any
+  function body runs; an invalid UTF-8 byte sequence is structurally
+  impossible to convert into `text` in a UTF8 database — both proven
+  directly, not assumed;
+- sender forgery has no parameter to exploit (`dm_send_message` takes
+  no sender argument — always `auth.uid()`), and the only other path,
+  a direct `insert into dm_messages` with someone else's id as
+  `sender_id`, is refused by table grants for `authenticated`;
+- `file_dm_report`'s message-id array: 0 ids, 11 ids (even with real
+  ids among them — refusal is total, never thinned to 10), and one
+  nonexistent id mixed with one real id (same conversation) are all
+  refused, and NONE of the three refused attempts writes anything to
+  `reports` or `dm_report_evidence` — all-or-nothing; exactly 10 real
+  ids succeeds; a conversation the reporter isn't in is refused
+  regardless of id validity;
+- **FINDING, reproduced not asserted-fixed**: duplicate message ids in
+  one report are not rejected and have no unique constraint to stop
+  them — the same message is copied into `dm_report_evidence` twice,
+  inflating both the evidence row count and the volume
+  `mod_dm_evidence` later audits for that target. Same tripwire
+  pattern as the blank-message finding;
+- `mod_dm_evidence`'s audit promise, exactly: two calls against a
+  target with real evidence produce exactly two new `dm.content_read`
+  rows (not deduplicated), each naming reader/target/volume; a call
+  against a target with ZERO filed evidence returns zero rows and
+  writes ZERO audit rows (distinct from, but as important as, outright
+  refusal); a plain member's call is refused outright and writes
+  nothing; `verify_audit_chain()` still verifies after all of the
+  above;
+- suspension mid-conversation: `dm_can_message` reads 'none' for a
+  suspended recipient (identical to a block — no oracle), sending into
+  an existing accepted conversation is refused with the same
+  block-shaped message, and the sender keeps her own read access to
+  the history; the suspended party herself can still read her DMs at
+  the data layer but cannot send (a different, self-describing
+  refusal, which leaks nothing about anyone else);
+- an independent structural sweep (grouping `pg_proc` by name for
+  every `dm_%` function plus `file_dm_report`/`mod_dm_evidence`, not a
+  maintained name list) confirms exactly one signature each;
+- the dead `dm_e2e_enabled` key never reappears in `app_config`.
+
+## What the suspension-visibility regression suite proves — AND FAILS ON (20)
+
+Regression coverage for commit `097c318`, which corrected
+`docs/community-guidelines.md` and the in-app `SuspendedScreen` to say
+a suspended/banned member's profile AND posts are removed from the
+platform. This suite checks whether the CODE actually delivers that,
+across every public surface, as an uninvolved, active third member:
+
+**Confirmed CLEAN** (all pass): `profile_posts` (her own posts, on her
+own profile), `feed_following` (a follower's feed), `feed_hashtag` (a
+tag page carrying her post), `search_people` (exact-handle search),
+`list_following` (a follower's following list), `get_thread` (her ROOT
+post tombstones — no handle, no body — rather than simply vanishing,
+while an uninvolved reply in the same thread stays visible), and
+mention rendering (a fresh post made AFTER her suspension that
+`@mentions` her does not resolve her into the mentions list).
+
+**FAILS, by design, on the current tree**: the profile ROW ITSELF —
+`handle`, `bio`, `founding_member`, `created_at` — is still fully
+readable by any other active member. `src/app/(member)/u/[handle]/page.tsx`
+does a plain `.from("profiles").select(...)` with no status filter in
+the app code, and the `profiles_read` RLS policy
+(`20261006000001_social_core_hardening.sql`) excludes only
+`status = 'deleted'` — `'suspended'` and `'banned'` both still pass.
+The assertion encodes the PUBLISHED PROMISE, not the current schema,
+and is deliberately left red: a passing test here would mean the test
+had been weakened to match the bug. See the QA report for severity and
+a suggested fix location.
+
+Also characterises, without re-discovering, the KNOWN and ALREADY-
+QUEUED expiry gap: `refresh_my_status()` only clears an expired
+`status_expires_at` for `auth.uid()` — the suspended member's own next
+sign-in. Confirmed here: a third party's read does not flip it,
+another member calling `refresh_my_status()` on her own account cannot
+clear someone else's expiry, and only the suspended member's own call
+restores her to `active`. Nothing else in the schema — no cron
+extension is installed, no trigger, no Owner action — clears it.
