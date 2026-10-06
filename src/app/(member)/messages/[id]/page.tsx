@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
-import { dmFeatureOn } from "@/lib/dm/server";
+import { dmFeatureOn, shouldShowDmDisclosure } from "@/lib/dm/server";
 import { ThreadClient } from "@/components/dm/ThreadClient";
 
 export const metadata: Metadata = { title: "Messages" };
@@ -16,5 +16,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  return <ThreadClient viewerId={viewer.user.id} conversationId={id} />;
+  const showDisclosure = await shouldShowDmDisclosure();
+  return (
+    <ThreadClient viewerId={viewer.user.id} showDisclosure={showDisclosure} conversationId={id} />
+  );
 }

@@ -29,13 +29,15 @@ interface ThreadState {
 }
 
 /**
- * One conversation: @handle-only header, the unmissable disclosure
- * banner, asymmetric bubbles, a composer that cannot lie — request
+ * One conversation: @handle-only header, the disclosure banner
+ * (dismissible on a 45-day cycle, server-decided, shared with the
+ * inbox), asymmetric bubbles, a composer that cannot lie — request
  * states, the waiting state, and the indistinguishable
  * can-no-longer-reply state all say exactly what is true.
  */
 export function ThreadClient(props: {
   viewerId: string;
+  showDisclosure: boolean;
   conversationId?: string;
   peerId?: string;
   peerHandle?: string;
@@ -356,8 +358,9 @@ export function ThreadClient(props: {
         </div>
       </header>
 
-      {/* The honest disclosure — identical copy on every DM surface. */}
-      <DmDisclosure />
+      {/* The honest disclosure — identical copy on every DM surface.
+          One dismissal covers the inbox and every thread alike. */}
+      <DmDisclosure initiallyVisible={props.showDisclosure} />
 
       {/* The messages. */}
       <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto bg-background px-4 py-3 lg:max-h-[60dvh]">

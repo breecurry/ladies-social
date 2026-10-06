@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { dmFeatureOn } from "@/lib/dm/server";
+import { dmFeatureOn, shouldShowDmDisclosure } from "@/lib/dm/server";
 import { ThreadClient } from "@/components/dm/ThreadClient";
 
 export const metadata: Metadata = { title: "New message" };
@@ -36,5 +36,13 @@ export default async function NewConversationPage({
     .maybeSingle();
   if (!peer) notFound();
 
-  return <ThreadClient viewerId={viewer.user.id} peerId={peer.user_id} peerHandle={peer.handle} />;
+  const showDisclosure = await shouldShowDmDisclosure();
+  return (
+    <ThreadClient
+      viewerId={viewer.user.id}
+      showDisclosure={showDisclosure}
+      peerId={peer.user_id}
+      peerHandle={peer.handle}
+    />
+  );
 }

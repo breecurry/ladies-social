@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
-import { dmFeatureOn } from "@/lib/dm/server";
+import { dmFeatureOn, shouldShowDmDisclosure } from "@/lib/dm/server";
 import { InboxClient } from "@/components/dm/InboxClient";
 
 export const metadata: Metadata = { title: "Messages" };
@@ -16,5 +16,12 @@ export default async function MessagesPage() {
   if (!viewer) redirect("/login");
   if (!viewer.profile || !viewer.isActiveMember) notFound();
 
-  return <InboxClient viewerId={viewer.user.id} viewerHandle={viewer.profile.handle} />;
+  const showDisclosure = await shouldShowDmDisclosure();
+  return (
+    <InboxClient
+      viewerId={viewer.user.id}
+      viewerHandle={viewer.profile.handle}
+      showDisclosure={showDisclosure}
+    />
+  );
 }

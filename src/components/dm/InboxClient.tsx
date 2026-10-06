@@ -21,9 +21,11 @@ type Tab = "primary" | "requests";
 export function InboxClient({
   viewerId,
   viewerHandle,
+  showDisclosure,
 }: {
   viewerId: string;
   viewerHandle: string;
+  showDisclosure: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("primary");
   const [rows, setRows] = useState<DmConversationRow[] | null>(null);
@@ -82,7 +84,7 @@ export function InboxClient({
         </button>
       </header>
 
-      <DmDisclosure />
+      <DmDisclosure initiallyVisible={showDisclosure} />
 
       <div role="tablist" aria-label="Inbox" className="flex border-b border-border bg-surface">
         <TabButton

@@ -664,12 +664,18 @@ export type MyAccountStatus = {
 // Messages surface discloses that to the member.
 // ---------------------------------------------------------------
 
-/** Messages settings row (absent row = these defaults). */
+/**
+ * Messages settings row (absent row = these defaults; the disclosure
+ * columns are null until the member first dismisses the DM disclosure
+ * banner — null reads as "never dismissed").
+ */
 export type DmSettingsRow = {
   user_id: string;
   requests_from: DmRequestPolicy;
   dms_enabled: boolean;
   read_receipts: boolean;
+  disclosure_dismissed_at: string | null;
+  disclosure_dismissed_version: number | null;
   updated_at: string;
 };
 
@@ -1032,6 +1038,11 @@ export type Database = {
         Returns: undefined;
       };
       dm_mark_read: { Args: { p_conversation: string }; Returns: undefined };
+      dm_disclosure_should_show: {
+        Args: { p_current_version: number; p_quiet_days: number };
+        Returns: boolean;
+      };
+      dm_dismiss_disclosure: { Args: { p_version: number }; Returns: undefined };
       dm_list_conversations: {
         Args: { p_requests?: boolean };
         Returns: DmConversationRow[];

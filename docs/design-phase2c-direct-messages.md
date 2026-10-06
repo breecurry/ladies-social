@@ -38,8 +38,10 @@ Suite 09 asserts this structurally against `pg_proc`.
 ### 0.2 Hard constraint two: honesty in copy
 
 Every DM surface says exactly what is true. The disclosure (§2) is
-never softened, never a tooltip, never dismissible. "Delete" says who
-still has a copy. A refusal never reveals a block.
+never softened, never a tooltip. It is dismissible on a fixed cycle
+(owner decision, 2026-10-06; see §2) — never silently hidden, and any
+failure to read or write its dismissal state shows it. "Delete" says
+who still has a copy. A refusal never reveals a block.
 
 ---
 
@@ -68,9 +70,9 @@ because nothing existed.
 
 ## 2. The member-facing disclosure
 
-Rendered by `src/components/dm/DmDisclosure.tsx` as a persistent
-banner on the inbox and on every thread (including the new-message
-composer, which is a thread surface). Verbatim:
+Rendered by `src/components/dm/DmDisclosure.tsx` as a banner on the
+inbox and on every thread (including the new-message composer, which
+is a thread surface). Verbatim:
 
 > **Your messages are not private from Hersciety.** Direct messages
 > are not end-to-end encrypted. The platform owner and moderators can
@@ -78,10 +80,37 @@ composer, which is a thread surface). Verbatim:
 > disclosed to authorities in matters involving trafficking or sexual
 > exploitation, including of minors.
 
-Rules: plain English, no euphemism, not dismissible, not a tooltip,
-identical copy everywhere. The "every read is logged" clause is load-
+Rules: plain English, no euphemism, not a tooltip, identical copy
+everywhere. The "every read is logged" clause is load-
 bearing — it is enforced by `mod_dm_evidence()` (§5.3) and must never
 outlive that enforcement.
+
+**Dismissal (owner decision, 2026-10-06; the original always-on
+decision was 2026-10-05).** The banner carries an X. Dismissing it
+hides it on BOTH surfaces (inbox and every thread — one account-level
+state) for a minimum of 45 days, then it returns at full prominence
+and can be dismissed again, indefinitely. The quiet period is the
+single constant `DM_DISCLOSURE_QUIET_DAYS` in
+`src/lib/dm/disclosure.ts`. Mechanics, all server-side:
+
+- State lives on `dm_settings` (`disclosure_dismissed_at`,
+  `disclosure_dismissed_version`), per ACCOUNT — not localStorage —
+  so the quiet period holds across devices and cookie clears. Absent
+  row or null columns read as "never dismissed".
+- The show/hide decision is `dm_disclosure_should_show()` (migration
+  `20261026000001`), evaluated against the database clock and
+  resolved in the server page, passed to the clients as a prop (no
+  flash). Show when ANY of: never dismissed, dismissed version <
+  `DM_DISCLOSURE_VERSION`, or dismissed more than the quiet period
+  ago.
+- The VERSION exists so a changed disclosure overrides the timer: if
+  the copy materially changes (because staff access behaviour
+  changed), bump `DM_DISCLOSURE_VERSION` in the same commit and every
+  member sees the new text immediately, mid-quiet-period or not.
+- FAIL TOWARD SHOWING: migration not applied, RPC error, unreadable
+  state, failed persist — every failure path shows the banner. The X
+  says what it does ("Dismiss this notice (it will return in 45
+  days)"); the re-show is exactly as prominent as the first show.
 
 ---
 

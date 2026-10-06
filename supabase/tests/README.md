@@ -32,6 +32,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/19-dm-adversarial.sql
 # 20 is EXPECTED to fail — see its own section below.
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/20-suspension-visibility-regression.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/21-ban-route-authority-and-follow-counts.sql
+psql -v ON_ERROR_STOP=1 -d uf_test -f tests/22-dm-disclosure-dismissal.sql
 ```
 
 `00-supabase-shim.sql` mirrors what hosted Supabase provides (an `auth`
@@ -632,3 +633,37 @@ and list-matching follow counts):
 - structure: exactly ONE `profile_follow_counts` signature in
   `pg_proc`, EXECUTE for `authenticated` only (not `anon`, not
   `service_role`, not `public`).
+
+## What the DM disclosure dismissal suite proves (22)
+
+Covers migration `20261026000001` (owner decision 2026-10-06: the DM
+disclosure banner gets an X; the original always-on decision was
+2026-10-05). The copy itself is unchanged and untested here — this
+suite tests WHEN it shows, which is decided by
+`dm_disclosure_should_show(current_version, quiet_days)` against the
+database clock, with the version and the 45-day quiet period passed in
+from their single home in `src/lib/dm/disclosure.ts`:
+
+- structure: the two nullable `dm_settings` columns exist (null =
+  never dismissed, the lazy-default pattern), each new function has
+  exactly one signature (the PostgREST ambiguity guard), anon holds no
+  EXECUTE, authenticated does;
+- both functions refuse while the DM feature flag is off, like every
+  other DM function;
+- **never dismissed shows** — with no `dm_settings` row at all, and
+  with a row whose disclosure columns are null;
+- **dismissing hides** and lazy-creates the row with the table's
+  defaults intact, stamped by the server clock (`now()`), never a
+  client clock;
+- **dismissed yesterday stays hidden; dismissed 46 days ago shows
+  again** — and can be dismissed again (the cycle repeats);
+- **a bumped disclosure version shows IMMEDIATELY, inside the quiet
+  period** — changed copy overrides the timer by design;
+- invalid arguments fail safe: bad dismiss versions refuse, nonsense
+  should-show arguments return SHOW (the safe failure direction for a
+  disclosure is visible);
+- **isolation**: a member can neither read nor write another member's
+  dismissal state — the dismiss function takes no user parameter
+  (structurally own-row), a cross-member UPDATE matches 0 rows, a
+  cross-member INSERT raises under RLS, a cross-member SELECT sees
+  nothing, and one member's dismissal quiets nothing for anyone else.
