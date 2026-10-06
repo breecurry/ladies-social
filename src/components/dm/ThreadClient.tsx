@@ -5,23 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   DotsThree,
-  LockSimple,
   PaperPlaneTilt,
   Prohibit,
-  ShieldCheck,
   SpeakerSimpleSlash,
   Trash,
   User,
   Flag,
 } from "@phosphor-icons/react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { DmConversationRow } from "@/lib/database.types";
+import type { DmConversationRow, DmMessageRow } from "@/lib/database.types";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/shell/ToastProvider";
-import { sendDm, syncConversation, clearLocalThread } from "@/lib/dm/client";
-import type { StoredMessage } from "@/lib/dm/store";
-import { VerifyDialog } from "@/components/dm/VerifyDialog";
+import { DmDisclosure } from "@/components/dm/DmDisclosure";
 import { DmReportDialog } from "@/components/dm/DmReportDialog";
 
 type Route = "inbox" | "request" | "none";
@@ -33,31 +29,29 @@ interface ThreadState {
 }
 
 /**
- * One conversation (design §11-§14): @handle-only header, the honest
- * encryption line, asymmetric bubbles, a composer that cannot lie —
- * request states, the waiting state, and the indistinguishable
+ * One conversation: @handle-only header, the unmissable disclosure
+ * banner, asymmetric bubbles, a composer that cannot lie — request
+ * states, the waiting state, and the indistinguishable
  * can-no-longer-reply state all say exactly what is true.
  */
 export function ThreadClient(props: {
   viewerId: string;
-  viewerHandle: string;
   conversationId?: string;
   peerId?: string;
   peerHandle?: string;
 }) {
-  const { viewerId, viewerHandle } = props;
+  const { viewerId } = props;
   const router = useRouter();
   const { showToast } = useToast();
 
   const [thread, setThread] = useState<ThreadState | null>(null);
-  const [messages, setMessages] = useState<StoredMessage[]>([]);
+  const [messages, setMessages] = useState<DmMessageRow[]>([]);
   const [route, setRoute] = useState<Route | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [verifyOpen, setVerifyOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
@@ -121,11 +115,20 @@ export function ThreadClient(props: {
     }
     if (conversationIdRef.current) {
       try {
-        const stored = await syncConversation(viewerId, conversationIdRef.current);
-        setMessages(stored);
-        const newestIncoming = stored
-          .filter((m) => m.senderId !== viewerId)
-          .reduce((max, m) => Math.max(max, m.serverId), 0);
+        const response = await fetch(
+          `/api/dm/messages?conversationId=${encodeURIComponent(conversationIdRef.current)}`,
+        );
+        const body = (await response.json()) as { ok: boolean; messages?: DmMessageRow[] };
+        if (!body.ok) {
+          setLoadError("Could not load messages. We will keep trying.");
+          return;
+        }
+        setLoadError(null);
+        const rows = body.messages ?? [];
+        setMessages(rows);
+        const newestIncoming = rows
+          .filter((m) => m.sender_id !== viewerId)
+          .reduce((max, m) => Math.max(max, m.id), 0);
         if (newestIncoming > lastMarkedRef.current) {
           lastMarkedRef.current = newestIncoming;
           void fetch("/api/dm/conversations/action", {
@@ -179,16 +182,29 @@ export function ThreadClient(props: {
     setSending(true);
     setSendError(null);
     try {
-      const result = await sendDm(viewerId, viewerHandle, thread.peerId, text);
+      const response = await fetch("/api/dm/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientId: thread.peerId, body: text }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        ok: boolean;
+        conversationId?: string;
+        error?: string;
+      } | null;
+      if (!result?.ok) {
+        // The typed text is preserved; the member retries, never retypes.
+        setSendError(result?.error ?? "Could not send. Tap to retry.");
+        return;
+      }
       setDraft("");
-      if (!props.conversationId && conversationIdRef.current === null) {
+      if (!props.conversationId && conversationIdRef.current === null && result.conversationId) {
         conversationIdRef.current = result.conversationId;
         router.replace(`/messages/${result.conversationId}`);
       }
       await refresh();
-    } catch (error) {
-      // The typed text is preserved; the member retries, never retypes.
-      setSendError(error instanceof Error ? error.message : "Could not send. Tap to retry.");
+    } catch {
+      setSendError("Could not send. Tap to retry.");
     } finally {
       setSending(false);
     }
@@ -210,16 +226,12 @@ export function ThreadClient(props: {
         showToast(body.error ?? "Something went wrong. Try again.");
         return;
       }
-      if (action === "delete") {
-        await clearLocalThread(conversationIdRef.current);
+      if (action === "delete" || action === "decline") {
         router.push("/messages");
         return;
       }
-      if (action === "decline") {
-        router.push("/messages");
-        return;
-      }
-      if (action === "mute") showToast("You will not be notified about this conversation. It stays in your inbox.");
+      if (action === "mute")
+        showToast("You will not be notified about this conversation. It stays in your inbox.");
       if (action === "unmute") showToast("Notifications are back on for this conversation.");
       await refresh();
     } finally {
@@ -254,16 +266,14 @@ export function ThreadClient(props: {
   }
 
   const conversation = thread.conversation;
-  const isRequestToMe =
-    conversation?.state === "request" && conversation.is_initiator === false;
+  const isRequestToMe = conversation?.state === "request" && conversation.is_initiator === false;
   const isWaiting = conversation?.state === "request" && conversation.is_initiator === true;
   const canReply =
     !isRequestToMe && !isWaiting && (route === "inbox" || route === "request" || route === null);
 
-  const lastOwn = [...messages].reverse().find((m) => m.senderId === viewerId);
+  const lastOwn = [...messages].reverse().find((m) => m.sender_id === viewerId);
   const peerReadAt = conversation?.peer_read_at ? new Date(conversation.peer_read_at) : null;
-  const lastOwnRead =
-    lastOwn && peerReadAt !== null && peerReadAt >= new Date(lastOwn.sentAt);
+  const lastOwnRead = lastOwn && peerReadAt !== null && peerReadAt >= new Date(lastOwn.sent_at);
 
   return (
     <div className="flex min-h-[calc(100dvh-120px)] flex-col lg:mt-6 lg:min-h-0 lg:overflow-hidden lg:rounded-lg lg:border lg:border-border lg:shadow-e1">
@@ -299,14 +309,6 @@ export function ThreadClient(props: {
                 onClick={() => {
                   setMenuOpen(false);
                   router.push(`/u/${thread.peerHandle}`);
-                }}
-              />
-              <MenuItem
-                icon={<ShieldCheck size={20} aria-hidden />}
-                label={`Verify @${thread.peerHandle}`}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setVerifyOpen(true);
                 }}
               />
               <MenuDivider />
@@ -347,33 +349,25 @@ export function ThreadClient(props: {
                   setMenuOpen(false);
                   setReportOpen(true);
                 }}
-                disabled={!conversation || messages.every((m) => m.kind !== "message")}
+                disabled={!conversation || messages.length === 0}
               />
             </div>
           ) : null}
         </div>
       </header>
 
-      {/* The honest encryption line (design §11). */}
-      <button
-        type="button"
-        onClick={() => setVerifyOpen(true)}
-        className="flex items-center justify-center gap-1.5 bg-background px-4 py-2 text-caption text-text-secondary"
-      >
-        <LockSimple size={14} aria-hidden />
-        Messages are end-to-end encrypted. Hersciety cannot read them.
-      </button>
+      {/* The honest disclosure — identical copy on every DM surface. */}
+      <DmDisclosure />
 
       {/* The messages. */}
       <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto bg-background px-4 py-3 lg:max-h-[60dvh]">
         {messages.map((message, index) => (
           <Bubble
-            key={message.key}
+            key={message.id}
             message={message}
-            own={message.senderId === viewerId}
+            own={message.sender_id === viewerId}
             showTime={
-              index === messages.length - 1 ||
-              messages[index + 1]?.senderId !== message.senderId
+              index === messages.length - 1 || messages[index + 1]?.sender_id !== message.sender_id
             }
           />
         ))}
@@ -417,7 +411,11 @@ export function ThreadClient(props: {
               onKeyDown={(event) => {
                 // Enter sends on desktop; Shift+Enter inserts a newline.
                 // On touch keyboards Enter inserts a newline (§12).
-                if (event.key === "Enter" && !event.shiftKey && window.matchMedia("(min-width: 1024px)").matches) {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  window.matchMedia("(min-width: 1024px)").matches
+                ) {
                   event.preventDefault();
                   void send();
                 }
@@ -440,19 +438,13 @@ export function ThreadClient(props: {
           </div>
           {canReply && !conversation && route === "request" ? (
             <p className="mt-2 text-caption text-text-tertiary">
-              @{thread.peerHandle} does not follow you, so this will arrive as a quiet request.
-              You can send one message until they accept.
+              @{thread.peerHandle} does not follow you, so this will arrive as a quiet request. You
+              can send one message until they accept.
             </p>
           ) : null}
         </div>
       )}
 
-      <VerifyDialog
-        open={verifyOpen}
-        onClose={() => setVerifyOpen(false)}
-        peerId={thread.peerId}
-        peerHandle={thread.peerHandle}
-      />
       {conversation ? (
         <DmReportDialog
           open={reportOpen}
@@ -469,7 +461,7 @@ export function ThreadClient(props: {
       <ConfirmDialog
         open={confirmDelete}
         title="Delete this conversation?"
-        body={`This removes the conversation from your account and your devices. You cannot get it back. @${thread.peerHandle} will still have their copy of the conversation.`}
+        body={`This removes the conversation from your account. You cannot get it back. @${thread.peerHandle} will still have their copy of the conversation.`}
         cancelLabel="Keep conversation"
         confirmLabel="Delete for me"
         onCancel={() => setConfirmDelete(false)}
@@ -496,25 +488,10 @@ function Bubble({
   own,
   showTime,
 }: {
-  message: StoredMessage;
+  message: DmMessageRow;
   own: boolean;
   showTime: boolean;
 }) {
-  if (message.kind === "key_change") {
-    return (
-      <p className="my-2 text-center text-caption text-text-tertiary">
-        @{message.senderHandle}&apos;s security code changed. This usually means a new device —
-        if you were not expecting it, verify before saying anything sensitive.
-      </p>
-    );
-  }
-  if (message.kind === "undecryptable") {
-    return (
-      <p className="my-1 text-center text-caption text-text-tertiary">
-        A message sent before this device was set up cannot be shown here.
-      </p>
-    );
-  }
   return (
     <div className={`flex flex-col ${own ? "items-end" : "items-start"}`}>
       <div
@@ -525,12 +502,12 @@ function Bubble({
         }`}
       >
         {/* Accessible sender prefix: never conveyed by bubble side alone. */}
-        <span className="sr-only">{own ? "You said: " : `@${message.senderHandle} said: `}</span>
-        {message.plaintext}
+        <span className="sr-only">{own ? "You said: " : `@${message.sender_handle} said: `}</span>
+        {message.body}
       </div>
       {showTime ? (
         <span className="mt-0.5 px-1 text-caption text-text-tertiary">
-          {new Date(message.sentAt).toLocaleString(undefined, {
+          {new Date(message.sent_at).toLocaleString(undefined, {
             day: "numeric",
             month: "short",
             hour: "2-digit",

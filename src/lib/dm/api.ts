@@ -22,10 +22,3 @@ export async function requireDm(): Promise<
   }
   return requireUser();
 }
-
-/** A bytea wire value from the client: "\x" + hex. */
-export function isBytea(value: unknown, bytes?: number): value is string {
-  if (typeof value !== "string" || !/^\\x[0-9a-fA-F]+$/.test(value)) return false;
-  if ((value.length - 2) % 2 !== 0) return false;
-  return bytes === undefined || value.length - 2 === bytes * 2;
-}

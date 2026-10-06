@@ -26,14 +26,7 @@ export type ReportReason =
 export type ReportStatus = "open" | "in_review" | "actioned" | "dismissed" | "escalated";
 export type ReportRouting = "standard" | "admin_only" | "owner_conflict";
 export type NotifType =
-  | "follow"
-  | "like"
-  | "reply"
-  | "mention"
-  | "system"
-  | "message"
-  | "reshare"
-  | "quote";
+  "follow" | "like" | "reply" | "mention" | "system" | "message" | "reshare" | "quote";
 export type TagStatus = "active" | "detrended" | "blocked";
 /** "Who can mention you" (Phase 2F §12). Default: everyone (owner decision). */
 export type MentionPolicy = "everyone" | "followed" | "no_one";
@@ -477,11 +470,7 @@ export type FollowListRow = PersonRow & { followed_at: string };
  * timestamp never reaches the client on a browsable surface.
  */
 export type ActivityBucket =
-  | "Active recently"
-  | "This month"
-  | "Earlier"
-  | "Dormant"
-  | "New, not yet active";
+  "Active recently" | "This month" | "Earlier" | "Dormant" | "New, not yet active";
 
 /** One directory row from owner_directory(). @handle is the only identity. */
 export type DirectoryRow = {
@@ -647,8 +636,9 @@ export type MyAccountStatus = {
 };
 
 // ---------------------------------------------------------------
-// Direct messages (Phase 2C). The server stores ciphertext only;
-// bytea travels as "\x"-prefixed hex over PostgREST.
+// Direct messages (Phase 2C, reworked 2026-10-05). NOT end-to-end
+// encrypted: the server stores readable message bodies, and every
+// Messages surface discloses that to the member.
 // ---------------------------------------------------------------
 
 /** Messages settings row (absent row = these defaults). */
@@ -658,24 +648,6 @@ export type DmSettingsRow = {
   dms_enabled: boolean;
   read_receipts: boolean;
   updated_at: string;
-};
-
-/** The member's own active device, from dm_my_device(). */
-export type DmMyDevice = {
-  device_id: string;
-  identity_key: string;
-  created_at: string;
-  prekeys_remaining: number;
-};
-
-/** A prekey bundle for session setup, from dm_prekey_bundle(). */
-export type DmPrekeyBundle = {
-  device_id: string;
-  identity_key: string;
-  signed_prekey: string;
-  signed_prekey_sig: string;
-  prekey_id: number | null;
-  prekey: string | null;
 };
 
 /** One inbox row, from dm_list_conversations(). @handle only, ever. */
@@ -691,6 +663,8 @@ export type DmConversationRow = {
   unread_count: number;
   my_last_read_at: string | null;
   peer_read_at: string | null;
+  last_body: string | null;
+  last_sender_id: string | null;
 };
 
 /** The result row of dm_send_message(). */
@@ -701,16 +675,12 @@ export type DmSendResult = {
   sent_at: string;
 };
 
-/** One ciphertext row, from dm_fetch_messages(). */
-export type DmWireMessage = {
+/** One message row, from dm_fetch_messages(). */
+export type DmMessageRow = {
   id: number;
   sender_id: string;
   sender_handle: string;
-  sender_device_id: string;
-  recipient_device_id: string;
-  header: Json;
-  ciphertext: string;
-  frank_hash: string;
+  body: string;
   sent_at: string;
 };
 
@@ -722,8 +692,7 @@ export type ModDmEvidenceRow = {
   reported_at: string;
   message_id: number;
   sender_handle: string;
-  plaintext: string;
-  verified: boolean;
+  body: string;
   sent_at: string;
 };
 
@@ -1009,28 +978,9 @@ export type Database = {
         Returns: boolean;
       };
       dm_feature_enabled: { Args: Record<string, never>; Returns: boolean };
-      dm_register_device: {
-        Args: {
-          p_device_name: string;
-          p_identity_key: string;
-          p_signed_prekey: string;
-          p_signed_prekey_sig: string;
-          p_prekeys: string[];
-        };
-        Returns: string;
-      };
-      dm_add_prekeys: { Args: { p_prekeys: string[] }; Returns: number };
-      dm_my_device: { Args: Record<string, never>; Returns: DmMyDevice[] };
       dm_can_message: { Args: { p_user: string }; Returns: string };
-      dm_prekey_bundle: { Args: { p_user: string }; Returns: DmPrekeyBundle[] };
       dm_send_message: {
-        Args: {
-          p_recipient: string;
-          p_recipient_device: string;
-          p_header: Json;
-          p_ciphertext: string;
-          p_frank_hash: string;
-        };
+        Args: { p_recipient: string; p_body: string };
         Returns: DmSendResult[];
       };
       dm_accept_request: { Args: { p_conversation: string }; Returns: undefined };
@@ -1048,14 +998,14 @@ export type Database = {
       dm_unread_total: { Args: Record<string, never>; Returns: number };
       dm_fetch_messages: {
         Args: { p_conversation: string; p_after_id?: number | null; p_limit?: number };
-        Returns: DmWireMessage[];
+        Returns: DmMessageRow[];
       };
       file_dm_report: {
         Args: {
           p_conversation: string;
           p_reason: ReportReason;
           p_details?: string | null;
-          p_evidence: Json;
+          p_message_ids: number[];
         };
         Returns: string;
       };

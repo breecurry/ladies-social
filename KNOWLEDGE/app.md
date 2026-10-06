@@ -14,124 +14,140 @@ function may ever match or return `display_name`; smoke suites 02, 07,
 and 09 assert this structurally against `pg_proc`. Many members are
 hiding from specific people. Safety beats convenience in every call.
 
-## Direct messages (Phase 2C) — E2E, text-only, 1:1
+## Direct messages (Phase 2C, reworked) — NOT end-to-end encrypted, text-only, 1:1
 
-Owner decision 2026-10-07, built 2026-10-05 (migration
-`20261011000001_direct_messages.sql`): DMs are **end-to-end encrypted
-from the first release**. The server stores ciphertext only and can
-never read a message body. Text-only and 1:1 only; group E2E is a
-materially harder protocol and comes later, deliberately.
+🔴 **Owner decision 2026-10-09, FINAL — the rework landed 2026-10-05
+(migration `20261021000001_dm_remove_e2e.sql`, which supersedes the E2E
+design of `20261011000001`): DMs are NOT end-to-end encrypted. The
+platform owner CAN read message content. Members are told so plainly on
+every Messages surface, and messages may be disclosed to authorities in
+matters involving trafficking or sexual exploitation (including of
+minors).** This is deliberate and considered a feature. Do not
+re-propose E2E in any form, and do not propose a cryptographic review —
+there is no cryptography left to review. The breach trade-off (a DB
+breach exposes content; members are often hiding from specific people)
+is known and accepted; the mitigation is the access hardening below.
 
-### 🚩 THE FEATURE FLAG: `dm_e2e_enabled` — OFF in production
+### 🚩 THE FEATURE FLAG: `dm_enabled` — OFF in production
 
-The complete DM stack ships dark. **An external cryptographic audit is
-the gate that turns it on** (browser E2E is roughly 60-80% as strong as
-native; this is known and accepted, but unaudited ratchet code must not
-carry real members' conversations). The flag has two layers, and BOTH
-must be on for the feature to exist:
+Renamed from `dm_e2e_enabled` (which became a lie). The complete DM
+stack ships dark. **Grove-Test and Grove-Security passing are the gate
+that turns it on.** Two layers, BOTH must be on:
 
-1. **Environment: `DM_E2E_ENABLED=true`** (read in
-   `src/lib/dm/flag.ts`, server-side only). Gates every DM page, the
-   Messages nav entries, the settings surfaces, and every `/api/dm/*`
-   route (plain 404 while off). Set it per Vercel environment: ON in
-   Preview for exercising the feature, ABSENT in Production.
-2. **Database: `app_config` row `dm_e2e_enabled` = `true`** (checked by
+1. **Environment: `DM_ENABLED=true`** (read in `src/lib/dm/flag.ts`,
+   server-side only). Gates every DM page, the Messages nav entries,
+   the settings surfaces, and every `/api/dm/*` route (plain 404 while
+   off). Set per Vercel environment.
+2. **Database: `app_config` row `dm_enabled` = `true`** (checked by
    `dm_feature_enabled()` inside every DM SECURITY DEFINER function).
-   This stops hand-crafted Supabase RPC calls from reaching DMs while
-   the feature is off. The migration deliberately does NOT insert this
-   row. To flip:
-   `insert into app_config (key, value) values ('dm_e2e_enabled', 'true'::jsonb)
+   Stops hand-crafted Supabase RPC calls while off. The migration
+   deliberately does NOT insert this row, and DELETES any leftover
+   `dm_e2e_enabled` row — a row under the old key enables nothing
+   (suite 09 proves it). To flip:
+   `insert into app_config (key, value) values ('dm_enabled', 'true'::jsonb)
     on conflict (key) do update set value = 'true'::jsonb;`
 
 ⚠️ Preview and Production share the live Supabase project, so the
 database layer is shared: flipping the DB flag enables the *data layer*
 everywhere at once, while the env var keeps the Production *UI* dark.
-That window (DB on, prod env off) is for the audit/preview period only.
-Go-live order: apply migration → flip the DB flag → set
-`DM_E2E_ENABLED=true` in Production → redeploy.
+Go-live order: apply migration → Grove-Test + Grove-Security pass →
+flip the DB flag → set `DM_ENABLED=true` in Production → redeploy
+(Vercel snapshots env vars per deployment).
 
-When the flag is off there is NO fallback messaging path. Off means the
-surfaces do not exist — never readable-by-the-server DMs.
+### What the rework removed (all deleted, none of it dormant)
 
-### Crypto (src/lib/dm/crypto.ts)
+The Double Ratchet / X3DH layer (`src/lib/dm/crypto.ts`), the IndexedDB
+plaintext store and protocol orchestration (`store.ts`, `client.ts`),
+device registration and prekeys (`user_devices` and `one_time_prekeys`
+TABLES ARE DROPPED; `dm_register_device` / `dm_add_prekeys` /
+`dm_my_device` / `dm_prekey_bundle` / `dm_active_device` dropped),
+message franking (the server reads content now; proving a sender sent
+unreadable content is moot), safety numbers / VerifyDialog /
+key-change notices, the `@noble/*` dependencies, and **the one-device-
+per-account limit — phone + laptop now simply work.**
+`dm_messages` now carries a readable `body` (1–2000 chars) instead of
+`header`/`ciphertext`/`frank_hash`. All DM tables held 0 rows at
+reshape time; nothing was migrated.
 
-- **Libraries (permissive, audited, pinned in package.json):**
-  `@noble/curves` 2.4.0 (MIT), `@noble/ciphers` 2.4.0 (MIT),
-  `@noble/hashes` 2.4.0 (MIT). **libsignal is AGPLv3 and must never be
-  used, vendored, or ported.**
-- X3DH-style agreement (x25519 identity + signed prekey + optional
-  one-time prekey, ed25519 signature on the signed prekey) feeding a
-  Double Ratchet (HKDF root chain, HMAC message chains, XChaCha20-
-  Poly1305 AEAD, header-bound AAD, skipped-key handling capped at 200).
-- Identity key on the wire = 64 bytes: x25519 DH public ‖ ed25519
-  signing public (two keypairs, no Edwards↔Montgomery conversion).
-- **Franking** (HMAC-key construction, CRYPTO 2017; never raw AES-GCM —
-  "invisible salamanders"):
-  `frank = HMAC-SHA256(K_frank, "hersciety-dm-frank-v1"\n sender_uuid \n recipient_uuid \n plaintext)`;
-  `K_frank` rides inside the ciphertext; the server stores
-  `sha256(frank)` per message. A report reveals plaintext + `K_frank`
-  for exactly the chosen messages; `file_dm_report()` recomputes with
-  pgcrypto and marks each message verified or not. The reporter cannot
-  fabricate; the sender cannot deny; the platform reads ONLY reported
-  messages.
-- **One active device per account** in this release. Registering a new
-  device (new browser, cleared storage) revokes the old one; old
-  messages become unreadable on the new device — the honest E2E trade,
-  said in the UI, never papered over with a server-readable backup.
-  Device keys, ratchet sessions, and decrypted history live in
-  IndexedDB (`hersciety-dm` database).
+### The disclosure (verbatim, src/components/dm/DmDisclosure.tsx)
 
-### Inbox rules (server-enforced in dm_send_message / dm_prekey_bundle)
+Persistent banner on the inbox and every thread, never dismissible,
+never a tooltip:
+
+> **Your messages are not private from Hersciety.** Direct messages
+> are not end-to-end encrypted. The platform owner and moderators can
+> read them, and every one of those reads is logged. Messages may be
+> disclosed to authorities in matters involving trafficking or sexual
+> exploitation, including of minors.
+
+The "every read is logged" clause is enforced by `mod_dm_evidence()`
+(below). If that enforcement ever changes, the copy must change with
+it.
+
+### Access hardening — the mitigation that replaces E2E (do not weaken)
+
+- RLS on every DM table; `dm_conversations`, `dm_participant_state`,
+  `dm_messages`, `dm_report_evidence` have ZERO policies and zero
+  direct privileges — the SECURITY DEFINER functions (pinned
+  search_path) are the only path, and each verifies participation.
+  `dm_settings` alone is member-writable, own-row.
+- Staff reach message content through exactly ONE function:
+  `mod_dm_evidence(p_target)` (report evidence only; no
+  browse-all-conversations surface exists, deliberately).
+- **Every `mod_dm_evidence()` call that returns content writes a
+  `dm.content_read` row to the hash-chained audit_log** (reader,
+  target, volume). Suite 09 asserts it.
+- Encryption at rest: Supabase encrypts all data at rest with AES-256
+  (infrastructure-level, always on, not configurable). Honest limits:
+  it does not protect against credentialed DB access, and direct SQL
+  (dashboard, stolen credentials) bypasses RLS and the audit trail —
+  that residual risk is the accepted trade-off of the owner decision.
+
+### Inbox rules (server-enforced in dm_route / dm_send_message — unchanged)
 
 - Main inbox receives only from people the recipient follows.
-- Everyone else gets EXACTLY ONE message request: silent (no push, no
-  badge, no notification row, never counted anywhere), preview-only, no
-  second message until accepted. Declining hides the request but keeps
-  the conversation row — the row itself is the one-request cap, so no
-  path yields a second request. Request-state conversations are never
-  deleted for this reason.
-- Settings (`dm_settings`): who can send a request = everyone (default)
-  / followed / no_one, a global DM off switch, read receipts (off by
-  default). "Who can message you" is structurally follow-gated and is
-  not a setting.
+- Everyone else gets EXACTLY ONE message request: silent (no
+  notification row, never counted anywhere), no second message until
+  accepted. Declining hides the request but keeps the conversation row
+  — the row itself is the one-request cap.
+- Settings (`dm_settings`): requests from everyone (default) /
+  followed / no_one, a global DM off switch, read receipts (off by
+  default).
 - **Block, DMs-off, and "no one" raise the IDENTICAL refusal** ("You
   can no longer message this account.") so a blocked person cannot
-  distinguish a block. The prekey-bundle endpoint enforces the same
-  rules so it cannot be used as an oracle. An existing conversation
-  stays readable on BOTH sides across a block (the history may be the
-  evidence); only sending stops.
+  distinguish a block. An existing conversation stays readable on BOTH
+  sides across a block; only sending stops.
 - Notifications (`notif_type` 'message') fire only for accepted
-  conversations, carry no content and no preview, honour the per-type
-  pref and the per-conversation mute, and cap at one unread per sender.
+  conversations, carry no content (kept deliberately, shoulder-surfing
+  safety), honour the per-type pref and per-conversation mute, one
+  unread per sender.
+- The inbox rows now carry a server-side preview (`last_body`, 160
+  chars, respects the member's delete-for-me horizon).
 
 ### Moderation hand-off
 
 A DM report files with `report_subject` 'message' via
-`file_dm_report()`: same duplicate/hourly guards, same staff routing
-(accused staff → admin_only; reports naming the Owner go to the normal
-admin panel per her decision), same safety@unitedfeminist.com outbox
-copy (case reference + reason + accused @handle; never the reporter,
-never message text). Evidence lives in `dm_report_evidence` (the ONLY
-plaintext in the database, reporter-attached, franking-verified, no FK
-to the message so it survives deletion — preservation obligations).
-The console renders it via `mod_dm_evidence()` with per-message
-verified markers and the honest limit: the evidence is only what the
-reporter shared; the platform cannot pull more context.
+`file_dm_report(conversation, reason, details, message_ids bigint[])`:
+the reporter selects 1–10 messages and the SERVER snapshots them into
+`dm_report_evidence` (body/sender/recipient/sent_at copied from the
+real rows — nothing client-supplied is ever shown as the accused's
+words; a foreign message id voids the report). Same duplicate/hourly
+guards, staff routing, csam auto-escalation, and safety@ outbox copy
+(no reporter, no message text) as `file_report()`. The snapshot has no
+FK to the message so it survives deletion (preservation obligations).
+The console renders it via `DmEvidence` and tells the moderator the
+read was audit-logged.
 
 ### Known limits of this release (deliberate, not bugs)
 
-- Single device; no multi-device fan-out, no encrypted backup, no
-  history on a new device.
 - No unsend / delete-for-everyone; no per-message delete (conversation
   delete-for-me only).
-- No push notifications (no push infrastructure exists platform-wide).
-- No typing indicators or presence — the server never emits them at
-  all, which satisfies "off by default" structurally.
-- Text only. DM images are gated behind the five preconditions in
-  docs/design-phase2c-direct-messages.md §17.
-- Browser E2E ≈ 60-80% of native strength (hostile-server JS is the
-  residual risk); mitigations are CSP (still pending platform-wide),
-  and the external audit gate.
+- No push notifications (no push infrastructure platform-wide).
+- No typing indicators or presence — the server never emits them.
+- Text only; no message-content search yet (now possible server-side,
+  but a product decision for later).
+- DM images remain gated behind design §9 — and server-side CSAM
+  hash-scanning of DM images is now possible, which E2E had ruled out.
 
 ## Passkeys and the sensitive-action gate (built 2026-10-05)
 

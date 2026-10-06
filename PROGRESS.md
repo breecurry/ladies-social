@@ -878,6 +878,11 @@ export to S3 Object Lock.
 
 ## Needs the owner
 
+- [ ] **Apply migration `20261021000001` (DM rework, removes E2E) to the
+      live project** — written, verified locally (fresh apply, double
+      re-run, data-preservation re-run), NOT applied. Applying migrations
+      is Grove's step. The code is deployed and degrades cleanly until
+      then (the feature is dark at both layers regardless).
 - [ ] **Apply migration `20261017000001` (Phase 2F) to the live project** —
       the hashtags/mentions/reposts data layer. Code is deployed and
       degrades gracefully until the apply happens. (Applying migrations is
@@ -904,16 +909,12 @@ export to S3 Object Lock.
       to safety@unitedfeminist.com send on the current deployment. Note it is
       scoped to `production` only, so preview deploys do not send email —
       deliberate, not a defect.
-- [ ] **Decide how the DM crypto gets independently reviewed** — the only
-      gate left before messages can be turned on. Options put to the owner
-      2026-10-08: (A) scoped review by one reputable crypto engineer —
-      **recommended**, because this is a textbook X3DH + Double Ratchet on
-      already-audited MIT primitives confined to roughly one module, not a
-      bespoke protocol; (B) ship with an honest in-product "not yet
-      independently reviewed" disclosure; (C) full firm audit now
-      (~$15k-$50k); (D) leave DMs dark until there are members worth
-      attacking. Until one is chosen, both flag layers stay off and no member
-      can reach a DM surface.
+- [x] ~~Decide how the DM crypto gets independently reviewed~~ — **DEAD,
+      owner decision 2026-10-09: DMs are not end-to-end encrypted, so there
+      is no cryptography to review. Never re-raise an encryption review in
+      any form.** The remaining gate before DMs turn on is Grove-Test +
+      Grove-Security passing the non-E2E rework, then the Owner flips the
+      two `dm_enabled` layers.
 - [x] **Apply migration `20261011000001` to the live project — DONE
       2026-10-08 by Grove**, verified and proven idempotent on production
       (three total runs). `…0011` is now USED; the next migration writer
@@ -942,24 +943,21 @@ re-raise.
   `banned_identifiers` on every permanent ban.
 - **Real names are collected but not publicly displayed by default.**
   Pseudonymity with accountability.
-- 🔒 **DMs ARE end-to-end encrypted. Owner decision, 2026-10-07.** This
-  reverses the earlier "not E2E in V1" position, which the owner overruled.
-  She was right on the facts: end-to-end encryption and moderation are not
-  mutually exclusive. Reporting works by client-side report-with-evidence —
-  the reporting member's own device attaches the decrypted messages, and
-  cryptographic franking proves the sender really sent them and the reporter
-  did not fabricate them. The `user_devices` and `one_time_prekeys` tables
-  from migration 0007 exist for exactly this and are finally populated by the
-  DM build. **First release is text-only and 1:1 only**; group chat is a
-  harder protocol and comes later.
-  **The one capability given up is proactive server-side CSAM hash-scanning
-  of DM images — and that costs nothing today, because no image upload exists
-  anywhere in the product.** It only becomes a real trade-off if DM images
-  are ever enabled, which is a separate gated decision with its own
-  preconditions in `docs/design-phase2c-direct-messages.md`.
-  ⚠️ Build caveats: browser E2E is roughly 60-80% of native-app security, so
-  the crypto must pass an external audit before it ships; and libsignal is
-  AGPLv3, so a permissively-licensed implementation is required.
+- 🔒 **DMs are NOT end-to-end encrypted. Owner decision, 2026-10-09 — FINAL,
+  supersedes the 2026-10-07 E2E decision.** The platform owner can read
+  message content; members are told so plainly and up front on every
+  Messages surface; messages may be disclosed to authorities in matters
+  involving trafficking or sexual exploitation, including of minors. The
+  disclosure is considered a feature. The breach trade-off is known and
+  accepted; the mitigation is access hardening (zero-policy RLS,
+  functions-only access, every staff content read written to the audit
+  log), not encryption. **Do not re-propose E2E in any form, and never
+  propose an encryption review — there is no cryptography left to
+  review.** The rework (migration `20261021000001`) deleted the Double
+  Ratchet layer, franking, device keys (and the one-device limit), and
+  renamed the flag to `dm_enabled`. **First release is text-only and 1:1
+  only.** A side effect of the reversal: server-side CSAM hash-scanning of
+  DM images is possible again if DM images ever ship.
   Full design: `docs/design-phase2c-direct-messages.md`.
 - **Images are served through Cloudflare** so free CSAM scanning sees them,
   and EXIF is stripped at upload so location data never reaches storage.
@@ -1074,3 +1072,71 @@ The new migration is NOT applied to the live project — until it is,
 role changes, unbans and the audit-log/user_private reads keep
 requiring AAL2 exactly as before (the new prompts degrade to a refused
 action with the server's step-up message).
+
+## DM rework: end-to-end encryption REMOVED (2026-10-05)
+
+**Status: SHIPPED (code); migration `20261021000001_dm_remove_e2e.sql`
+WRITTEN, NOT APPLIED. The feature stays DARK at both layers.**
+
+Owner decision (2026-10-09, final): DMs are NOT end-to-end encrypted.
+The platform owner can read message content; members are told so
+plainly on every Messages surface; messages may be disclosed to
+authorities in matters involving trafficking or sexual exploitation,
+including of minors. This was a DELETION, not a build:
+
+1. **Removed the whole cryptographic layer**: `src/lib/dm/crypto.ts`
+   (Double Ratchet / X3DH), the IndexedDB store and protocol client,
+   device registration + prekeys (the `user_devices` and
+   `one_time_prekeys` tables are DROPPED — nothing outside DMs used
+   them), message franking, safety numbers / VerifyDialog /
+   DmBootstrap, the `/api/dm/devices|prekeys|bundle` routes, the
+   `@noble/*` dependencies, and `scripts/dm-crypto-test.ts`. The
+   one-device-per-account limit died with the keys: phone + laptop
+   now simply work.
+2. **Reshaped `dm_messages`** to a readable `body` (1-2000 chars)
+   instead of header/ciphertext/frank_hash (0 rows existed; the
+   reshape is guarded so a post-launch re-run cannot touch data).
+3. **Access hardening replaces E2E** (the owner's accepted
+   mitigation): zero-policy RLS on every content table (functions are
+   the only path and verify participation); staff reach content only
+   through `mod_dm_evidence()`, and **every such call writes a
+   `dm.content_read` row to the hash-chained audit log**; Supabase
+   provides AES-256 at rest (infrastructure-level, always on; nothing
+   further is configurable at this tier — documented honestly in the
+   design doc, including the direct-SQL residual risk).
+4. **Report evidence is now a server-side snapshot**: the reporter
+   selects 1-10 messages and `file_dm_report()` copies them from the
+   real rows (no client-supplied plaintext, no franking, no
+   verified/unverified distinction — a server copy cannot be
+   fabricated). The snapshot table stays separate so evidence
+   survives message/account deletion.
+5. **Flag renamed** `dm_e2e_enabled` → `dm_enabled` (env
+   `DM_ENABLED`); the migration deletes any old-key row and inserts
+   nothing. A row under the old key enables nothing (suite 09 proves
+   it). Both layers remain OFF.
+6. **The unmissable disclosure** (`DmDisclosure`, persistent banner on
+   inbox + every thread): "Your messages are not private from
+   Hersciety. Direct messages are not end-to-end encrypted. The
+   platform owner and moderators can read them, and every one of
+   those reads is logged. Messages may be disclosed to authorities in
+   matters involving trafficking or sexual exploitation, including of
+   minors."
+7. **RPC signatures changed** (old signatures dropped explicitly —
+   exactly one signature per DM function, asserted structurally in
+   suite 09): `dm_send_message(uuid,text)`,
+   `file_dm_report(uuid,report_reason,text,bigint[])`, and new return
+   shapes for `dm_fetch_messages`, `dm_list_conversations` (now
+   carries a server-side `last_body` preview), `mod_dm_evidence`
+   (volatile now — it writes the audit row).
+
+Verified locally on a fresh Postgres: all migrations 0001→20261021
+apply clean; the new migration re-runs twice (plain +
+--single-transaction) with notices only; a third run against a
+database WITH message data left the data untouched; suites 01-17 all
+pass (09 fully rewritten for the non-E2E design); `tsc --noEmit`,
+`eslint .`, and `next build` green with the flag off AND on.
+
+Until the migration is applied, production code degrades cleanly: the
+feature is dark (env unset), `dmFeatureOn()` treats any error as off,
+and even with env set the DB functions still gate on the absent
+`dm_enabled` row.

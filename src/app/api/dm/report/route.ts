@@ -3,7 +3,6 @@ import { z } from "zod";
 import { rpcError } from "@/lib/api";
 import { requireDm } from "@/lib/dm/api";
 import { dispatchSafetyEmails } from "@/lib/email/safety";
-import type { Json } from "@/lib/database.types";
 
 const schema = z.object({
   conversationId: z.string().uuid(),
@@ -20,24 +19,16 @@ const schema = z.object({
     "other",
   ]),
   details: z.string().trim().max(2000).optional(),
-  evidence: z
-    .array(
-      z.object({
-        messageId: z.number().int().positive(),
-        plaintext: z.string().min(1).max(4000),
-        frankKey: z.string().regex(/^[0-9a-f]{64}$/),
-      }),
-    )
-    .min(1)
-    .max(10),
+  messageIds: z.array(z.number().int().positive()).min(1).max(10),
 });
 
 /**
- * POST /api/dm/report — client-side report-with-evidence. The
- * reporter's device attaches the decrypted messages she selected; the
- * database verifies each franking commitment (the sender really sent
- * exactly this; the reporter cannot fabricate) and queues the safety@
- * email copy, which is dispatched here like every other report.
+ * POST /api/dm/report — report messages in a conversation. The
+ * reporter selects which messages (1-10); the database snapshots them
+ * server-side into the evidence table (the server can read them — no
+ * client-supplied content is ever presented as the accused's words)
+ * and queues the safety@ email copy, dispatched here like every other
+ * report.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const auth = await requireDm();
@@ -47,13 +38,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
-  const { conversationId, reason, details, evidence } = parsed.data;
+  const { conversationId, reason, details, messageIds } = parsed.data;
 
   const { data: reportId, error } = await auth.supabase.rpc("file_dm_report", {
     p_conversation: conversationId,
     p_reason: reason,
     p_details: details && details !== "" ? details : null,
-    p_evidence: evidence as unknown as Json,
+    p_message_ids: messageIds,
   });
   if (error) return rpcError(error);
 

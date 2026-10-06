@@ -4,7 +4,6 @@ import { getViewer } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { dmFeatureOn } from "@/lib/dm/server";
 import { ThreadClient } from "@/components/dm/ThreadClient";
-import { DmBootstrap } from "@/components/dm/DmBootstrap";
 
 export const metadata: Metadata = { title: "New message" };
 
@@ -37,15 +36,5 @@ export default async function NewConversationPage({
     .maybeSingle();
   if (!peer) notFound();
 
-  return (
-    <>
-      <DmBootstrap />
-      <ThreadClient
-        viewerId={viewer.user.id}
-        viewerHandle={viewer.profile.handle}
-        peerId={peer.user_id}
-        peerHandle={peer.handle}
-      />
-    </>
-  );
+  return <ThreadClient viewerId={viewer.user.id} peerId={peer.user_id} peerHandle={peer.handle} />;
 }

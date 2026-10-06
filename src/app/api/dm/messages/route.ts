@@ -1,36 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { rpcError } from "@/lib/api";
-import { requireDm, isBytea } from "@/lib/dm/api";
-import type { Json } from "@/lib/database.types";
-
-const headerSchema = z.object({
-  dh: z.string().regex(/^[0-9a-f]{64}$/),
-  pn: z.number().int().min(0),
-  n: z.number().int().min(0),
-  x3dh: z
-    .object({
-      ik: z.string().regex(/^[0-9a-f]{128}$/),
-      ek: z.string().regex(/^[0-9a-f]{64}$/),
-      spk: z.string().regex(/^[0-9a-f]{64}$/),
-      opk: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
-    })
-    .optional(),
-});
+import { requireDm } from "@/lib/dm/api";
 
 const sendSchema = z.object({
   recipientId: z.string().uuid(),
-  recipientDeviceId: z.string().uuid(),
-  header: headerSchema,
-  ciphertext: z.string().max(33000),
-  frankHash: z.string(),
+  body: z.string().min(1).max(2000),
 });
 
 /**
- * POST /api/dm/messages — store one end-to-end encrypted message. The
- * body is ciphertext plus public header values; every inbox and
- * permission rule (block, DMs off, request policy, the one-message
- * request cap) is enforced inside dm_send_message(), never here.
+ * POST /api/dm/messages — send one message. The body is stored
+ * readable on the server (DMs are not end-to-end encrypted — a fact
+ * every Messages surface discloses); every inbox and permission rule
+ * (block, DMs off, request policy, the one-message request cap) is
+ * enforced inside dm_send_message(), never here.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const auth = await requireDm();
@@ -40,28 +23,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
-  const { recipientId, recipientDeviceId, header, ciphertext, frankHash } = parsed.data;
-  if (!isBytea(ciphertext) || !isBytea(frankHash, 32)) {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
-  }
+  const { recipientId, body } = parsed.data;
 
   const { data, error } = await auth.supabase.rpc("dm_send_message", {
     p_recipient: recipientId,
-    p_recipient_device: recipientDeviceId,
-    p_header: header as Json,
-    p_ciphertext: ciphertext,
-    p_frank_hash: frankHash,
+    p_body: body,
   });
-  if (error) {
-    // The one retryable case: her security code changed (new device).
-    if (error.message.includes("RECIPIENT_DEVICE_CHANGED")) {
-      return NextResponse.json(
-        { ok: false, error: "RECIPIENT_DEVICE_CHANGED" },
-        { status: 409 },
-      );
-    }
-    return rpcError(error);
-  }
+  if (error) return rpcError(error);
   const row = data?.[0];
   if (!row) {
     return NextResponse.json({ ok: false, error: "Could not send." }, { status: 400 });
@@ -76,9 +44,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * GET /api/dm/messages?conversationId=&afterId= — ciphertext rows for
- * a conversation the caller participates in. Decryption happens on the
- * member's device; the server cannot read what it returns.
+ * GET /api/dm/messages?conversationId=&afterId= — the messages of a
+ * conversation the caller participates in. Participation is verified
+ * inside dm_fetch_messages(); the caller's own "delete for me"
+ * horizon applies.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const auth = await requireDm();

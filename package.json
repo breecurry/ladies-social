@@ -12,13 +12,9 @@
     "format:check": "prettier --check .",
     "provision": "bash scripts/provision.sh",
     "bootstrap": "node scripts/bootstrap.mjs",
-    "test:dm-crypto": "node --experimental-strip-types scripts/dm-crypto-test.ts",
     "test:avatar-pipeline": "node --experimental-strip-types scripts/avatar-pipeline-test.ts"
   },
   "dependencies": {
-    "@noble/ciphers": "^2.4.0",
-    "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^2.4.0",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
