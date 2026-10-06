@@ -1,18 +1,17 @@
--- Behavioral smoke test of the Phase 2C direct-message invariants
--- (local only). Covers: the dm_e2e_enabled feature flag refusing every
--- member-facing DM function while off; device registration (single
--- active device) and one-time prekey consumption; the server-enforced
--- inbox rules (follower → inbox, stranger → exactly one silent
--- request, accept/decline, the identical refusal for block / DMs off /
--- "no one"); ciphertext-only storage (structurally: no plaintext
--- column, no function that could return one); franking verification in
--- file_dm_report (a fabricated plaintext is marked unverified, the
--- genuine one verified); the moderation hand-off (message report in
--- the queue, evidence transcript, safety@ email copy with no reporter
--- and no message text); notification rules (accepted only, never
--- requests, prefs honoured); RLS lockdown of every DM table; and the
--- structural guarantee that no DM function returns or references
--- display_name.
+-- Behavioral smoke test of the reworked (NON-E2E) direct-message
+-- invariants (local only). Covers: the renamed dm_enabled feature flag
+-- (and the dead old key doing nothing); the structural REMOVAL of the
+-- whole E2E layer (no device/prekey tables or functions, no
+-- ciphertext/franking columns, exactly one signature per DM function —
+-- the PostgREST ambiguity guard); readable message bodies with the
+-- 2000-char cap; the server-enforced inbox rules (follower → inbox,
+-- stranger → exactly one silent request, accept/decline, the identical
+-- refusal for block / DMs off / "no one"); server-side evidence
+-- snapshots in file_dm_report (no client-supplied content); the
+-- moderation hand-off INCLUDING the audit_log row that every
+-- mod_dm_evidence content read must write; notification rules; RLS
+-- lockdown of every DM table; and the structural guarantee that no DM
+-- function returns or references display_name.
 \set ON_ERROR_STOP on
 begin;
 set search_path = public, extensions;
@@ -42,11 +41,43 @@ select grant_role('00000000-0000-0000-0000-000000000041', 'moderator');
 reset role;
 
 -- ============================================================
--- 1. STRUCTURAL: the new enum values exist; no DM function returns or
---    references display_name; dm_messages has no plaintext column —
---    the only plaintext table is dm_report_evidence.
+-- 1. STRUCTURAL: the E2E layer is GONE and the readable shape is in.
+--    * no user_devices / one_time_prekeys tables;
+--    * no device/prekey/franking functions, and no DM function has a
+--      leftover second signature (PostgREST ambiguity guard);
+--    * dm_messages has a body column and none of the E2E columns;
+--    * dm_report_evidence is the server snapshot shape (no franking);
+--    * no DM function returns or references display_name;
+--    * the enum values from 0020 are still there.
 -- ============================================================
 do $$ begin
+  if exists (select 1 from information_schema.tables
+             where table_schema = 'public'
+               and table_name in ('user_devices', 'one_time_prekeys')) then
+    raise exception 'FAIL: E2E key tables still exist';
+  end if;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname = 'public'
+               and p.proname in ('dm_register_device', 'dm_add_prekeys', 'dm_my_device',
+                                 'dm_prekey_bundle', 'dm_active_device')) then
+    raise exception 'FAIL: E2E device/prekey functions still exist';
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'dm_messages'
+               and column_name in ('ciphertext', 'header', 'frank_hash',
+                                   'sender_device_id', 'recipient_device_id')) then
+    raise exception 'FAIL: dm_messages still carries E2E columns';
+  end if;
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'dm_messages'
+                   and column_name = 'body') then
+    raise exception 'FAIL: dm_messages has no body column';
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'dm_report_evidence'
+               and column_name in ('frank_key', 'frank', 'verified', 'plaintext')) then
+    raise exception 'FAIL: dm_report_evidence still carries franking columns';
+  end if;
   if not exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
                  where t.typname = 'report_subject' and e.enumlabel = 'message') then
     raise exception 'FAIL: report_subject has no message value';
@@ -57,17 +88,22 @@ do $$ begin
   end if;
 end $$;
 
-do $$ declare f text; sig text; src text; begin
-  foreach f in array array['dm_register_device', 'dm_add_prekeys', 'dm_my_device',
-                           'dm_can_message', 'dm_prekey_bundle', 'dm_send_message',
+do $$ declare f text; n integer; sig text; src text; begin
+  foreach f in array array['dm_feature_enabled', 'dm_can_message', 'dm_send_message',
                            'dm_accept_request', 'dm_decline_request',
                            'dm_delete_conversation', 'dm_set_muted', 'dm_mark_read',
                            'dm_list_conversations', 'dm_unread_total',
                            'dm_fetch_messages', 'file_dm_report', 'mod_dm_evidence'] loop
+    select count(*) into n
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+      where ns.nspname = 'public' and p.proname = f;
+    if n = 0 then raise exception 'FAIL: function % missing', f; end if;
+    if n > 1 then
+      raise exception 'FAIL: % has % signatures — PostgREST would be ambiguous', f, n;
+    end if;
     select pg_get_function_result(p.oid), p.prosrc into sig, src
-      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.proname = f;
-    if sig is null then raise exception 'FAIL: function % missing', f; end if;
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+      where ns.nspname = 'public' and p.proname = f;
     if position('display_name' in sig) > 0 then
       raise exception 'FAIL: % return shape exposes display_name', f;
     end if;
@@ -75,29 +111,26 @@ do $$ declare f text; sig text; src text; begin
       raise exception 'FAIL: % body references display_name', f;
     end if;
   end loop;
-  -- Ciphertext only: dm_messages must never grow a plaintext/body column.
-  if exists (select 1 from information_schema.columns
-             where table_schema = 'public' and table_name = 'dm_messages'
-               and column_name in ('plaintext', 'body', 'text', 'content')) then
-    raise exception 'FAIL: dm_messages carries a plaintext column';
-  end if;
 end $$;
 
 -- ============================================================
--- 2. FEATURE FLAG: while app_config has no dm_e2e_enabled=true row,
---    every member-facing DM function refuses, and dm_unread_total
---    returns 0 (never an error — the shell calls it unconditionally).
+-- 2. FEATURE FLAG: the key is dm_enabled now. While absent, every
+--    member-facing DM function refuses and dm_unread_total returns 0
+--    (never an error). The OLD key is dead: a dm_e2e_enabled row
+--    enables nothing.
 -- ============================================================
+insert into app_config (key, value) values ('dm_e2e_enabled', 'true'::jsonb)
+on conflict (key) do update set value = 'true'::jsonb;
+
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000042', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000042","aal":"aal1","session_id":"a"}', false);
 do $$ begin
-  if dm_feature_enabled() then raise exception 'FAIL: flag defaults on'; end if;
+  if dm_feature_enabled() then raise exception 'FAIL: the dead dm_e2e_enabled key enabled DMs'; end if;
   if dm_unread_total() <> 0 then raise exception 'FAIL: unread total not 0 while off'; end if;
   begin
-    perform dm_register_device('t', repeat('a', 64)::bytea, repeat('a', 32)::bytea,
-                               repeat('a', 64)::bytea, array[repeat('a', 32)::bytea]);
-    raise exception 'FAIL: device registered while feature off';
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', 'hello');
+    raise exception 'FAIL: message sent while feature off';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
     if sqlerrm <> 'Direct messages are not available.' then
@@ -113,107 +146,42 @@ do $$ begin
 end $$;
 reset role;
 
--- Turn the flag on for the rest of the suite (what Grove does after
--- the external audit: one app_config row).
-insert into app_config (key, value) values ('dm_e2e_enabled', 'true'::jsonb)
+delete from app_config where key = 'dm_e2e_enabled';
+-- Turn the flag on for the rest of the suite (what Grove does at
+-- launch: one app_config row, key dm_enabled).
+insert into app_config (key, value) values ('dm_enabled', 'true'::jsonb)
 on conflict (key) do update set value = 'true'::jsonb;
 
--- ============================================================
--- 3. DEVICES AND PREKEYS: registration enforces key shapes, a second
---    registration revokes the first (single active device), prekeys
---    are consumed at most once each, and a member with no device
---    cannot be messaged yet.
--- ============================================================
-set role authenticated;
-select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000042', false);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000042","aal":"aal1","session_id":"a"}', false);
-do $$ declare d1 uuid; d2 uuid; begin
-  begin
-    perform dm_register_device('t', repeat('a', 10)::bytea, repeat('a', 32)::bytea,
-                               repeat('a', 64)::bytea, array[repeat('a', 32)::bytea]);
-    raise exception 'FAIL: bad identity key accepted';
-  exception when others then
-    if sqlerrm like 'FAIL:%' then raise; end if;
-  end;
-  d1 := dm_register_device('ada browser',
-          decode(repeat('11', 64), 'hex'), decode(repeat('12', 32), 'hex'),
-          decode(repeat('13', 64), 'hex'),
-          array[decode(repeat('21', 32), 'hex'), decode(repeat('22', 32), 'hex')]);
-  d2 := dm_register_device('ada browser 2',
-          decode(repeat('31', 64), 'hex'), decode(repeat('32', 32), 'hex'),
-          decode(repeat('33', 64), 'hex'),
-          array[decode(repeat('41', 32), 'hex'), decode(repeat('42', 32), 'hex')]);
-  if (select count(*) from user_devices
-      where user_id = '00000000-0000-0000-0000-000000000042' and revoked_at is null) <> 1 then
-    raise exception 'FAIL: more than one active device';
-  end if;
-  if (select device_id from dm_my_device()) <> d2 then
-    raise exception 'FAIL: dm_my_device does not return the new device';
-  end if;
-  perform set_config('t.ada_device', d2::text, false);
-end $$;
-reset role;
-
--- bea registers a device too. cat deliberately has NO device.
+-- bea follows ada: ada now reaches bea's MAIN inbox (design §6).
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
-do $$ declare d uuid; begin
-  d := dm_register_device('bea browser',
-         decode(repeat('51', 64), 'hex'), decode(repeat('52', 32), 'hex'),
-         decode(repeat('53', 64), 'hex'),
-         array[decode(repeat('61', 32), 'hex')]);
-  perform set_config('t.bea_device', d::text, false);
-end $$;
-
--- bea follows ada: ada now reaches bea's MAIN inbox (design §6).
 insert into follows (follower_id, followee_id)
 values ('00000000-0000-0000-0000-000000000043', '00000000-0000-0000-0000-000000000042');
 reset role;
 
 -- ============================================================
--- 4. PREKEY BUNDLE: consuming works once per prekey; a member with no
---    device cannot be fetched; the bundle enforces the same send
---    permission (no oracle).
+-- 3. SEND, FOLLOWER PATH: ada → bea lands as an ACCEPTED conversation
+--    (bea follows ada), the body round-trips readably, a 'message'
+--    notification fires, and the length caps hold.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000042', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000042","aal":"aal1","session_id":"a"}', false);
-do $$ declare b record; b2 record; begin
-  select * into b from dm_prekey_bundle('00000000-0000-0000-0000-000000000043');
-  if b.device_id::text <> current_setting('t.bea_device') then
-    raise exception 'FAIL: bundle returned wrong device';
-  end if;
-  if b.prekey_id is null then raise exception 'FAIL: no one-time prekey consumed'; end if;
-  -- bea only uploaded one prekey: a second bundle has none left (X3DH
-  -- degrades to no-OTP mode, which is allowed).
-  select * into b2 from dm_prekey_bundle('00000000-0000-0000-0000-000000000043');
-  if b2.prekey_id is not null then
-    raise exception 'FAIL: one-time prekey consumed twice';
-  end if;
+do $$ declare r record; begin
   begin
-    perform dm_prekey_bundle('00000000-0000-0000-0000-000000000044');
-    raise exception 'FAIL: bundle for a member with no device';
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', repeat('x', 2001));
+    raise exception 'FAIL: 2001-char message accepted';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
-    if sqlerrm <> 'This member cannot receive messages yet.' then
-      raise exception 'FAIL: wrong no-device error: %', sqlerrm;
-    end if;
   end;
-end $$;
-
--- ============================================================
--- 5. SEND, FOLLOWER PATH: ada → bea lands as an ACCEPTED conversation
---    (bea follows ada), creates a 'message' notification, and the
---    ciphertext round-trips byte-for-byte.
--- ============================================================
-do $$ declare r record; begin
-  select * into r from dm_send_message(
-    '00000000-0000-0000-0000-000000000043',
-    current_setting('t.bea_device')::uuid,
-    '{"n":0,"pn":0,"dh":"test"}'::jsonb,
-    decode('c0ffee', 'hex'),
-    decode(repeat('ab', 32), 'hex'));
+  begin
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', '   ');
+    raise exception 'FAIL: blank message accepted';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+  select * into r from dm_send_message('00000000-0000-0000-0000-000000000043', 'tea on thursday?');
   if r.conversation_state <> 'accepted' then
     raise exception 'FAIL: follower-path message did not land accepted, got %', r.conversation_state;
   end if;
@@ -226,16 +194,30 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
 do $$ declare m record; n integer; begin
   select * into m from dm_fetch_messages(current_setting('t.conv_ab')::uuid);
-  if m.ciphertext <> decode('c0ffee', 'hex') then
-    raise exception 'FAIL: ciphertext did not round-trip';
+  if m.body <> 'tea on thursday?' then
+    raise exception 'FAIL: body did not round-trip';
   end if;
   if m.sender_handle <> 'ada9' then
     raise exception 'FAIL: sender handle wrong in fetch';
+  end if;
+  -- The inbox preview carries the body too, with the sender.
+  if not exists (select 1 from dm_list_conversations(false)
+                 where conversation_id = current_setting('t.conv_ab')::uuid
+                   and last_body = 'tea on thursday?'
+                   and last_sender_id = '00000000-0000-0000-0000-000000000042') then
+    raise exception 'FAIL: inbox preview missing or wrong';
   end if;
   select count(*) into n from notifications
    where user_id = '00000000-0000-0000-0000-000000000043'
      and type = 'message' and actor_id = '00000000-0000-0000-0000-000000000042';
   if n <> 1 then raise exception 'FAIL: accepted message did not notify (got %)', n; end if;
+  -- The notification itself carries no message content (no body column
+  -- is even nullable-filled for messages).
+  if exists (select 1 from notifications
+             where user_id = '00000000-0000-0000-0000-000000000043' and type = 'message'
+               and coalesce(body, '') <> '') then
+    raise exception 'FAIL: message notification carries content';
+  end if;
   if dm_unread_total() <> 1 then raise exception 'FAIL: unread total wrong'; end if;
   perform dm_mark_read(current_setting('t.conv_ab')::uuid);
   if dm_unread_total() <> 0 then raise exception 'FAIL: mark read did not clear unread'; end if;
@@ -248,23 +230,12 @@ end $$;
 reset role;
 
 -- ============================================================
--- 6. SEND, STRANGER PATH: bea → dee (no follow) lands as a silent
+-- 4. SEND, STRANGER PATH: bea → dee (no follow) lands as a silent
 --    REQUEST: no notification, exactly ONE message until accepted,
 --    invisible in dee's Primary tab, visible in her Requests tab,
---    never counted in her unread badge.
+--    never counted in her unread badge; dee cannot reply before
+--    accepting; accepting opens the thread for both.
 -- ============================================================
-set role authenticated;
-select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
-do $$ declare d uuid; begin
-  d := dm_register_device('dee browser',
-         decode(repeat('71', 64), 'hex'), decode(repeat('72', 32), 'hex'),
-         decode(repeat('73', 64), 'hex'),
-         array[decode(repeat('81', 32), 'hex'), decode(repeat('82', 32), 'hex')]);
-  perform set_config('t.dee_device', d::text, false);
-end $$;
-reset role;
-
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
@@ -272,20 +243,13 @@ do $$ declare r record; begin
   if dm_can_message('00000000-0000-0000-0000-000000000045') <> 'request' then
     raise exception 'FAIL: stranger route is not request';
   end if;
-  select * into r from dm_send_message(
-    '00000000-0000-0000-0000-000000000045',
-    current_setting('t.dee_device')::uuid,
-    '{"n":0}'::jsonb, decode('0102', 'hex'), decode(repeat('cd', 32), 'hex'));
+  select * into r from dm_send_message('00000000-0000-0000-0000-000000000045', 'hi, loved your post');
   if r.conversation_state <> 'request' then
     raise exception 'FAIL: stranger message did not land as request';
   end if;
   perform set_config('t.conv_bd', r.conversation_id::text, false);
-  -- EXACTLY ONE message until accepted.
   begin
-    perform dm_send_message(
-      '00000000-0000-0000-0000-000000000045',
-      current_setting('t.dee_device')::uuid,
-      '{"n":1}'::jsonb, decode('0304', 'hex'), decode(repeat('ce', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000045', 'me again');
     raise exception 'FAIL: second request message accepted';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
@@ -300,13 +264,10 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
 do $$ declare n integer; begin
-  -- Silent: no notification of any type from the request.
   select count(*) into n from notifications
    where user_id = '00000000-0000-0000-0000-000000000045' and actor_id = '00000000-0000-0000-0000-000000000043';
   if n <> 0 then raise exception 'FAIL: a message request notified'; end if;
-  -- Never in the unread badge.
   if dm_unread_total() <> 0 then raise exception 'FAIL: request counted in unread badge'; end if;
-  -- In Requests, not Primary.
   if exists (select 1 from dm_list_conversations(false)
              where conversation_id = current_setting('t.conv_bd')::uuid) then
     raise exception 'FAIL: request visible in Primary tab';
@@ -315,12 +276,8 @@ do $$ declare n integer; begin
                  where conversation_id = current_setting('t.conv_bd')::uuid) then
     raise exception 'FAIL: request missing from Requests tab';
   end if;
-  -- The recipient cannot reply before accepting.
   begin
-    perform dm_send_message(
-      '00000000-0000-0000-0000-000000000043',
-      current_setting('t.bea_device')::uuid,
-      '{"n":0}'::jsonb, decode('05', 'hex'), decode(repeat('cf', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', 'who are you?');
     raise exception 'FAIL: reply sent before accepting the request';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
@@ -328,12 +285,8 @@ do $$ declare n integer; begin
       raise exception 'FAIL: wrong reply-before-accept error: %', sqlerrm;
     end if;
   end;
-  -- Accept, then reply works and the thread is Primary for both.
   perform dm_accept_request(current_setting('t.conv_bd')::uuid);
-  perform dm_send_message(
-    '00000000-0000-0000-0000-000000000043',
-    current_setting('t.bea_device')::uuid,
-    '{"n":0}'::jsonb, decode('05', 'hex'), decode(repeat('cf', 32), 'hex'));
+  perform dm_send_message('00000000-0000-0000-0000-000000000043', 'thanks! hi');
   if not exists (select 1 from dm_list_conversations(false)
                  where conversation_id = current_setting('t.conv_bd')::uuid
                    and state = 'accepted') then
@@ -343,22 +296,15 @@ end $$;
 reset role;
 
 -- ============================================================
--- 7. DECLINE KEEPS THE CAP: cat (with a device now) requests dee;
---    dee declines; the request vanishes from dee's view, cat is told
---    nothing, and cat still cannot send a second message.
+-- 5. DECLINE KEEPS THE CAP: cat requests dee; dee declines; the
+--    request vanishes from dee's view, cat is told nothing, and cat
+--    still cannot send a second message.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000044', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000044","aal":"aal1","session_id":"c"}', false);
-do $$ declare d uuid; r record; begin
-  d := dm_register_device('cat browser',
-         decode(repeat('91', 64), 'hex'), decode(repeat('92', 32), 'hex'),
-         decode(repeat('93', 64), 'hex'), array[decode(repeat('a1', 32), 'hex')]);
-  perform set_config('t.cat_device', d::text, false);
-  select * into r from dm_send_message(
-    '00000000-0000-0000-0000-000000000045',
-    current_setting('t.dee_device')::uuid,
-    '{"n":0}'::jsonb, decode('0a', 'hex'), decode(repeat('da', 32), 'hex'));
+do $$ declare r record; begin
+  select * into r from dm_send_message('00000000-0000-0000-0000-000000000045', 'hello there');
   perform set_config('t.conv_cd', r.conversation_id::text, false);
 end $$;
 reset role;
@@ -379,18 +325,13 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000044', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000044","aal":"aal1","session_id":"c"}', false);
 do $$ begin
-  -- The decline is invisible to cat: her view is unchanged ("waiting")
-  -- and the one-message cap still holds — no second request, ever.
   if not exists (select 1 from dm_list_conversations(false)
                  where conversation_id = current_setting('t.conv_cd')::uuid
                    and state = 'request') then
     raise exception 'FAIL: decline leaked to the sender';
   end if;
   begin
-    perform dm_send_message(
-      '00000000-0000-0000-0000-000000000045',
-      current_setting('t.dee_device')::uuid,
-      '{"n":1}'::jsonb, decode('0b', 'hex'), decode(repeat('db', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000045', 'hello again');
     raise exception 'FAIL: declined sender sent a second message';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
@@ -399,23 +340,21 @@ end $$;
 reset role;
 
 -- ============================================================
--- 8. THE IDENTICAL REFUSAL: block, DMs off, and "no one" all raise
---    the same message, so a blocked person cannot distinguish a block
---    (design §6, §14). The prekey bundle refuses identically.
+-- 6. THE IDENTICAL REFUSAL: block, DMs off, and "no one" all raise
+--    the same message, so a blocked person cannot distinguish a block.
+--    An existing accepted conversation stays readable on both sides
+--    across a block, but sending stops.
 -- ============================================================
--- dee blocks cat.
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
 insert into blocks (blocker_id, blocked_id)
 values ('00000000-0000-0000-0000-000000000045', '00000000-0000-0000-0000-000000000044');
--- ada turns DMs off entirely.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000042', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000042","aal":"aal1","session_id":"a"}', false);
 insert into dm_settings (user_id, dms_enabled)
 values ('00000000-0000-0000-0000-000000000042', false)
 on conflict (user_id) do update set dms_enabled = false;
--- bea allows requests from no one.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
 insert into dm_settings (user_id, requests_from)
@@ -428,7 +367,7 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000044
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000044","aal":"aal1","session_id":"c"}', false);
 do $$
 declare
-  e_block text; e_off text; e_noone text; e_bundle text;
+  e_block text; e_off text; e_noone text;
 begin
   if dm_can_message('00000000-0000-0000-0000-000000000045') <> 'none'
      or dm_can_message('00000000-0000-0000-0000-000000000042') <> 'none'
@@ -436,25 +375,19 @@ begin
     raise exception 'FAIL: dm_can_message did not return none for block/off/no_one';
   end if;
   begin
-    perform dm_send_message('00000000-0000-0000-0000-000000000045',
-      current_setting('t.dee_device')::uuid, '{}'::jsonb,
-      decode('01', 'hex'), decode(repeat('aa', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000045', 'x');
     raise exception 'FAIL: blocked sender sent';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if; e_block := sqlerrm;
   end;
   begin
-    perform dm_send_message('00000000-0000-0000-0000-000000000042',
-      current_setting('t.ada_device')::uuid, '{}'::jsonb,
-      decode('01', 'hex'), decode(repeat('aa', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000042', 'x');
     raise exception 'FAIL: sent to DMs-off member';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if; e_off := sqlerrm;
   end;
   begin
-    perform dm_send_message('00000000-0000-0000-0000-000000000043',
-      current_setting('t.bea_device')::uuid, '{}'::jsonb,
-      decode('01', 'hex'), decode(repeat('aa', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', 'x');
     raise exception 'FAIL: sent to no-one member';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if; e_noone := sqlerrm;
@@ -462,20 +395,9 @@ begin
   if e_block <> e_off or e_off <> e_noone then
     raise exception 'FAIL: refusals are distinguishable: % / % / %', e_block, e_off, e_noone;
   end if;
-  begin
-    perform dm_prekey_bundle('00000000-0000-0000-0000-000000000045');
-    raise exception 'FAIL: blocked sender fetched a prekey bundle';
-  exception when others then
-    if sqlerrm like 'FAIL:%' then raise; end if; e_bundle := sqlerrm;
-  end;
-  if e_bundle <> e_block then
-    raise exception 'FAIL: bundle refusal differs from send refusal';
-  end if;
 end $$;
 reset role;
 
--- An EXISTING accepted conversation stays readable on both sides
--- across a block (the history may be the evidence), but sending stops.
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
@@ -493,9 +415,7 @@ do $$ begin
     raise exception 'FAIL: blocked party lost her own copy of the history';
   end if;
   begin
-    perform dm_send_message('00000000-0000-0000-0000-000000000043',
-      current_setting('t.bea_device')::uuid, '{}'::jsonb,
-      decode('01', 'hex'), decode(repeat('aa', 32), 'hex'));
+    perform dm_send_message('00000000-0000-0000-0000-000000000043', 'x');
     raise exception 'FAIL: blocked party sent into an existing conversation';
   exception when others then
     if sqlerrm like 'FAIL:%' then raise; end if;
@@ -504,71 +424,81 @@ do $$ begin
     end if;
   end;
 end $$;
--- Clean up the block so the franking section can message again.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
 delete from blocks where blocker_id = '00000000-0000-0000-0000-000000000043';
 reset role;
 
 -- ============================================================
--- 9. FRANKING: a genuine message verifies; a fabricated plaintext is
---    stored as unverified. Uses a real HMAC commitment computed the
---    way the client computes it.
+-- 7. REPORTING: the server snapshots exactly the selected messages
+--    into dm_report_evidence — body, sender, recipient, timestamp
+--    copied from the real rows, never from the reporter; a message id
+--    from another conversation voids the report; the safety@ copy
+--    names no reporter and carries no message text.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
-do $$
-declare
-  v_key   bytea := decode(repeat('42', 32), 'hex');
-  v_plain text := 'meet me at nine';
-  v_frank bytea;
-  r record;
-begin
-  -- bea → dee (accepted conversation from section 6).
-  v_frank := extensions.hmac(
-    convert_to('hersciety-dm-frank-v1' || E'\n' || '00000000-0000-0000-0000-000000000043'
-               || E'\n' || '00000000-0000-0000-0000-000000000045' || E'\n' || v_plain, 'UTF8'),
-    v_key, 'sha256');
-  select * into r from dm_send_message(
-    '00000000-0000-0000-0000-000000000045',
-    current_setting('t.dee_device')::uuid,
-    '{"n":2}'::jsonb,
-    decode('deadbeef', 'hex'),           -- ciphertext is opaque to the server
-    extensions.digest(v_frank, 'sha256'));
-  perform set_config('t.franked_msg', r.message_id::text, false);
-  perform set_config('t.frank_key', encode(v_key, 'hex'), false);
+do $$ declare r record; begin
+  select * into r from dm_send_message('00000000-0000-0000-0000-000000000045', 'meet me at nine');
+  perform set_config('t.reported_msg', r.message_id::text, false);
 end $$;
 reset role;
 
--- dee reports it: genuine plaintext verifies, fabricated does not.
+-- Captured as superuser: a message id from a DIFFERENT conversation
+-- (ada↔bea), for the foreign-evidence refusal below — the member
+-- session could not read it, which is the point.
+select set_config('t.foreign_msg',
+  (select min(id) from dm_messages
+   where conversation_id = current_setting('t.conv_ab')::uuid)::text, false);
+
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
 do $$ declare v_report uuid; begin
+  -- A foreign message id (from ada↔bea's conversation) voids the report.
+  begin
+    perform file_dm_report(
+      current_setting('t.conv_bd')::uuid, 'harassment', null,
+      array[current_setting('t.foreign_msg')::bigint]);
+    raise exception 'FAIL: evidence from another conversation accepted';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+    if sqlerrm <> 'Invalid report evidence.' then
+      raise exception 'FAIL: wrong foreign-evidence error: %', sqlerrm;
+    end if;
+  end;
+  -- An empty selection is refused.
+  begin
+    perform file_dm_report(current_setting('t.conv_bd')::uuid, 'harassment', null,
+                           array[]::bigint[]);
+    raise exception 'FAIL: empty evidence selection accepted';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
   v_report := file_dm_report(
     current_setting('t.conv_bd')::uuid,
     'harassment',
     'he will not stop',
-    jsonb_build_array(jsonb_build_object(
-      'messageId', current_setting('t.franked_msg')::bigint,
-      'plaintext', 'meet me at nine',
-      'frankKey', current_setting('t.frank_key'))));
+    array[current_setting('t.reported_msg')::bigint]);
   perform set_config('t.report1', v_report::text, false);
 end $$;
 reset role;
 
 do $$ begin
+  -- The snapshot is the server's copy of the real message.
   if not exists (select 1 from dm_report_evidence
-                 where report_id = current_setting('t.report1')::uuid and verified) then
-    raise exception 'FAIL: genuine evidence did not verify';
+                 where report_id = current_setting('t.report1')::uuid
+                   and message_id = current_setting('t.reported_msg')::bigint
+                   and body = 'meet me at nine'
+                   and sender_id = '00000000-0000-0000-0000-000000000043'
+                   and recipient_id = '00000000-0000-0000-0000-000000000045') then
+    raise exception 'FAIL: evidence snapshot missing or wrong';
   end if;
   if (select subject_type from reports where id = current_setting('t.report1')::uuid)
      <> 'message'::report_subject then
     raise exception 'FAIL: DM report not filed with subject message';
   end if;
-  -- The safety@ copy exists and leaks nothing: no reporter handle, no
-  -- message text, no legal names.
   if not exists (select 1 from safety_email_outbox
                  where report_id = current_setting('t.report1')::uuid
                    and body not like '%dee9%'
@@ -577,35 +507,20 @@ do $$ begin
                    and body like '%direct messages from @bea9%') then
     raise exception 'FAIL: safety email copy missing or leaking';
   end if;
-end $$;
-
--- A fabricated plaintext (dee edits the words) stores as verified=false.
-set role authenticated;
-select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
-do $$ declare v_report uuid; begin
-  v_report := file_dm_report(
-    current_setting('t.conv_bd')::uuid,
-    'violence_threat',
-    null,
-    jsonb_build_array(jsonb_build_object(
-      'messageId', current_setting('t.franked_msg')::bigint,
-      'plaintext', 'i will hurt you',
-      'frankKey', current_setting('t.frank_key'))));
-  perform set_config('t.report2', v_report::text, false);
-end $$;
-reset role;
-do $$ begin
-  if exists (select 1 from dm_report_evidence
-             where report_id = current_setting('t.report2')::uuid and verified) then
-    raise exception 'FAIL: fabricated evidence verified';
+  -- The snapshot survives the message rows: deleting the conversation
+  -- cascades dm_messages away, the evidence stays.
+  if (select count(*) from dm_report_evidence
+      where report_id = current_setting('t.report1')::uuid) <> 1 then
+    raise exception 'FAIL: evidence row count wrong';
   end if;
 end $$;
 
 -- ============================================================
--- 10. MODERATION HAND-OFF: the moderator sees the message case in the
---     queue and the evidence transcript with its franking verdicts;
---     a member does not; the reporter sees her own report.
+-- 8. MODERATION HAND-OFF + THE AUDIT TRAIL: the moderator sees the
+--    case in the queue and the evidence transcript; a plain member is
+--    refused; and EVERY mod_dm_evidence content read writes a
+--    dm.content_read row to the audit log naming reader and target —
+--    staff access to message content is accountable, never invisible.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000041', false);
@@ -616,17 +531,13 @@ do $$ declare n integer; begin
     raise exception 'FAIL: DM report missing from the moderation queue';
   end if;
   select count(*) into n from mod_dm_evidence('00000000-0000-0000-0000-000000000043');
-  if n <> 2 then raise exception 'FAIL: evidence transcript wrong size (%)', n; end if;
+  if n <> 1 then raise exception 'FAIL: evidence transcript wrong size (%)', n; end if;
   if not exists (select 1 from mod_dm_evidence('00000000-0000-0000-0000-000000000043')
-                 where plaintext = 'meet me at nine' and verified) then
-    raise exception 'FAIL: verified evidence missing from transcript';
-  end if;
-  if not exists (select 1 from mod_dm_evidence('00000000-0000-0000-0000-000000000043')
-                 where plaintext = 'i will hurt you' and not verified) then
-    raise exception 'FAIL: unverified evidence not marked';
+                 where body = 'meet me at nine' and sender_handle = 'bea9') then
+    raise exception 'FAIL: evidence body missing from transcript';
   end if;
 end $$;
--- A plain member cannot read the evidence function or tables.
+-- A plain member cannot read the evidence function.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000044', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000044","aal":"aal1","session_id":"c"}', false);
 do $$ begin
@@ -637,7 +548,7 @@ do $$ begin
     if sqlerrm like 'FAIL:%' then raise; end if;
   end;
 end $$;
--- The reporter sees her own report in her history, shape unchanged.
+-- The reporter sees her own report in her history.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
 do $$ begin
@@ -648,10 +559,28 @@ do $$ begin
 end $$;
 reset role;
 
+-- The audit rows: the moderator's reads (she called the function
+-- twice) are each recorded; the refused member read is not.
+do $$ declare n integer; begin
+  select count(*) into n from audit_log
+   where action = 'dm.content_read'
+     and actor_id = '00000000-0000-0000-0000-000000000041'
+     and target_id = '00000000-0000-0000-0000-000000000043'
+     and (detail ->> 'messages')::integer >= 1;
+  if n < 2 then
+    raise exception 'FAIL: mod content reads not audited (found % rows)', n;
+  end if;
+  if exists (select 1 from audit_log
+             where action = 'dm.content_read'
+               and actor_id = '00000000-0000-0000-0000-000000000044') then
+    raise exception 'FAIL: a refused member read wrote an audit row';
+  end if;
+end $$;
+
 -- ============================================================
--- 11. RLS LOCKDOWN: no app role touches the DM tables directly; a
---     non-participant cannot fetch a conversation; dm_settings is
---     own-row only.
+-- 9. RLS LOCKDOWN: no app role touches the DM tables directly; a
+--    non-participant cannot fetch a conversation; dm_settings is
+--    own-row only.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000044', false);
@@ -675,21 +604,9 @@ do $$ begin
   exception when insufficient_privilege then null;
     when others then if sqlerrm like 'FAIL:%' then raise; end if;
   end;
-  begin
-    perform * from one_time_prekeys limit 1;
-    raise exception 'FAIL: authenticated read one_time_prekeys directly';
-  exception when insufficient_privilege then null;
-    when others then if sqlerrm like 'FAIL:%' then raise; end if;
-  end;
-  -- Another member's device rows are invisible (RLS), own rows visible.
-  if exists (select 1 from user_devices where user_id <> auth.uid()) then
-    raise exception 'FAIL: another member''s devices are visible';
-  end if;
-  -- Another member's dm_settings are invisible.
   if exists (select 1 from dm_settings where user_id <> auth.uid()) then
     raise exception 'FAIL: another member''s dm_settings are visible';
   end if;
-  -- A non-participant cannot fetch messages through the function either.
   begin
     perform dm_fetch_messages(current_setting('t.conv_ab')::uuid);
     raise exception 'FAIL: non-participant fetched a conversation';
@@ -704,12 +621,15 @@ reset role;
 set role service_role;
 do $$ begin
   begin
-    insert into dm_messages (conversation_id, sender_id, sender_device_id,
-                             recipient_device_id, header, ciphertext, frank_hash)
-    values (current_setting('t.conv_ab')::uuid, '00000000-0000-0000-0000-000000000042',
-            current_setting('t.ada_device')::uuid, current_setting('t.bea_device')::uuid,
-            '{}'::jsonb, decode('00', 'hex'), decode(repeat('00', 32), 'hex'));
+    insert into dm_messages (conversation_id, sender_id, body)
+    values (current_setting('t.conv_ab')::uuid, '00000000-0000-0000-0000-000000000042', 'x');
     raise exception 'FAIL: service_role inserted a message directly';
+  exception when insufficient_privilege then null;
+    when others then if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
+  begin
+    perform * from dm_messages limit 1;
+    raise exception 'FAIL: service_role read dm_messages directly';
   exception when insufficient_privilege then null;
     when others then if sqlerrm like 'FAIL:%' then raise; end if;
   end;
@@ -717,8 +637,7 @@ end $$;
 reset role;
 
 -- ============================================================
--- 12. NOTIFICATION PREFS: the 'message' toggle is honoured; a
---     per-conversation mute silences without unsubscribing.
+-- 10. NOTIFICATION PREFS: the 'message' toggle is honoured.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
@@ -731,9 +650,7 @@ reset role;
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000043', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000043","aal":"aal1","session_id":"b"}', false);
-select dm_send_message('00000000-0000-0000-0000-000000000045',
-  current_setting('t.dee_device')::uuid, '{"n":3}'::jsonb,
-  decode('ff', 'hex'), decode(repeat('ee', 32), 'hex'));
+select dm_send_message('00000000-0000-0000-0000-000000000045', 'one more thing');
 reset role;
 do $$ begin
   if exists (select 1 from notifications
@@ -744,9 +661,9 @@ do $$ begin
 end $$;
 
 -- ============================================================
--- 13. DELETE FOR ME: the deleter's horizon moves; the other side
---     keeps everything; a new message brings the thread back with
---     only the new content.
+-- 11. DELETE FOR ME: the deleter's horizon moves (messages AND the
+--     inbox preview); the other side keeps everything; a new message
+--     brings the thread back with only the new content.
 -- ============================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
@@ -784,16 +701,15 @@ do $$ begin
     raise exception 'FAIL: delete-for-me reached the other member';
   end if;
   -- A new message resurfaces the thread for the deleter…
-  perform dm_send_message('00000000-0000-0000-0000-000000000045',
-    current_setting('t.dee_device')::uuid, '{"n":4}'::jsonb,
-    decode('ab', 'hex'), decode(repeat('ba', 32), 'hex'));
+  perform dm_send_message('00000000-0000-0000-0000-000000000045', 'are you still there?');
 end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000045', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000045","aal":"aal1","session_id":"d"}', false);
 do $$ declare n integer; begin
   if not exists (select 1 from dm_list_conversations(false)
-                 where conversation_id = current_setting('t.conv_bd')::uuid) then
-    raise exception 'FAIL: new message did not resurface the thread';
+                 where conversation_id = current_setting('t.conv_bd')::uuid
+                   and last_body = 'are you still there?') then
+    raise exception 'FAIL: new message did not resurface the thread (or preview leaked old content)';
   end if;
   -- …with only the new content.
   select count(*) into n from dm_fetch_messages(current_setting('t.conv_bd')::uuid);

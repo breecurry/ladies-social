@@ -261,58 +261,59 @@ curl against a running build; see PROGRESS.md.
 
 ## What the DM suite (09) proves
 
-Covers migration 0020 (Phase 2C — end-to-end encrypted direct
-messages, text-only, 1:1):
+Covers migration 0020 (Phase 2C direct messages) as reworked by
+migration 20261021000001 (the owner's decision: DMs are NOT end-to-end
+encrypted; the platform can read message content, members are told so
+plainly, and staff reads are audited):
 
-- **the feature flag holds at the database**: with no
-  `app_config.dm_e2e_enabled = true` row (the shipped default), every
-  member-facing DM function refuses with one calm message, and the
-  badge count returns 0 instead of erroring — Direct messages stay
-  unreachable below the app layer until the external crypto audit
-  passes and the flag is deliberately flipped;
-- **the server stores ciphertext only, structurally**: `dm_messages`
-  has no plaintext column (the test fails the moment one is added),
-  and no DM function returns or even references `display_name`
-  (checked against `pg_proc` for all 16 functions) — every DM surface
-  is @handle-only below the app layer;
-- device registration enforces key shapes, keeps exactly ONE active
-  device per account (a new registration revokes the old), and
-  one-time prekeys are consumed at most once each; a member with no
-  registered device cannot be messaged yet, said honestly;
+- **the feature flag holds at the database, under its new honest
+  name**: with no `app_config.dm_enabled = true` row (the shipped
+  default), every member-facing DM function refuses with one calm
+  message and the badge count returns 0 instead of erroring; a
+  leftover row under the OLD key (`dm_e2e_enabled`) enables nothing;
+- **the E2E layer is structurally gone**: no `user_devices` or
+  `one_time_prekeys` tables, no device/prekey/franking functions,
+  no ciphertext/header/frank_hash columns on `dm_messages` (which now
+  carries a readable `body`, 1-2000 chars, blank refused), and **no DM
+  function has a leftover second signature** — the PostgREST
+  ambiguity guard, asserted against `pg_proc`;
+- no DM function returns or even references `display_name` (checked
+  structurally) — every DM surface is @handle-only below the app
+  layer;
 - **the inbox rules are server-enforced**: a sender the recipient
   follows lands in the main inbox; a stranger gets EXACTLY ONE silent
-  request — no notification of any kind, never counted in the unread
-  badge, invisible in Primary, visible in Requests — and cannot send
-  a second message until accepted; the recipient cannot reply before
+  request — no notification, never counted in the unread badge,
+  invisible in Primary, visible in Requests — and cannot send a
+  second message until accepted; the recipient cannot reply before
   accepting; declining hides the request without telling the sender
   and the one-message cap survives, so no path yields a second
   request;
-- **block, DMs-off, and "no one" raise the IDENTICAL refusal** (send
-  and prekey-bundle alike), so a blocked person cannot distinguish a
-  block; an existing conversation stays readable on BOTH sides across
-  a block (the history may be the evidence) while sending stops;
-- **franking works end to end**: a genuine reported message verifies
-  against the server's stored commitment (pgcrypto HMAC, the
-  salamander-safe HMAC-key construction), and a fabricated plaintext
-  is stored and shown as unverified — the reporter cannot fabricate,
-  the sender cannot deny;
-- **the moderation hand-off**: a DM report files with
-  `subject_type = 'message'`, appears in the queue as an account
-  case, the moderator reads exactly the transcript the reporter
-  attached (with per-message franking verdicts), a plain member
-  cannot, the reporter sees her own report, and the safety@ email
-  copy names no reporter and carries no message text;
-- notifications fire only for accepted conversations, honour the new
-  `message` pref and the per-conversation mute, and marking a thread
-  read clears them;
-- "delete for me" clears only the deleter's view; the other member
-  keeps her copy; a new message resurfaces the thread with only the
-  new content;
+- **block, DMs-off, and "no one" raise the IDENTICAL refusal**, so a
+  blocked person cannot distinguish a block; an existing conversation
+  stays readable on BOTH sides across a block (the history may be the
+  evidence) while sending stops;
+- **report evidence is a server-side snapshot**: file_dm_report copies
+  the selected messages (body, sender, recipient, timestamp) from the
+  real rows — nothing client-supplied is ever presented as the
+  accused's words; a message id from another conversation voids the
+  report; the safety@ email copy names no reporter and carries no
+  message text;
+- **every staff read of message content is audited**: each
+  mod_dm_evidence() call that returns content writes a
+  `dm.content_read` row to the hash-chained audit log naming the
+  reader, the target, and the volume; a refused member read writes
+  nothing; the moderation queue carries the case and a plain member
+  cannot read the transcript;
+- notifications fire only for accepted conversations, carry no message
+  content, honour the `message` pref and the per-conversation mute,
+  and marking a thread read clears them;
+- "delete for me" clears only the deleter's view — messages AND the
+  inbox preview; the other member keeps her copy; a new message
+  resurfaces the thread with only the new content;
 - RLS lockdown: no app role (member or service_role) can touch
-  `dm_conversations`, `dm_messages`, `dm_report_evidence`, or
-  `one_time_prekeys` directly; another member's `user_devices` and
-  `dm_settings` rows are invisible; a non-participant cannot fetch a
-  conversation through the functions either.
+  `dm_conversations`, `dm_messages`, or `dm_report_evidence` directly;
+  another member's `dm_settings` rows are invisible; a non-participant
+  cannot fetch a conversation through the functions either.
 
 ## What the Discover suite (10) proves
 
