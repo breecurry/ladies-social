@@ -5,6 +5,7 @@ import { getViewer } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { joinedDate } from "@/lib/format";
 import { HANDLE_REGEX } from "@/lib/validation";
+import { modTier } from "@/lib/moderation";
 import { Avatar } from "@/components/Avatar";
 import { OwnProfileAvatar } from "@/components/avatar/OwnProfileAvatar";
 import { AccountMenu } from "@/components/shell/AccountMenu";
@@ -46,12 +47,23 @@ export default async function ProfilePage({
   const supabase = await createSupabaseServerClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, bio, founding_member, created_at")
+    .select("user_id, handle, display_name, bio, founding_member, created_at, status")
     .eq("handle", normalized)
     .maybeSingle();
   if (!profile) notFound();
 
   const isOwn = profile.user_id === viewer.user.id;
+
+  // Published promise (Community Guidelines): a suspended or banned
+  // member's profile is removed from the platform. The profiles_read
+  // policy enforces this at the database; this check is defence in
+  // depth, and covers the window before the 20261023000001 migration
+  // is applied. The member still sees her own profile, and staff
+  // (reviewer and above) still see enforced profiles for moderation.
+  const isStaff = modTier(viewer.roles) !== "none";
+  if (!isOwn && !isStaff && profile.status !== "active" && profile.status !== "restricted") {
+    notFound();
+  }
   const replies = tab === "replies";
   const reposts = tab === "reposts";
 

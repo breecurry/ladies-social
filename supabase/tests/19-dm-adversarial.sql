@@ -107,33 +107,29 @@ begin
 end $$;
 
 -- ============================================================
--- 2. FINDING: the blank-message guard uses btrim(p_body), and
---    Postgres's single-argument btrim() strips ONLY ASCII space
---    characters — NOT tabs or newlines. A body of pure newlines (or
---    tabs) therefore satisfies char_length(btrim(p_body)) >= 1 and is
---    ACCEPTED, even though it renders as a visually blank message.
---    This is a real gap in the guard, reproduced here, not asserted
---    as already-fixed: if migration 20261021000001 is ever hardened to
---    use a real whitespace trim, this test must be updated to expect
---    REJECTION and the FAIL branch below deleted.
+-- 2. FIXED (migration 20261023000001): the blank-message guard now
+--    requires at least one NON-WHITESPACE character. Previously it was
+--    char_length(btrim(p_body)) >= 1, and Postgres's single-argument
+--    btrim() strips ONLY ASCII space characters — so a body of pure
+--    newlines or tabs was ACCEPTED and stored as a visually blank
+--    message. Both are now refused, exactly like the empty-string and
+--    spaces-only cases above.
 -- ============================================================
 do $$
-declare v_id bigint; v_body text;
 begin
-  select message_id into v_id from dm_send_message('00000000-0000-0000-0000-000000000073', E'\n\n\n');
-  if v_id is null then
-    raise exception 'REGRESSION: a newlines-only body is now refused — update this test to assert rejection and remove the FINDING note above';
-  end if;
-  select body into v_body from dm_fetch_messages(
-    (select conversation_id from dm_list_conversations(false)
-      where correspondent_id = '00000000-0000-0000-0000-000000000073' limit 1))
-   where id = v_id;
-  if v_body !~ '^\n+$' then raise exception 'FAIL: unexpected body for the newline case: %', v_body; end if;
+  begin
+    perform dm_send_message('00000000-0000-0000-0000-000000000073', E'\n\n\n');
+    raise exception 'FAIL: a newlines-only message was accepted';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
 
-  select message_id into v_id from dm_send_message('00000000-0000-0000-0000-000000000073', E'\t\t\t');
-  if v_id is null then
-    raise exception 'REGRESSION: a tabs-only body is now refused — update this test to assert rejection';
-  end if;
+  begin
+    perform dm_send_message('00000000-0000-0000-0000-000000000073', E'\t\t\t');
+    raise exception 'FAIL: a tabs-only message was accepted';
+  exception when others then
+    if sqlerrm like 'FAIL:%' then raise; end if;
+  end;
 end $$;
 
 -- ============================================================
@@ -283,11 +279,12 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000075
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000075","aal":"aal1","session_id":"h"}', false);
 do $$
 begin
-  -- DUPLICATE ids within the cap: the function does not reject
-  -- duplicates, and has no unique constraint on (report_id,
-  -- message_id) — so the SAME message is copied into evidence TWICE.
-  -- Reproduced here as a FINDING, not asserted as correct: it lets one
-  -- message inflate both the evidence row count AND the "messages"
+  -- DUPLICATE ids within the cap: FIXED (migration 20261023000001).
+  -- The report itself is still accepted — duplicates were never a
+  -- refusal condition — but the evidence snapshot is now
+  -- DE-DUPLICATED (one row per distinct message id), with a unique
+  -- index on (report_id, message_id) as the backstop, so one message
+  -- can no longer inflate the evidence row count or the "messages"
   -- volume mod_dm_evidence later audits for this target.
   perform file_dm_report(current_setting('t.gh_conv')::uuid, 'spam', null,
     array[current_setting('t.gh_msg1')::bigint, current_setting('t.gh_msg1')::bigint]);
@@ -296,8 +293,8 @@ reset role;
 
 do $$ begin
   if (select count(*) from dm_report_evidence
-       where message_id = current_setting('t.gh_msg1')::bigint) <> 2 then
-    raise exception 'REGRESSION: duplicate message ids no longer double-insert evidence — update this test, the finding is fixed';
+       where message_id = current_setting('t.gh_msg1')::bigint) <> 1 then
+    raise exception 'FAIL: a report listing the same message id twice must snapshot exactly ONE evidence row for it';
   end if;
 end $$;
 
