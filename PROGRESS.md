@@ -18,12 +18,13 @@ Migration `20261014000001` (admin dashboard) **is applied to the live
 project** (Grove, 2026-10-09; three idempotent runs, verified in the live
 schema): `/owner/members` and `/owner/insights` are live.
 
-All migrations through `20261019000001` are applied to the live project, and
-the avatar storage layer is configured and live.
-**⚠️ Migration `20261020000001` (the extended passkey gate — see its
-section below) is written and tested but NOT YET APPLIED to the live
-project; the deployed code degrades gracefully until it is applied.**
-Next, in order: **apply migration `20261020000001`** → **Grove-Test**
+All migrations through `20261026000001` are applied to the live project
+(2026-10, per Grove), and the avatar storage layer is configured and live.
+**⚠️ Migration `20261027000001` (the disclosure-dismissal tamper guard —
+see "Where things stand") is written and tested but NOT YET APPLIED to
+the live project; it changes no app code, so nothing degrades while it
+waits. Grove applies migrations — never an agent.**
+Next: **apply migration `20261027000001`** → **Grove-Test**
 (adversarial) → **Grove-Security** (mandatory before any public launch) →
 the Owner's passkey walkthrough end to end → counsel sign-off, then flip
 `published: true` in `src/lib/legal.ts` (one line per document).
@@ -67,9 +68,53 @@ re-enroll it once. Do not change this value again.
 
 ## Where things stand
 
-**Small-fix batch (2026-10, migration `20261025000001` — written, tested,
-NOT yet applied to the live project; the deployed code degrades gracefully
-until Grove applies it).** Three independent fixes:
+**Disclosure-dismissal tamper guard + docs pass (2026-10, migration
+`20261027000001` — written, tested, NOT yet applied to the live
+project; no app code changed, so the deployed code is byte-identical
+in behaviour until Grove applies it, and after).** Three items:
+
+1. **The forgery hole in the DM disclosure dismissal is closed.**
+   `dm_settings` legitimately keeps INSERT/UPDATE grants to
+   `authenticated` (own-row RLS) for the settings card, so a member
+   could hand-craft a PostgREST write to her own row and set
+   `disclosure_dismissed_version = 9999` or a far-future
+   `disclosure_dismissed_at`, permanently suppressing a future,
+   materially CHANGED disclosure — defeating the version field's whole
+   purpose (a changed disclosure reaches EVERY member). Additionally —
+   found during this pass — `dm_dismiss_disclosure(p_version)` is
+   EXECUTE-granted to `authenticated`, so the version parameter is
+   client-controlled at the PostgREST surface regardless of what the
+   app route passes: `rpc dm_dismiss_disclosure(9999)` forged the same
+   state. Fix, two parts: (a) a BEFORE INSERT/UPDATE trigger
+   (`trg_dm_settings_disclosure_guard`) SILENTLY clamps the two
+   disclosure columns on every write path unless the transaction-local
+   marker set only inside `dm_dismiss_disclosure()` is present
+   (silent, so the settings card's upsert — which never names those
+   columns — keeps working unchanged; clamp-to-null/previous, so any
+   future write path can only make the banner show MORE, never less);
+   (b) `dm_disclosure_should_show()` hides only on an EXACT version
+   match, so a forged FUTURE version is inert — it shows the banner.
+   Accepted residual: guessing the exact NEXT version pre-dismisses
+   that one bump for at most one 45-day quiet period (timestamps are
+   always the server clock); closing it would mean duplicating the
+   app's version constant into the database. Suite 22 proves the
+   clamp, the card's exact upsert shape, the RPC-forgery inertness,
+   and recovery by genuine dismissal — and was verified to go RED on
+   a tree without the migration.
+2. **Two stale "never dismissible" claims corrected** (KNOWLEDGE/app.md
+   disclosure section, and the DM-rework entry below): the banner has
+   been dismissible since 2026-10-06 — 45-day quiet period, immediate
+   return on a `DM_DISCLOSURE_VERSION` bump.
+3. **Suite 20's stale "EXPECTED TO FAIL" docs corrected** (header
+   comment, closing `\echo` lines, tests/README.md — assertions
+   byte-identical): `20261023000001` fixed the profile-row visibility
+   finding and suite 20 passes clean. A suite-20 failure is now to be
+   read as a REGRESSION of the published suspended/banned-profile
+   promise, never as "expected".
+
+**Small-fix batch (2026-10, migration `20261025000001` — applied to the
+live project along with everything through `20261026000001`).** Three
+independent fixes:
 
 1. **Ban-through-a-block** (`src/app/api/mod/ban/route.ts`): the POST
    handler's typed-handle gate read `profiles` through the CALLER'S
@@ -1155,13 +1200,21 @@ including of minors. This was a DELETION, not a build:
    `DM_ENABLED`); the migration deletes any old-key row and inserts
    nothing. A row under the old key enables nothing (suite 09 proves
    it). Both layers remain OFF.
-6. **The unmissable disclosure** (`DmDisclosure`, persistent banner on
-   inbox + every thread): "Your messages are not private from
-   Hersciety. Direct messages are not end-to-end encrypted. The
-   platform owner and moderators can read them, and every one of
-   those reads is logged. Messages may be disclosed to authorities in
-   matters involving trafficking or sexual exploitation, including of
-   minors."
+6. **The disclosure** (`DmDisclosure`, banner on inbox + every
+   thread): "Your messages are not private from Hersciety. Direct
+   messages are not end-to-end encrypted. The platform owner and
+   moderators can read them, and every one of those reads is logged.
+   Messages may be disclosed to authorities in matters involving
+   trafficking or sexual exploitation, including of minors."
+   (Since 2026-10-06 — migrations `20261026000001`/`20261027000001`,
+   after this entry was written — the banner is DISMISSIBLE: the X
+   quiets it for a minimum of 45 days (`DM_DISCLOSURE_QUIET_DAYS`,
+   `src/lib/dm/disclosure.ts`), it returns after the quiet period,
+   and it returns IMMEDIATELY regardless of the timer when
+   `DM_DISCLOSURE_VERSION` is bumped for materially changed copy.
+   The dismissal state is tamper-guarded: only
+   `dm_dismiss_disclosure()` can write it — a trigger clamps every
+   other path, and forged states fail toward showing. Suite 22.)
 7. **RPC signatures changed** (old signatures dropped explicitly —
    exactly one signature per DM function, asserted structurally in
    suite 09): `dm_send_message(uuid,text)`,

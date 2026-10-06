@@ -29,7 +29,7 @@ psql -v ON_ERROR_STOP=1 -d uf_test -f tests/16-passkey-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/17-extended-passkey-gate.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/18-revoke-grants-and-signup-path.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/19-dm-adversarial.sql
-# 20 is EXPECTED to fail — see its own section below.
+# 20 was deliberately red once; 20261023000001 fixed the finding and it must pass now.
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/20-suspension-visibility-regression.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/21-ban-route-authority-and-follow-counts.sql
 psql -v ON_ERROR_STOP=1 -d uf_test -f tests/22-dm-disclosure-dismissal.sql
@@ -567,43 +567,48 @@ Independent QA (Grove-Test), written separately from the author's own
   maintained name list) confirms exactly one signature each;
 - the dead `dm_e2e_enabled` key never reappears in `app_config`.
 
-## What the suspension-visibility regression suite proves — AND FAILS ON (20)
+## What the suspension-visibility regression suite proves (20) — MUST PASS
 
 Regression coverage for commit `097c318`, which corrected
 `docs/community-guidelines.md` and the in-app `SuspendedScreen` to say
 a suspended/banned member's profile AND posts are removed from the
 platform. This suite checks whether the CODE actually delivers that,
 across every public surface, as an uninvolved, active third member:
+`profile_posts` (her own posts, on her own profile), `feed_following`
+(a follower's feed), `feed_hashtag` (a tag page carrying her post),
+`search_people` (exact-handle search), `list_following` (a follower's
+following list), `get_thread` (her ROOT post tombstones — no handle,
+no body — rather than simply vanishing, while an uninvolved reply in
+the same thread stays visible), mention rendering (a fresh post made
+AFTER her suspension that `@mentions` her does not resolve her into
+the mentions list), and — the final section — the profile ROW ITSELF
+(`handle`, `bio`, `founding_member`, `created_at`), which must be
+unreadable by any other active member while she is suspended or
+banned.
 
-**Confirmed CLEAN** (all pass): `profile_posts` (her own posts, on her
-own profile), `feed_following` (a follower's feed), `feed_hashtag` (a
-tag page carrying her post), `search_people` (exact-handle search),
-`list_following` (a follower's following list), `get_thread` (her ROOT
-post tombstones — no handle, no body — rather than simply vanishing,
-while an uninvolved reply in the same thread stays visible), and
-mention rendering (a fresh post made AFTER her suspension that
-`@mentions` her does not resolve her into the mentions list).
+**History, so a future red is read correctly**: that final section was
+originally written RED on purpose. When this suite was first added,
+the profile row stayed fully readable during a suspension or ban —
+only her posts were hidden — and the assertion encoded the PUBLISHED
+PROMISE rather than the bug, deliberately left failing instead of
+weakened. Migration `20261023000001` (profile visibility and DM
+fixes: `profiles_read` now admits only `active`/`restricted` profiles
+to other members, and the profile page 404s on a status-filtered
+read) FIXED the gap, and the suite has passed clean end to end since.
+Not one assertion was weakened to get it green. **If suite 20 goes
+red today — at that section or any other — it is a REGRESSION of a
+promise published in `docs/community-guidelines.md`. Never dismiss a
+suite-20 failure as "expected"; fix the code.**
 
-**FAILS, by design, on the current tree**: the profile ROW ITSELF —
-`handle`, `bio`, `founding_member`, `created_at` — is still fully
-readable by any other active member. `src/app/(member)/u/[handle]/page.tsx`
-does a plain `.from("profiles").select(...)` with no status filter in
-the app code, and the `profiles_read` RLS policy
-(`20261006000001_social_core_hardening.sql`) excludes only
-`status = 'deleted'` — `'suspended'` and `'banned'` both still pass.
-The assertion encodes the PUBLISHED PROMISE, not the current schema,
-and is deliberately left red: a passing test here would mean the test
-had been weakened to match the bug. See the QA report for severity and
-a suggested fix location.
-
-Also characterises, without re-discovering, the KNOWN and ALREADY-
-QUEUED expiry gap: `refresh_my_status()` only clears an expired
+Also characterises, without re-discovering, the expiry gap fixed in
+`20261022000001`: `refresh_my_status()` only clears an expired
 `status_expires_at` for `auth.uid()` — the suspended member's own next
 sign-in. Confirmed here: a third party's read does not flip it,
 another member calling `refresh_my_status()` on her own account cannot
 clear someone else's expiry, and only the suspended member's own call
-restores her to `active`. Nothing else in the schema — no cron
-extension is installed, no trigger, no Owner action — clears it.
+restores her to `active`. The pg_cron sweep (`sweep_expired_statuses()`,
+invoked directly here because pg_cron cannot be installed in this
+sandbox) is the only other thing that clears it.
 
 ## What the ban-route-authority / follow-counts suite proves (21)
 
@@ -666,4 +671,23 @@ from their single home in `src/lib/dm/disclosure.ts`:
   dismissal state — the dismiss function takes no user parameter
   (structurally own-row), a cross-member UPDATE matches 0 rows, a
   cross-member INSERT raises under RLS, a cross-member SELECT sees
-  nothing, and one member's dismissal quiets nothing for anyone else.
+  nothing, and one member's dismissal quiets nothing for anyone else;
+- **tamper guard** (migration `20261027000001`): a member cannot forge
+  her OWN dismissal state either. `trg_dm_settings_disclosure_guard`
+  (BEFORE INSERT OR UPDATE on `dm_settings`) silently clamps the two
+  disclosure columns — INSERTs get null, UPDATEs keep the previous
+  values — unless the transaction-local marker only
+  `dm_dismiss_disclosure()` sets is present. Proven here: a direct
+  own-row UPDATE forging `disclosure_dismissed_version = 9999` and/or
+  a far-future `disclosure_dismissed_at` SUCCEEDS as a statement (the
+  clamp is silent, so the settings card can never start erroring) but
+  changes neither column; the settings card's exact upsert shape
+  (`user_id, requests_from, dms_enabled, read_receipts` in both arms)
+  still updates the settings it owns and disturbs nothing; an upsert
+  or first-row INSERT that smuggles the disclosure columns lands the
+  owned columns and clamps the smuggled ones; and a forged FUTURE
+  version through the RPC's client-controlled parameter
+  (`dm_dismiss_disclosure(9999)`) is recorded but INERT, because
+  `dm_disclosure_should_show` hides only on an EXACT version match —
+  every forged state fails toward SHOWING, and a genuine dismissal
+  afterwards still works.

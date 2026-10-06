@@ -71,8 +71,30 @@ reshape time; nothing was migrated.
 
 ### The disclosure (verbatim, src/components/dm/DmDisclosure.tsx)
 
-Persistent banner on the inbox and every thread, never dismissible,
-never a tooltip:
+Banner on the inbox and every thread, never a tooltip. Dismissible
+since 2026-10-06 (migration 20261026000001) on a per-account cycle:
+the X quiets it for a minimum quiet period (45 days — the constant
+`DM_DISCLOSURE_QUIET_DAYS` in `src/lib/dm/disclosure.ts`), after which
+it returns at full prominence and can be dismissed again. If the copy
+ever materially changes, bump `DM_DISCLOSURE_VERSION` in the same file
+and the banner returns IMMEDIATELY for every member, quiet period or
+not — that is the version field's whole purpose. Visibility is decided
+server-side (`dm_disclosure_should_show`, database clock) and every
+odd or unreadable state fails TOWARD SHOWING.
+
+Tamper-guarded (migration 20261027000001): the dismissal state can
+only be written by `dm_dismiss_disclosure()` (server clock, caller's
+own row). A BEFORE INSERT/UPDATE trigger on `dm_settings`
+(`trg_dm_settings_disclosure_guard`) silently clamps
+`disclosure_dismissed_at` / `disclosure_dismissed_version` on every
+other write path — including a member's own-row PostgREST writes,
+which the table otherwise legitimately accepts for the settings card —
+so a member cannot forge a far-future dismissal or a sky-high version
+to suppress a future, changed disclosure. A forged future version
+through the RPC parameter is inert too: `dm_disclosure_should_show`
+hides only on an EXACT version match. Suite 22 proves all of it.
+
+The copy:
 
 > **Your messages are not private from Hersciety.** Direct messages
 > are not end-to-end encrypted. The platform owner and moderators can
@@ -220,30 +242,24 @@ locked.
 Forward-only, idempotent, never edit an applied file. `main`
 auto-deploys to production BEFORE migrations are applied, so new code
 must degrade gracefully against the un-migrated database (every DM
-entry point treats errors as "feature off"). Migration
-`20261011000001` is written and tested (fresh, re-run, single
-transaction, populated) but NOT applied to the live project — Grove
-applies it after review. Migration `20261020000001` (the extended
-passkey gate) is likewise written, tested fresh + re-run locally, and
-NOT applied — until Grove applies it, role changes, unbans and the
-audit_log/user_private reads still demand aal2 and the new passkey
-step-up prompts degrade to a refused action (same deploy-skew posture
-as `20261019000001`). Migration `20261022000001` (post_mentions block
-filter + the suspension-expiry sweep) is written and tested (fresh
-apply + two re-runs locally, suites 01-17 green) and NOT applied — no
-deployed code depends on it, so there is no skew at all: until Grove
-applies it, mention metadata still leaks across blocks and lapsed
-suspensions still clear only on sign-in (the pre-fix behaviour,
-nothing worse). It installs pg_cron (first migration to do so) and
-schedules `hersciety-status-expiry-sweep` (*/5) running
-`sweep_expired_statuses()`, which mirrors `refresh_my_status()`
+entry point treats errors as "feature off"). Everything through
+`20261026000001` is applied to the live project (2026-10, per Grove).
+`20261027000001` (the disclosure-dismissal tamper guard) is written
+and tested (fresh apply + three re-runs + single-transaction re-run
+locally, all 22 suites green) and NOT applied — Grove applies
+migrations, never an agent. It ships no app-code change, so there is
+no deploy skew at all: until Grove applies it, the pre-fix behaviour
+simply persists (a member could forge her own dismissal state —
+nothing worse, nobody else's). The pg_cron sweep from `20261022000001`
+(`hersciety-status-expiry-sweep`, */5, running
+`sweep_expired_statuses()`) is live; it mirrors `refresh_my_status()`
 exactly — same status flip, same `mod.status_expired` audit action, no
 notification. Any future lapsed-status logic must change BOTH
 functions together.
 
 ## Tests
 
-`supabase/tests/` 01-17 against local Postgres per tests/README.md.
+`supabase/tests/` 01-22 against local Postgres per tests/README.md.
 09-dm-smoke covers the DM invariants; 14-phase2f covers hashtags,
 mention policy and caps, reposts, quotes, trending, and tag
 suppression; 15 covers the profile Reposts tab walls and the
@@ -251,8 +267,11 @@ suppression; 15 covers the profile Reposts tab walls and the
 fresh passkey); 17 covers the gate's extension to grant_role /
 revoke_role / owner_unban and the audit_log / user_private RLS reads —
 including that a non-owner with a perfectly fresh passkey is still
-refused everywhere; `npm run test:dm-crypto` unit-tests the protocol
-under Node. Extend suites; never replace them.
+refused everywhere; 19 is DM-adversarial; 20 is the
+suspension-visibility promise (MUST pass — a red here is a regression
+of a published promise); 21 pins the ban-route authority order and
+follow counts; 22 covers the disclosure-dismissal cycle and its tamper
+guard. Extend suites; never replace them.
 
 ## Hashtags, mentions, reposts (Phase 2F, built 2026-10-10)
 
@@ -578,8 +597,9 @@ true:
   counts == lists against the lists themselves) will catch a drift.
   The profile page falls back to raw counts ONLY while the migration
   is unapplied (deploy-before-migrate posture, same as avatar_keys).
-- **Stale-docs debt** (left alone on purpose — suite 20 is
-  edit-protected): suite 20's header comment and tests/README.md still
-  describe the profile-row visibility leak as EXPECTED TO FAIL, but
-  20261023000001 fixed it and suite 20 passes clean end to end now.
-  A docs-only pass should update both.
+- **Suite 20 MUST PASS** (stale-docs debt resolved 2026-10-06): suite
+  20 was deliberately written RED to encode the published
+  suspended/banned-profile promise; 20261023000001 fixed the gap and
+  the suite passes clean end to end. Its header and tests/README.md
+  now say so. A suite-20 failure is a REGRESSION of a promise
+  published in docs/community-guidelines.md — never "expected".

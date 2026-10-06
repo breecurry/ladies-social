@@ -14,17 +14,18 @@
 -- a pg_cron sweep, which this file invokes directly since pg_cron
 -- itself cannot be installed in this sandbox.
 --
--- ⚠️ THIS FILE IS EXPECTED TO FAIL ON THE CURRENT TREE, at the final
--- section. It reproduces a real, previously-undiscovered gap,
--- UNRELATED to the expiry fix above: the suspended/banned member's
--- PROFILE ROW ITSELF (handle, bio, founding-member badge, join date,
--- follower/following counts) remains fully readable by any other
--- active member — only her POSTS are hidden. This directly
--- contradicts the published promise. The assertion encodes the
--- PROMISE, not the current behaviour, and is intentionally left red
--- rather than weakened to match the bug — see the QA report for the
--- full writeup and severity. Everything BEFORE that final section
--- passes clean.
+-- ✅ THIS FILE MUST PASS, END TO END. It was originally written RED
+-- on purpose: its final section reproduced a then-real gap (the
+-- suspended/banned member's PROFILE ROW ITSELF — handle, bio,
+-- founding-member badge, join date — stayed readable by any other
+-- active member, contradicting the published promise), and the
+-- assertion encoded the PROMISE rather than the bug. Migration
+-- 20261023000001 (profile visibility and DM fixes) FIXED that gap,
+-- and this suite has passed clean ever since. NOT ONE ASSERTION WAS
+-- WEAKENED to get it green. If this file goes red — at the final
+-- section or anywhere else — that is a REGRESSION of the promise
+-- published in docs/community-guidelines.md and shown on the
+-- SuspendedScreen. Do not dismiss it as "expected"; fix the code.
 \set ON_ERROR_STOP on
 begin;
 set search_path = public, extensions;
@@ -291,8 +292,11 @@ do $$ begin
   end if;
 end $$;
 reset role;
-\echo IF YOU SEE THIS, THE PROFILE-VISIBILITY BUG HAS BEEN FIXED -- remove the FINDING comment above; this file then passes clean end to end.
+-- (The assertion above was this suite's deliberately-red FINDING until
+-- migration 20261023000001 fixed the profiles_read policy. Its failure
+-- message still says where a fix belongs — if you ever see it, that is
+-- a regression, not the known finding coming back "as expected".)
 
 rollback;
-\echo ALL SUSPENSION-VISIBILITY REGRESSION CHECKS PASSED EXCEPT THE PROFILE-ROW FINDING (see report)
+\echo ALL SUSPENSION-VISIBILITY REGRESSION CHECKS PASSED
 
