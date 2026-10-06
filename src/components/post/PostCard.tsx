@@ -31,6 +31,11 @@ export interface PostCardData {
   viewer_reshared?: boolean;
   mentions?: ResolvedMention[] | null;
   quoted?: QuotedCard | null;
+  /** Multi-part threads: live "Part k of N" when the post belongs to a
+   * chain of 2+ readable parts; null/absent otherwise (including every
+   * row read before migration 20261024000001 applies). */
+  chain_index?: number | null;
+  chain_count?: number | null;
 }
 
 /**
@@ -50,10 +55,13 @@ export function PostCard({
   parentContext,
   followPill = false,
   attribution,
+  chainPosition,
 }: {
   post: PostCardData;
-  /** feed = clickable card; root = thread hero with full timestamp. */
-  variant?: "feed" | "root";
+  /** feed = clickable card; root = thread hero with full timestamp;
+   * part = a chain part in the thread view (not clickable, no hero
+   * timestamp — the flat spine of the multi-part threads design §11). */
+  variant?: "feed" | "root" | "part";
   avatarSize?: AvatarSize;
   /** One-line parent context for profile Replies rows (spec §7.3). */
   parentContext?: { handle: string; excerpt: string } | null;
@@ -67,6 +75,10 @@ export function PostCard({
   /** Handles of the people whose reposts surfaced this card, newest
    * first — the "@handle reposted" line (Phase 2F §16). */
   attribution?: string[] | null;
+  /** Thread view only: this card's live position in its chain, shown
+   * as the worded caption and read in the card's accessible name —
+   * never colour or the connector alone (design §11.3, §19). */
+  chainPosition?: { index: number; count: number } | null;
 }) {
   const router = useRouter();
   const viewer = useViewer();
@@ -231,9 +243,22 @@ export function PostCard({
       ? `${repeatLabelBase}, ${reshareCount} ${reshareCount === 1 ? "repost" : "reposts"}`
       : repeatLabelBase;
 
+  // The feed/profile data path carries chain_index/chain_count; the
+  // thread view passes chainPosition. Either way the reader learns
+  // "this is part k of a thread of N" in words.
+  const chain =
+    chainPosition ??
+    (typeof post.chain_count === "number" &&
+    post.chain_count >= 2 &&
+    typeof post.chain_index === "number"
+      ? { index: post.chain_index, count: post.chain_count }
+      : null);
+
   return (
     <article
-      aria-label={`Post by @${post.author_handle}, ${relativeTime(post.created_at)}`}
+      aria-label={`Post by @${post.author_handle}${
+        chain ? `, part ${chain.index} of ${chain.count}` : ""
+      }, ${relativeTime(post.created_at)}`}
       onClick={openThread}
       onKeyDown={onCardKeyDown}
       tabIndex={variant === "feed" ? 0 : undefined}
@@ -290,9 +315,31 @@ export function PostCard({
         ) : null}
       </div>
 
+      {chainPosition ? (
+        <p className="text-caption text-text-tertiary">
+          Part {chainPosition.index} of {chainPosition.count}
+        </p>
+      ) : null}
+
       <PostBody body={post.body} mentions={post.mentions ?? null} />
 
       {post.quoted ? <QuotedPreview quoted={post.quoted} /> : null}
+
+      {chain && !chainPosition ? (
+        <Link
+          href={`/post/${post.id}`}
+          onClick={(event) => event.stopPropagation()}
+          aria-label={`${
+            chain.index > 1 ? `Part ${chain.index} of ${chain.count}. ` : ""
+          }Show this thread, ${chain.count} parts`}
+          className="flex min-h-11 items-center gap-1.5 text-label text-accent hover:underline"
+        >
+          {chain.index > 1 ? `Part ${chain.index} of ${chain.count} · ` : ""}Show this thread
+          <span aria-hidden className="text-caption font-normal text-text-tertiary">
+            · {chain.count} parts
+          </span>
+        </Link>
+      ) : null}
 
       {variant === "root" ? (
         <p className="text-caption text-text-tertiary">{fullTimestamp(post.created_at)}</p>

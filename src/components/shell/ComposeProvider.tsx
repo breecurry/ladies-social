@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Composer, type ReplyTarget, type QuoteTarget } from "@/components/compose/Composer";
+import type { ReplyControl } from "@/lib/database.types";
 
 interface ComposeContextValue {
   openCompose: (replyTo?: ReplyTarget, quote?: QuoteTarget) => void;
@@ -17,12 +18,30 @@ export function useCompose(): ComposeContextValue {
 }
 
 /**
+ * The session draft (multi-part threads design §1): an ordered list of
+ * parts plus the chain-level settings. A fresh draft is one empty
+ * part; a member who never taps "Add to thread" sees the single-field
+ * composer unchanged. Held here, not in the Composer, so an accidental
+ * dismissal never loses a half-written thread.
+ */
+export interface ComposeDraft {
+  parts: string[];
+  audience: ReplyControl;
+}
+
+const EMPTY_DRAFT: ComposeDraft = { parts: [""], audience: "everyone" };
+
+function draftHasContent(draft: ComposeDraft): boolean {
+  return draft.parts.some((part) => part.trim().length > 0);
+}
+
+/**
  * Compose modal provider (spec §5): the composer opens as an overlay
  * over whatever surface you are on — for a new post, a reply, or a
- * quote-post (Phase 2F §15, the composer with the original rendered as
- * a nested compact card above the field). A single-level draft
- * survives an accidental dismissal for the session (spec §5.7);
- * closing with unsent content asks before discarding.
+ * quote-post (Phase 2F §15). The structured draft survives an
+ * accidental dismissal for the session (spec §5.7); closing with
+ * unsent content asks before discarding, with copy that scales to the
+ * whole thread (multi-part design §8.4).
  */
 export function ComposeProvider({
   viewerHandle,
@@ -34,24 +53,24 @@ export function ComposeProvider({
   const [open, setOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyTarget | undefined>(undefined);
   const [quote, setQuote] = useState<QuoteTarget | undefined>(undefined);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const openCompose = useCallback((replyTarget?: ReplyTarget, quoteTarget?: QuoteTarget) => {
     // A different target means the kept draft no longer applies.
     setReplyTo((previous) => {
-      if ((previous?.id ?? null) !== (replyTarget?.id ?? null)) setDraft("");
+      if ((previous?.id ?? null) !== (replyTarget?.id ?? null)) setDraft(EMPTY_DRAFT);
       return replyTarget;
     });
     setQuote((previous) => {
-      if ((previous?.id ?? null) !== (quoteTarget?.id ?? null)) setDraft("");
+      if ((previous?.id ?? null) !== (quoteTarget?.id ?? null)) setDraft(EMPTY_DRAFT);
       return quoteTarget;
     });
     setOpen(true);
   }, []);
 
   const requestClose = useCallback(() => {
-    if (draft.trim().length > 0) {
+    if (draftHasContent(draft)) {
       setConfirmDiscard(true);
     } else {
       setOpen(false);
@@ -61,6 +80,7 @@ export function ComposeProvider({
   const value = useMemo(() => ({ openCompose }), [openCompose]);
 
   const label = replyTo ? "Reply" : quote ? "Quote" : "New post";
+  const multiPart = draft.parts.length > 1;
 
   return (
     <ComposeContext.Provider value={value}>
@@ -74,7 +94,7 @@ export function ComposeProvider({
           onDraftChange={setDraft}
           onClose={requestClose}
           onPosted={() => {
-            setDraft("");
+            setDraft(EMPTY_DRAFT);
             setOpen(false);
           }}
         />
@@ -82,12 +102,19 @@ export function ComposeProvider({
       <Dialog
         open={confirmDiscard}
         onClose={() => setConfirmDiscard(false)}
-        label="Discard this post?"
+        label={multiPart ? "Discard this thread?" : "Discard this post?"}
         sheet={false}
         maxWidth="max-w-sm"
       >
         <div className="flex flex-col gap-4 p-5">
-          <h2 className="text-heading">Discard this post?</h2>
+          <h2 className="text-heading">
+            {multiPart ? "Discard this thread?" : "Discard this post?"}
+          </h2>
+          {multiPart ? (
+            <p className="text-body text-text-secondary">
+              All {draft.parts.length} parts will be discarded.
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -100,7 +127,7 @@ export function ComposeProvider({
             <button
               type="button"
               onClick={() => {
-                setDraft("");
+                setDraft(EMPTY_DRAFT);
                 setConfirmDiscard(false);
                 setOpen(false);
               }}

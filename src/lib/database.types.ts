@@ -392,6 +392,15 @@ export type FeedPost = {
   reshared_by?: string[] | null;
   mentions?: ResolvedMention[] | null;
   quoted?: QuotedCard | null;
+  /**
+   * Multi-part threads (migration 20261024000001): when the post
+   * belongs to a chain of 2 or more readable parts, its live position
+   * and the live part count ("Part 2 of 4"); null — or absent on rows
+   * read before the migration applies — for an ordinary post, so every
+   * older row degrades to exactly the old card.
+   */
+  chain_index?: number | null;
+  chain_count?: number | null;
 };
 
 /**
@@ -420,6 +429,13 @@ export type ThreadPost = {
   viewer_reshared?: boolean;
   mentions?: ResolvedMention[] | null;
   quoted?: QuotedCard | null;
+  /**
+   * Multi-part threads: the post's structural position on its author's
+   * chain spine (1-based, hidden parts included so the client can
+   * place an honest removed-part marker), or null for everything off
+   * the spine. Absent on rows read before migration 20261024000001.
+   */
+  spine_seq?: number | null;
 };
 
 /** Row shape returned by profile_posts(). */
@@ -795,6 +811,23 @@ export type Database = {
         };
         Returns: number;
       };
+      /** Atomic multi-part publish (migration 20261024000001): every
+       * part through create_post in ONE transaction, all-or-nothing.
+       * p_key is the client-generated idempotency key, honoured for 24
+       * hours, so a retry after a lost response cannot double-post. */
+      create_thread: {
+        Args: {
+          p_bodies: string[];
+          p_reply_control?: ReplyControl;
+          p_quote?: number | null;
+          p_key?: string | null;
+        };
+        Returns: number;
+      };
+      /** Resolves a chain part to its chain head (anything else maps
+       * to itself; a missing or blocked post maps to null). Also the
+       * client's feature probe for pre-migration degradation. */
+      chain_head: { Args: { p_post: number }; Returns: number | null };
       delete_post: { Args: { p_post: number }; Returns: undefined };
       file_report: {
         Args: {
