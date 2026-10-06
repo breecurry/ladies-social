@@ -7,19 +7,24 @@
 -- WHETHER THE CODE ACTUALLY DELIVERS THAT, across every public
 -- surface: feeds, profile pages, reply trees, follower/following
 -- lists, search, hashtag pages, and mention rendering. It also
--- characterises the already-known, already-queued expiry gap
--- (status_expires_at only clears on the member's own next sign-in).
+-- verifies the expiry-gap fix that landed in migration
+-- 20261022000001 (sweep_expired_statuses(), rebased into this tree
+-- after this suite was first written) — status_expires_at used to
+-- clear ONLY on the member's own next sign-in; it now also clears on
+-- a pg_cron sweep, which this file invokes directly since pg_cron
+-- itself cannot be installed in this sandbox.
 --
 -- ⚠️ THIS FILE IS EXPECTED TO FAIL ON THE CURRENT TREE, at the final
--- section. It reproduces a real, previously-undiscovered gap: the
--- suspended/banned member's PROFILE ROW ITSELF (handle, bio,
--- founding-member badge, join date, follower/following counts)
--- remains fully readable by any other active member — only her POSTS
--- are hidden. This directly contradicts the published promise. The
--- assertion encodes the PROMISE, not the current behaviour, and is
--- intentionally left red rather than weakened to match the bug — see
--- the QA report for the full writeup and severity. Everything BEFORE
--- that final section passes clean.
+-- section. It reproduces a real, previously-undiscovered gap,
+-- UNRELATED to the expiry fix above: the suspended/banned member's
+-- PROFILE ROW ITSELF (handle, bio, founding-member badge, join date,
+-- follower/following counts) remains fully readable by any other
+-- active member — only her POSTS are hidden. This directly
+-- contradicts the published promise. The assertion encodes the
+-- PROMISE, not the current behaviour, and is intentionally left red
+-- rather than weakened to match the bug — see the QA report for the
+-- full writeup and severity. Everything BEFORE that final section
+-- passes clean.
 \set ON_ERROR_STOP on
 begin;
 set search_path = public, extensions;
@@ -170,9 +175,75 @@ do $$ begin
   end if;
 end $$;
 
--- Only the suspended member's OWN next sign-in (her own
--- refresh_my_status() call, exactly as the app runs on login/layout
--- load) clears it, and only then does her content reappear.
+-- ============================================================
+-- THE GAP IS NOW CLOSED (migration 20261022000001, rebased in after
+-- this suite was first written): sweep_expired_statuses() mirrors
+-- refresh_my_status() exactly and is meant to run on a pg_cron
+-- schedule so a suspension ends even if the member never signs in.
+-- It is scheduler-only (no app role may call it — confirmed below),
+-- so it is invoked here the same way `cron.schedule` would invoke it:
+-- as the session superuser, with no auth.uid() in scope. pg_cron
+-- itself could not be installed in this sandbox (no
+-- shared_preload_libraries support in an ad-hoc local cluster — the
+-- migration degrades gracefully, by design, and logs a NOTICE instead
+-- of failing), so the SCHEDULE is unverified here; the FUNCTION is
+-- fully verified, which is the part that actually matters for "does
+-- the gap close when the cron fires on a platform that supports it".
+-- ============================================================
+do $$ begin
+  if has_function_privilege('anon', 'sweep_expired_statuses()', 'execute')
+     or has_function_privilege('authenticated', 'sweep_expired_statuses()', 'execute')
+     or has_function_privilege('service_role', 'sweep_expired_statuses()', 'execute') then
+    raise exception 'FAIL: sweep_expired_statuses() is reachable by an app role — it must be scheduler-only';
+  end if;
+end $$;
+
+-- Clear any lingering session claim first: a real pg_cron background
+-- worker runs on its own connection with no JWT claims ever set, so
+-- auth.uid() there is genuinely NULL — this session has set
+-- request.jwt.claim.sub several times above (session-level, so it
+-- persists across role switches by design, matching every other
+-- suite's convention) and must not leak into the "no session" case.
+select set_config('request.jwt.claim.sub', '', false);
+select set_config('request.jwt.claims', '{}', false);
+select sweep_expired_statuses(); -- as the superuser session, exactly as cron.schedule would invoke it
+
+do $$ begin
+  if (select status from profiles where user_id = '00000000-0000-0000-0000-000000000082') <> 'active' then
+    raise exception 'FAIL: sweep_expired_statuses() did not clear the lapsed suspension — the gap is NOT closed';
+  end if;
+  if not exists (select 1 from audit_log
+                 where action = 'mod.status_expired'
+                   and target_id = '00000000-0000-0000-0000-000000000082'
+                   and actor_id is null and actor_role = 'system') then
+    raise exception 'FAIL: the sweep did not write the mod.status_expired audit row attributed to system';
+  end if;
+end $$;
+
+-- Her content reappears to the uninvolved viewer WITHOUT her ever
+-- having signed in — this is the actual fix, proven behaviourally,
+-- not just at the status column.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000081', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000081","aal":"aal1","session_id":"v"}', false);
+do $$ begin
+  if not exists (select 1 from profile_posts('00000000-0000-0000-0000-000000000082'::uuid)) then
+    raise exception 'FAIL: her post did not reappear after the sweep cleared her status';
+  end if;
+end $$;
+reset role;
+
+-- The sign-in path stays, belt-and-braces: re-suspend, let it lapse
+-- again, and confirm her OWN refresh_my_status() call ALSO still
+-- clears it independently of the sweep.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","aal":"aal2","session_id":"ow"}', false);
+select mod_suspend('00000000-0000-0000-0000-000000000082', 7, 'harassment', 'QA: re-suspend to test the sign-in path independently of the sweep');
+reset role;
+update profiles set status_expires_at = now() - interval '1 hour'
+ where user_id = '00000000-0000-0000-0000-000000000082';
+
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000082', false);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000082","aal":"aal1","session_id":"t"}', false);
@@ -195,10 +266,12 @@ end $$;
 --     status <> 'deleted' and (user_id = auth.uid() or
 --       (is_active_member() and not internal.blocked_by(...)))
 -- 'suspended' and 'banned' are BOTH still readable under this policy.
--- She is re-suspended here (the gap section above restored her to
--- active) purely so this check runs against an unambiguous
--- 'suspended' row — the leak is identical for 'banned' (shown
--- separately via a direct psql probe in the QA report).
+-- The 20261022000001 sweep fix does not touch this — it clears the
+-- STATUS, which this leak does not depend on at all. She is
+-- re-suspended here (the sections above restored her to active)
+-- purely so this check runs against an unambiguous 'suspended' row —
+-- the leak is identical for 'banned' (shown separately via a direct
+-- psql probe in the QA report).
 -- The assertion below encodes the PUBLISHED PROMISE (profile removed)
 -- and will FAIL against the current schema — that failure IS the
 -- finding, reported in full in the QA report, not silenced here.
